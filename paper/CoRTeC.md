@@ -2543,7 +2543,9 @@ that does not depend on a query being declared (§9, defect 8). Auto-configurati
 class-conditional release with a fifth of the budget on the conditional table, exact-count batches,
 selection from a threefold pool and the release's own values below bin resolution (§3.3, §7.12)
 are the defaults, reached through one call,
-`generate_selected(release, n_rows)`. Selection refuses a pool that does not cover every released
+`generate_selected(release, n_rows)`; Stage C ships as `cortec.bound`, whose `bound_with_controls`
+spends `ε_cert` once through the ledger, scores the synthetic data beside a real ceiling and a
+permuted floor against that one draw, and writes the report of §7.9. Selection refuses a pool that does not cover every released
 cohort, the parser refuses a category the schema does not declare, and a vendor's rate limit is
 waited out rather than counted as a failed call (§J.2).
 
@@ -2553,7 +2555,7 @@ server in the dependency tree. Its claim is deliberately narrower than §8.2's: 
 it reports whether the correction helped, and it tells the user to keep their budget when it did
 not.
 
-**Test suites**: 200 passed / 7 skipped / 1 xfailed in the research harness, 127 in `cortec`, 26 in
+**Test suites**: 200 passed / 7 skipped / 1 xfailed in the research harness, 136 in `cortec`, 26 in
 `cortec-hybrid`. Every regression test is named after the defect it prevents, and each was verified
 to fail against the pre-fix code. What building them changed in this paper, and what the tools
 enforce and still do not, are in Appendix J.
@@ -2831,7 +2833,7 @@ the second-vendor pool and the NHANES sweeps of this revision account for about 
 | §7.11 class-conditional release, matched generator test | `paper/audit/regen_class_conditional.py`, `results/class_conditional_eval.json`, `results/credit_cc/`, `results/credit_cc_d2/`, `results/credit_cc_d3/`, `results/credit_pooled/`, `results/credit_pooled_d2/` | scores three Gemini 3.5 Flash draws from the class-conditional finance release against three from the pooled one, same hierarchy, ε, n and prompts, under the paper's protocol; Welch p and Hedges' g per metric |
 | §F.3 AIM on the 12-column finance schema | `paper/audit/regen_credit_aim12.py`, `results/credit_aim12_eval.json`, `results/credit_aim12/` (five AIM fits, their wall times and the dropped columns), [`src/datasets_extra.py`](https://github.com/Calyie/cortec/blob/main/src/datasets_extra.py) (`credit_aim12`) | scores AIM's five fits beside CoRTeC's five draws, MST's and PATE-CTGAN's three and the real floors, every arm on the same 12 columns; Holm over the fourteen CoRTeC-vs-AIM and CoRTeC-vs-MST comparisons; refuses to write unless the stored 2026-09-11 evaluation reproduces on every metric the evaluator has not since changed |
 | §7.1.2 matched control | [`src/generic_pipeline.py`](https://github.com/Calyie/cortec/blob/main/src/generic_pipeline.py), [`src/prompts.py`](https://github.com/Calyie/cortec/blob/main/src/prompts.py) (`build_matched_header_only_prompt`), `results/matched_header_only_ablation/` | CoRTeC's prompt with the released arrays deleted, built by stripping CoRTeC's own output and refusing to return if any released quantity survives |
-| Tests | `test_cortec.py`, `tools/*/tests/` | 208 + 127 + 26, each named after the defect it prevents |
+| Tests | `test_cortec.py`, `tools/*/tests/` | 208 + 136 + 26, each named after the defect it prevents |
 
 ---
 
