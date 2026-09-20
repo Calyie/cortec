@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+title: "CoRTeC: Cohort-Conditioned Differentially Private Synthetic Tabular Data from a Frozen Language Model"
+message: "If you use this software or the accompanying paper, please cite it."
+type: software
+license: Apache-2.0
+repository-code: "https://github.com/Calyie/cortec"
+abstract: >-
+  CoRTeC spends a differential privacy budget on released statistics rather than on training a
+  model: public stratification at zero cost, DP histograms whose L1 sensitivity is 1 regardless of
+  bin count, and a conditional target table over a disjoint cell partition that costs one query's
+  worth of epsilon however many cells it holds. A frozen, un-finetuned language model generates
+  records from those statistics alone, so generation is post-processing and adds no privacy cost.
+authors:
+  - family-names: "Nnona"
+    given-names: "Calister"
+    email: "calisternnona@gmail.com"

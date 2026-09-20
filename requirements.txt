@@ -1,0 +1,31 @@
+# Core
+diffprivlib>=0.6.0
+# Appendix A states scikit-learn is pinned below 1.9 for diffprivlib compatibility; the pin was
+# stated in the paper and never declared here, so a fresh clone resolved above it. The floor was
+# also below diffprivlib's own requirement (it needs >=1.4.0). Tested: 1.6.1 and 1.8.x.
+scikit-learn>=1.4.0,<1.9
+pandas>=2.0.0
+numpy>=1.24.0
+scipy>=1.11.0
+
+# Privacy accounting (GNMax RDP composition for refinement loop)
+autodp>=0.2.1
+
+# LLM backends. All three are required to reproduce the paper: src/llm_generator.py imports
+# `anthropic`, `openai` and `google.genai`, and 44 of the 107 recorded runs used the latter two.
+# Only anthropic was declared here. Floors follow the API surface the code uses (reasoning_effort;
+# ThinkingConfig on the google-genai client). Tested: 0.120.2 / 3.8.0 / 2.22.0.
+anthropic>=0.25.0
+openai>=1.60.0
+google-genai>=1.0.0
+httpx>=0.24.0
+
+# Plotting
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Utilities
+tqdm>=4.65.0
+
+# Testing
+pytest>=7.4.0
