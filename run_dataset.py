@@ -21,7 +21,10 @@ warnings.filterwarnings("ignore")
 sys.path.insert(0, ".")
 from src.dataset_spec import get_spec, available
 import src.datasets_extra  # noqa: F401  (registers diabetes + credit)
-import src.datasets_obfuscated  # noqa: F401  (registers adult_obf, the contamination control)
+try:                                  # internal contamination variant; not in the public tree
+    import src.datasets_obfuscated  # noqa: F401  (registers adult_obf)
+except ImportError:
+    pass
 import src.datasets_regulated  # noqa: F401  (six untouched regulated benchmarks)
 import src.datasets_synthetic  # noqa: F401  (renal_registry — the contamination control)
 import src.datasets_clinical  # noqa: F401  (NHANES + MIMIC-III demo)
