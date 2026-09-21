@@ -229,38 +229,38 @@ appendix is needed to follow a claim in the body.
 
 ## 2. Background and Related Work
 
-**Marginal and graphical-model methods.** PrivBayes [53], MST [28] (winner of the 2018 NIST
-differential privacy synthetic data challenge [37]), PrivMRF [7] and AIM [29] select low-order
-marginals under DP and fit a graphical model via Private-PGM [27]. AIM is workload-adaptive and is the
+**Marginal and graphical-model methods.** PrivBayes [54], MST [29] (winner of the 2018 NIST
+differential privacy synthetic data challenge [38]), PrivMRF [7] and AIM [30] select low-order
+marginals under DP and fit a graphical model via Private-PGM [28]. AIM is workload-adaptive and is the
 strongest of these. Both MST and AIM are evaluated on marginal workload error: MST on the NIST score
 (3-way marginals over 100 random triples, high-order conjunctions, income inequality) at
 ε ∈ {0.3, 1.0, 8.0}; AIM on normalised L1 workload error over `all-3way`, `target` and `skewed`
 workloads at ε ∈ [0.01, 100]. Neither paper reports a downstream predictive-utility experiment. We
 state this as a scope observation rather than a criticism: these mechanisms target a different
-objective and attain it, and §7.3 shows them doing so. The benchmark of Tao et al. [45], which does
+objective and attain it, and §7.3 shows them doing so. The benchmark of Tao et al. [46], which does
 include a classification task, found the marginal methods ahead of the generative ones, a result
-§7.12 reproduces for the baselines they share.
+§7.12 reproduces for the baselines they share. A later benchmark by Chen et al. [10] reaches the same conclusion with a machine-learning utility score, and excludes language-model-based methods on the ground that their pretraining corpora would bias the evaluation, an objection the contamination control of §7.1.3 is designed to answer.
 
-**Deep generative models with DP training.** DP-GAN [49], PATE-GAN [24], DP-CTGAN and PATE-CTGAN [38]
-apply DP-SGD or the PATE framework [35, 36] to a generative model, the last two over the CTGAN
-architecture [51]. Rosenblatt et al. [38], who introduced PATE-CTGAN, do evaluate downstream utility,
-using train-on-synthetic/test-on-real against train-on-real together with the pMSE ratio [41] for
+**Deep generative models with DP training.** DP-GAN [50], PATE-GAN [25], DP-CTGAN and PATE-CTGAN [39]
+apply DP-SGD or the PATE framework [36, 37] to a generative model, the last two over the CTGAN
+architecture [52]. Rosenblatt et al. [39], who introduced PATE-CTGAN, do evaluate downstream utility,
+using train-on-synthetic/test-on-real against train-on-real together with the pMSE ratio [42] for
 distributional similarity, which is the protocol we adopt.
 
 **Language models for tabular generation.** GReaT [5] fine-tunes an LLM to emit rows, achieving high
-fidelity but no privacy guarantee, since the model memorises records. DP-LLMTGen [46] adds DP-SGD
-fine-tuning, which is private but expensive and still trains on private data. Curated LLM [39] uses a
+fidelity but no privacy guarantee, since the model memorises records. DP-LLMTGen [47] adds DP-SGD
+fine-tuning, which is private but expensive and still trains on private data. Curated LLM [40] uses a
 language model to augment small tabular datasets without a privacy guarantee; it conditions on the
 private data directly rather than on a release. DP-2Stage [3] reduces the cost of DP-SGD
 fine-tuning by first training on public pseudo-data, but still trains on the private records.
 
 **Private synthesis through model APIs.** The closest line of work to ours also keeps the foundation
-model frozen and reaches it only through an inference API. Private Evolution [26, 50]
+model frozen and reaches it only through an inference API. Private Evolution [27, 51]
 generates candidate records from the model, privately votes on which candidates lie nearest to the
 private records, and iterates, spending privacy budget on every round of votes; Swanberg et al.
-[44] adapt it to tabular data with a workload-based distance and find that API access to a
-strong model does not by itself beat the marginal baselines, and Tran et al. [47] extend it
-with evolutionary operators and private scoring. CoRTeC differs in where the budget goes and how
+[45] adapt it to tabular data with a workload-based distance and find that API access to a
+strong model does not by itself beat the marginal baselines, and Tran et al. [48] extend it
+with evolutionary operators and private scoring. Their one-shot variants treat the model's schema-only output as public data and spend the budget reweighting it to privately measured marginals, which is the nearest analogue to our selection step; the difference is that our release, not a later measurement, is what the model decodes, and the selection reads only that release. CoRTeC differs in where the budget goes and how
 often: it spends the budget once, on a statistics release that names the conditional structure a
 downstream model needs, and then treats the model as a decoder of that release, so the model is
 never in the privacy loop and the privacy analysis is a composition argument over counting queries
@@ -270,11 +270,11 @@ rather than over rounds of private selection.
 
 | method family | generator sees raw data? | where noise enters | utility reported in its own paper? | conditional structure |
 |---|---|---|---|---|
-| PrivBayes [53], MST [28], AIM [29], PrivMRF [7] | yes (to fit) | selected marginals | **no** | only what the chosen marginals imply |
-| DP-GAN [49], DP-CTGAN [38] | yes (DP-SGD) | gradients | partially | learned, degraded by clipping + noise |
-| PATE-GAN [24], PATE-CTGAN [38] | yes (PATE on discriminator) | teacher votes | **yes** (TSTR/TRTR, pMSE) | learned |
+| PrivBayes [54], MST [29], AIM [30], PrivMRF [7] | yes (to fit) | selected marginals | **no** | only what the chosen marginals imply |
+| DP-GAN [50], DP-CTGAN [39] | yes (DP-SGD) | gradients | partially | learned, degraded by clipping + noise |
+| PATE-GAN [25], PATE-CTGAN [39] | yes (PATE on discriminator) | teacher votes | **yes** (TSTR/TRTR, pMSE) | learned |
 | GReaT [5] | yes (fine-tuning) | **none; not DP** | yes | learned, memorised |
-| DP-LLMTGen [46] | yes (DP-SGD fine-tuning) | gradients | yes | learned |
+| DP-LLMTGen [47] | yes (DP-SGD fine-tuning) | gradients | yes | learned |
 | **CoRTeC (this work)** | **no** | released statistics only | yes | **released explicitly: a DP conditional table and one histogram block per outcome class** |
 
 Every method above lets the generator see private data, and privacy rides on the training mechanism.
@@ -400,7 +400,7 @@ receiving a couple of rows cannot emit a rate, and asked for "exactly k of n" it
 **Selection from a pool (line 15).** Quota batches match the release closely but not exactly, and
 a batch's rounding is the release's error at every cohort boundary. Generation is free in ε, so the
 pipeline asks for `k` times the rows it needs and keeps the `m` whose cell counts match the
-release: inclusion weights from iterative proportional fitting [10] over every released cell (cohort
+release: inclusion weights from iterative proportional fitting [11] over every released cell (cohort
 size, class balance, and one histogram per cohort, class and column), systematic sampling on those
 weights, then a greedy exchange of rows that lowers the weighted distance to the released counts,
 with the pooled marginals the 1-way measure reads weighted above the per-cell counts and any
@@ -560,15 +560,15 @@ Cost: 0.
 **(ii) Within a cohort, sequential composition.** Fix a cohort `P`. Each released histogram is a
 counting query of L1 sensitivity 1: `x` contributes to exactly one bin of one attribute, so removing
 it changes that histogram's L1 norm by 1 and every other histogram not at all. The Laplace mechanism
-[12] at scale `1/ε_q` therefore gives `ε_q`-DP per query. Under the pooled block (line 7′) the `q`
+[13] at scale `1/ε_q` therefore gives `ε_q`-DP per query. Under the pooled block (line 7′) the `q`
 queries on `P` compose sequentially to `q · ε_q = ε_marg`. Under the class-conditional blocks (line
 7a) `P` is partitioned by `y`: `x` lies in exactly one of `P ∩ {y=0}`, `P ∩ {y=1}`, so it is touched
 by the class-balance query of line 6 and by the `q − 1` histograms of its own block and by nothing in
 the other block, a chain of `q` queries and the same `q · ε_q`; the two blocks are disjoint and
-compose in parallel [30]. The derived pooled histogram of line 7b is a function of released
+compose in parallel [31]. The derived pooled histogram of line 7b is a function of released
 quantities only.
 
-**(iii) Across cohorts, parallel composition [30].** The cohorts are disjoint. Record `x` lies in
+**(iii) Across cohorts, parallel composition [31].** The cohorts are disjoint. Record `x` lies in
 exactly one, so it can influence only that cohort's queries; the others are identical on `D` and
 `D'`. By parallel composition the cost across cohorts is the maximum, not the sum: `ε_marg` total,
 independent of `|Π|`.
@@ -595,7 +595,7 @@ guarantee and a defect against the caller (defect 11, §7.7).
 **(vi) Stage B is free.** `G`'s input is a deterministic function of `R`; the row allocation uses
 released marginal masses; the positive count per cell is a stochastically rounded function of a
 released rate; deriving moments from released histograms, clipping, and any relabelling are functions
-of `R` and independently drawn randomness. By post-processing immunity [14] none increases the
+of `R` and independently drawn randomness. By post-processing immunity [15] none increases the
 privacy loss, and this holds for arbitrarily many draws.
 
 **(vii) Stage B's counts, selection and sub-bin values.** The per-bin counts a batch is asked
@@ -603,7 +603,7 @@ for are apportioned from released histograms (line 13), the counts still owed ar
 released targets and generated rows (line 14′), the selection (line 15) chooses among generated
 rows by their distance to released counts, and the redraw inside released bins (line 15′) reads
 public edges, the release's cohort rule and the rows. Each is a function of `R`, of rows `G`
-produced from `R`, and of independent randomness, so all four are post-processing under [14] and
+produced from `R`, and of independent randomness, so all four are post-processing under [15] and
 add nothing to the privacy loss, at any pool factor.
 
 **(viii) The published cohort size (line 5′).** `|P|` is a counting query of sensitivity 1 under
@@ -622,7 +622,7 @@ appears in the output, and how many levels share `ε_cond`, depend on `D`. The e
 here treat cohort and cell sizes as released quantities and charge them no budget, following common
 practice in the marginal-synthesis literature so that our ε = 2.0 tables are directly comparable to
 MST's and AIM's; both reference implementations charge them, and a recent audit of those
-implementations finds their empirical privacy close to the stated guarantee [17]. Two further facts about the reported
+implementations finds their empirical privacy close to the stated guarantee [18]. Two further facts about the reported
 CoRTeC rows are recorded in full in §J.3 and summarised here. First, the research pipeline published
 the per-cohort counts exact rather than noised for most of this project (defect 18); we measured the
 effect on every reported number by rebuilding each draw under noised counts, and the largest change
@@ -759,11 +759,11 @@ parallel and resumable, and it does not constrain where the compute runs.
 | dataset | domain | records | dims | positive rate | rows/person | role |
 |---|---|---|---|---|---|---|
 | **NHANES 2017–2018** [9] | **healthcare (examination + lab)** | 3,749 | 10 | 14.2% | 1 | **primary clinical dataset** |
-| **Diabetes 130-US Hospitals** [43] | **healthcare (administrative)** | 101,763 | 19 | 11.2% | **mean 1.42, max 40** | second clinical modality; scale and ε studies |
-| **UCI Adult** [11, 25] | census | 32,561 | 15 | 24.1% | 1 | comparability anchor; AIM's own primary dataset |
-| **Default of Credit Card Clients** [52] | finance | 30,000 | 15 | 22.1% | 1 | second regulated domain |
+| **Diabetes 130-US Hospitals** [44] | **healthcare (administrative)** | 101,763 | 19 | 11.2% | **mean 1.42, max 40** | second clinical modality; scale and ε studies |
+| **UCI Adult** [12, 26] | census | 32,561 | 15 | 24.1% | 1 | comparability anchor; AIM's own primary dataset |
+| **Default of Credit Card Clients** [53] | finance | 30,000 | 15 | 22.1% | 1 | second regulated domain |
 | renal registry (constructed) | synthetic clinical | 20,000 | 10 | 14.9% | 1 | contamination control (§7.1.3) |
-| MIMIC-III Demo v1.4 [23] | healthcare (ICU) | 129 admissions / 100 patients | 9 | 31.0% | — | structural check only |
+| MIMIC-III Demo v1.4 [24] | healthcare (ICU) | 129 admissions / 100 patients | 9 | 31.0% | — | structural check only |
 | six untouched benchmarks | 3 health, 3 finance | 303–45,211 | 8–20 | 6.0–53.1% | 1 | auto-configuration generalisation (§7.7) |
 
 Each dataset carries a different part of the argument. NHANES 2017–2018 is the primary clinical
@@ -842,14 +842,14 @@ has not met the bar §5 sets.
 ### 6.3 Baselines
 
 We compare against the three families an institution would realistically choose between, all via
-smartnoise-synth [34] at matched ε, with numerical columns pre-binned using the same public bounds
+smartnoise-synth [35] at matched ε, with numerical columns pre-binned using the same public bounds
 CoRTeC assumes, so no method gains an advantage from a different discretisation:
 
 | family | methods run | how privacy is obtained |
 |---|---|---|
-| marginal / graphical | **MST** [28], **AIM** [29] | DP measurement of selected low-order marginals, then graphical-model inference |
-| DP-SGD generative | **DP-CTGAN** [38] | gradient clipping + noise during training |
-| PATE generative | **PATE-CTGAN** [38], **PATE-GAN** [24] | a DP teacher ensemble supervises the discriminator |
+| marginal / graphical | **MST** [29], **AIM** [30] | DP measurement of selected low-order marginals, then graphical-model inference |
+| DP-SGD generative | **DP-CTGAN** [39] | gradient clipping + noise during training |
+| PATE generative | **PATE-CTGAN** [39], **PATE-GAN** [25] | a DP teacher ensemble supervises the discriminator |
 
 An unconditioned "header-only" prompt, the same frozen model given nothing but the column names,
 appears as a control, not a competitor. It carries no privacy guarantee and would not pass review in
@@ -861,7 +861,7 @@ own control.
 
 We report marginal fidelity (1-way and 2-way TV, the latter over all column pairs), conditional
 fidelity (error in P(target | group), on groups the method is told about and on strictly held-out
-group families sharing no column with the conditioning), pMSE ratio [41], 3-way workload error
+group families sharing no column with the conditioning), pMSE ratio [42], 3-way workload error
 (AIM's own metric, on their three workloads), and utility (TSTR under logistic regression, random
 forest and gradient boosting).
 
@@ -871,7 +871,7 @@ the only sensible target. The shuffled-target floor is real data with the target
 marginals, zero predictive content, and therefore what "no usable information" scores. Any metric
 that fails to separate these two has no power, and we check that before drawing conclusions.
 Evaluating a DP mechanism against explicit reference points rather than a bare threshold is the
-discipline DPBench [18] argues for; the floors are our instance of it. The discipline caught the
+discipline DPBench [19] argues for; the floors are our instance of it. The discipline caught the
 founding defect of this project: the original primary metric scored the real-data ceiling and the
 unconditioned baseline identically, so there was nothing for any method to improve, and a verdict had
 been drawn from it before the floors were checked (Appendix I, defect 5).
@@ -1153,7 +1153,7 @@ the Holm family below, the ε-sweep and the generator ladder were not regenerate
 `(ε_L, δ)` label (§10).
 
 **Result 2: where that places CoRTeC in the landscape.** Running every utility and fidelity
-comparison as one family of 14 tests and applying Holm–Bonferroni [19]:
+comparison as one family of 14 tests and applying Holm–Bonferroni [20]:
 
 | baseline | metric | CoRTeC | baseline | difference | Welch p | **Holm-adjusted p** | Hedges' g [95% CI] |
 |---|---|---|---|---|---|---|---|
@@ -1700,7 +1700,7 @@ benign prompting [2]: we cannot audit weights we did not train,
 but we can attack the artifact the method publishes, which is where such a record would have to
 surface to cause harm.
 
-**Setup.** The standard membership game [40], in the form Stadler et al. [42] apply to
+**Setup.** The standard membership game [41], in the form Stadler et al. [43] apply to
 synthetic data. The adversary sees the synthetic dataset and decides whether a
 candidate record was in the private training set: 1,000 members from the training split and 1,000
 non-members from the held-out split, disjoint and identically distributed, so the attack cannot
@@ -1799,7 +1799,7 @@ loosening the tolerance lets the floor through too. The table is therefore repor
 `ε_cert` = 1.0. On diabetes the tool prints "this test did not discriminate" and issues no verdict;
 its worst-case bound is driven by cells holding 2 synthetic rows, which are counted and reported as
 thin rather than silently trusted. Six defects in our own Stage C, the Monte Carlo check on the bound,
-the repetition tables and the fields the report emits per NIST SP 800-226 [33] are in §H.6.
+the repetition tables and the fields the report emits per NIST SP 800-226 [34] are in §H.6.
 
 ### 7.10 Cohort-wise or cell-wise: the default must be conditional on coverage
 
@@ -1854,7 +1854,7 @@ floor drawn for its own arm (§6.4), and the three are not interchangeable. Coho
 Asian, Mexican-American, other-Hispanic or multiracial records at all, while its fidelity and
 utility dashboards stayed green. That is a representativeness failure with direct consequences under
 the equity obligations §5 catalogues, and a different route to the disparate impact on minority
-subgroups that Ganev et al. [16] measured for differential privacy itself, and the conditional criterion does not catch it either,
+subgroups that Ganev et al. [17] measured for differential privacy itself, and the conditional criterion does not catch it either,
 because conditional error is computed over released cells and those are precisely the cells that
 are present. The model is not distorting shape within bands (within-band position is 0.42–0.49 on
 both paths against a real 0.448); it is simply never asked for the missing cells.
@@ -2647,93 +2647,95 @@ compliance, against the tenant-isolated frontier endpoints regulated institution
 
 [9] CDC/NCHS. National Health and Nutrition Examination Survey (NHANES) 2017–2018 data files. Centers for Disease Control and Prevention, National Center for Health Statistics, 2020.
 
-[10] W. Edwards Deming and Frederick F. Stephan. On a least squares adjustment of a sampled frequency table when the expected marginal totals are known. *Annals of Mathematical Statistics*, 11(4):427–444, 1940.
+[10] Kai Chen, Xiaochen Li, Chen Gong, Ryan McKenna, and Tianhao Wang. Benchmarking differentially private tabular data synthesis. *arXiv preprint arXiv:2504.14061*, 2025.
 
-[11] Dheeru Dua and Casey Graff. UCI machine learning repository. University of California, Irvine, School of Information and Computer Sciences, 2019.
+[11] W. Edwards Deming and Frederick F. Stephan. On a least squares adjustment of a sampled frequency table when the expected marginal totals are known. *Annals of Mathematical Statistics*, 11(4):427–444, 1940.
 
-[12] Cynthia Dwork, Frank McSherry, Kobbi Nissim, and Adam Smith. Calibrating noise to sensitivity in private data analysis. In *Theory of Cryptography Conference (TCC)*, pp. 265–284, 2006.
+[12] Dheeru Dua and Casey Graff. UCI machine learning repository. University of California, Irvine, School of Information and Computer Sciences, 2019.
 
-[13] Cynthia Dwork, Guy N. Rothblum, and Salil Vadhan. Boosting and differential privacy. In *IEEE Symposium on Foundations of Computer Science (FOCS)*, pp. 51–60, 2010.
+[13] Cynthia Dwork, Frank McSherry, Kobbi Nissim, and Adam Smith. Calibrating noise to sensitivity in private data analysis. In *Theory of Cryptography Conference (TCC)*, pp. 265–284, 2006.
 
-[14] Cynthia Dwork and Aaron Roth. The algorithmic foundations of differential privacy. *Foundations and Trends in Theoretical Computer Science*, 9(3–4):211–407, 2014.
+[14] Cynthia Dwork, Guy N. Rothblum, and Salil Vadhan. Boosting and differential privacy. In *IEEE Symposium on Foundations of Computer Science (FOCS)*, pp. 51–60, 2010.
 
-[15] European Union. Regulation (EU) 2016/679 of the European Parliament and of the Council (General Data Protection Regulation), Article 25 and Recital 26. *Official Journal of the European Union*, 2016.
+[15] Cynthia Dwork and Aaron Roth. The algorithmic foundations of differential privacy. *Foundations and Trends in Theoretical Computer Science*, 9(3–4):211–407, 2014.
 
-[16] Georgi Ganev, Bristena Oprisanu, and Emiliano De Cristofaro. Robin Hood and Matthew effects: Differential privacy has disparate impact on synthetic data. In *International Conference on Machine Learning (ICML)*, pp. 6944–6959, 2022.
+[16] European Union. Regulation (EU) 2016/679 of the European Parliament and of the Council (General Data Protection Regulation), Article 25 and Recital 26. *Official Journal of the European Union*, 2016.
 
-[17] Georgi Ganev, Meenatchi Sundaram Muthu Selva Annamalai, and Bogdan Kulynych. Tight auditing of differential privacy in MST and AIM. In *Theory and Practice of Differential Privacy (TPDP)*, 2026. arXiv:2604.18352.
+[17] Georgi Ganev, Bristena Oprisanu, and Emiliano De Cristofaro. Robin Hood and Matthew effects: Differential privacy has disparate impact on synthetic data. In *International Conference on Machine Learning (ICML)*, pp. 6944–6959, 2022.
 
-[18] Michael Hay, Ashwin Machanavajjhala, Gerome Miklau, Yan Chen, and Dan Zhang. Principled evaluation of differentially private algorithms using DPBench. In *ACM SIGMOD International Conference on Management of Data*, pp. 139–154, 2016.
+[18] Georgi Ganev, Meenatchi Sundaram Muthu Selva Annamalai, and Bogdan Kulynych. Tight auditing of differential privacy in MST and AIM. In *Theory and Practice of Differential Privacy (TPDP)*, 2026. arXiv:2604.18352.
 
-[19] Sture Holm. A simple sequentially rejective multiple test procedure. *Scandinavian Journal of Statistics*, 6(2):65–70, 1979.
+[19] Michael Hay, Ashwin Machanavajjhala, Gerome Miklau, Yan Chen, and Dan Zhang. Principled evaluation of differentially private algorithms using DPBench. In *ACM SIGMOD International Conference on Management of Data*, pp. 139–154, 2016.
 
-[20] Naoise Holohan, Stefano Braghin, Pól Mac Aonghusa, and Killian Levacher. Diffprivlib: The IBM differential privacy library. *arXiv preprint arXiv:1907.02444*, 2019.
+[20] Sture Holm. A simple sequentially rejective multiple test procedure. *Scandinavian Journal of Statistics*, 6(2):65–70, 1979.
 
-[21] ISO. ISO/IEC 20889:2018, Privacy enhancing data de-identification terminology and classification of techniques. International Organization for Standardization, 2018.
+[21] Naoise Holohan, Stefano Braghin, Pól Mac Aonghusa, and Killian Levacher. Diffprivlib: The IBM differential privacy library. *arXiv preprint arXiv:1907.02444*, 2019.
 
-[22] ISO. ISO/IEC 27559:2022, Information security, cybersecurity and privacy protection: Privacy enhancing data de-identification framework. International Organization for Standardization, 2022.
+[22] ISO. ISO/IEC 20889:2018, Privacy enhancing data de-identification terminology and classification of techniques. International Organization for Standardization, 2018.
 
-[23] Alistair E. W. Johnson, Tom J. Pollard, Lu Shen, Li-wei H. Lehman, Mengling Feng, Mohammad Ghassemi, Benjamin Moody, Peter Szolovits, Leo Anthony Celi, and Roger G. Mark. MIMIC-III, a freely accessible critical care database. *Scientific Data*, 3:160035, 2016.
+[23] ISO. ISO/IEC 27559:2022, Information security, cybersecurity and privacy protection: Privacy enhancing data de-identification framework. International Organization for Standardization, 2022.
 
-[24] James Jordon, Jinsung Yoon, and Mihaela van der Schaar. PATE-GAN: Generating synthetic data with differential privacy guarantees. In *International Conference on Learning Representations (ICLR)*, 2019.
+[24] Alistair E. W. Johnson, Tom J. Pollard, Lu Shen, Li-wei H. Lehman, Mengling Feng, Mohammad Ghassemi, Benjamin Moody, Peter Szolovits, Leo Anthony Celi, and Roger G. Mark. MIMIC-III, a freely accessible critical care database. *Scientific Data*, 3:160035, 2016.
 
-[25] Ron Kohavi. Scaling up the accuracy of naive-Bayes classifiers: A decision-tree hybrid. In *International Conference on Knowledge Discovery and Data Mining (KDD)*, pp. 202–207, 1996.
+[25] James Jordon, Jinsung Yoon, and Mihaela van der Schaar. PATE-GAN: Generating synthetic data with differential privacy guarantees. In *International Conference on Learning Representations (ICLR)*, 2019.
 
-[26] Zinan Lin, Sivakanth Gopi, Janardhan Kulkarni, Harsha Nori, and Sergey Yekhanin. Differentially private synthetic data via foundation model APIs 1: Images. In *International Conference on Learning Representations (ICLR)*, 2024.
+[26] Ron Kohavi. Scaling up the accuracy of naive-Bayes classifiers: A decision-tree hybrid. In *International Conference on Knowledge Discovery and Data Mining (KDD)*, pp. 202–207, 1996.
 
-[27] Ryan McKenna, Daniel Sheldon, and Gerome Miklau. Graphical-model based estimation and inference for differential privacy. In *International Conference on Machine Learning (ICML)*, pp. 4435–4444, 2019.
+[27] Zinan Lin, Sivakanth Gopi, Janardhan Kulkarni, Harsha Nori, and Sergey Yekhanin. Differentially private synthetic data via foundation model APIs 1: Images. In *International Conference on Learning Representations (ICLR)*, 2024.
 
-[28] Ryan McKenna, Gerome Miklau, and Daniel Sheldon. Winning the NIST contest: A scalable and general approach to differentially private synthetic data. *Journal of Privacy and Confidentiality*, 11(3), 2021.
+[28] Ryan McKenna, Daniel Sheldon, and Gerome Miklau. Graphical-model based estimation and inference for differential privacy. In *International Conference on Machine Learning (ICML)*, pp. 4435–4444, 2019.
 
-[29] Ryan McKenna, Brett Mullins, Daniel Sheldon, and Gerome Miklau. AIM: An adaptive and iterative mechanism for differentially private synthetic data. *Proceedings of the VLDB Endowment*, 15(11):2599–2612, 2022.
+[29] Ryan McKenna, Gerome Miklau, and Daniel Sheldon. Winning the NIST contest: A scalable and general approach to differentially private synthetic data. *Journal of Privacy and Confidentiality*, 11(3), 2021.
 
-[30] Frank McSherry. Privacy integrated queries: An extensible platform for privacy-preserving data analysis. In *ACM SIGMOD International Conference on Management of Data*, pp. 19–30, 2009.
+[30] Ryan McKenna, Brett Mullins, Daniel Sheldon, and Gerome Miklau. AIM: An adaptive and iterative mechanism for differentially private synthetic data. *Proceedings of the VLDB Endowment*, 15(11):2599–2612, 2022.
 
-[31] Ilya Mironov. On significance of the least significant bits for differential privacy. In *ACM Conference on Computer and Communications Security (CCS)*, pp. 650–661, 2012.
+[31] Frank McSherry. Privacy integrated queries: An extensible platform for privacy-preserving data analysis. In *ACM SIGMOD International Conference on Management of Data*, pp. 19–30, 2009.
 
-[32] NIST. De-identifying government datasets: Techniques and governance. *NIST Special Publication 800-188*, Simson L. Garfinkel, Joseph Near, Aref N. Dajani, Phyllis Singer, and Barbara Guttman, National Institute of Standards and Technology, 2023.
+[32] Ilya Mironov. On significance of the least significant bits for differential privacy. In *ACM Conference on Computer and Communications Security (CCS)*, pp. 650–661, 2012.
 
-[33] NIST. Guidelines for evaluating differential privacy guarantees. *NIST Special Publication 800-226*, Joseph P. Near, David Darais, Naomi Lefkovitz, and Gary S. Howarth, National Institute of Standards and Technology, 2025.
+[33] NIST. De-identifying government datasets: Techniques and governance. *NIST Special Publication 800-188*, Simson L. Garfinkel, Joseph Near, Aref N. Dajani, Phyllis Singer, and Barbara Guttman, National Institute of Standards and Technology, 2023.
 
-[34] OpenDP. SmartNoise Synth, version 1.0.8. https://github.com/opendp/smartnoise-sdk, 2024.
+[34] NIST. Guidelines for evaluating differential privacy guarantees. *NIST Special Publication 800-226*, Joseph P. Near, David Darais, Naomi Lefkovitz, and Gary S. Howarth, National Institute of Standards and Technology, 2025.
 
-[35] Nicolas Papernot, Martín Abadi, Úlfar Erlingsson, Ian Goodfellow, and Kunal Talwar. Semi-supervised knowledge transfer for deep learning from private training data. In *International Conference on Learning Representations (ICLR)*, 2017.
+[35] OpenDP. SmartNoise Synth, version 1.0.8. https://github.com/opendp/smartnoise-sdk, 2024.
 
-[36] Nicolas Papernot, Shuang Song, Ilya Mironov, Ananth Raghunathan, Kunal Talwar, and Úlfar Erlingsson. Scalable private learning with PATE. In *International Conference on Learning Representations (ICLR)*, 2018.
+[36] Nicolas Papernot, Martín Abadi, Úlfar Erlingsson, Ian Goodfellow, and Kunal Talwar. Semi-supervised knowledge transfer for deep learning from private training data. In *International Conference on Learning Representations (ICLR)*, 2017.
 
-[37] Diane Ridgeway, Mary F. Theofanos, Terese W. Manley, and Christine Task. Challenge design and lessons learned from the 2018 differential privacy challenges. *NIST Technical Note 2151*, 2021.
+[37] Nicolas Papernot, Shuang Song, Ilya Mironov, Ananth Raghunathan, Kunal Talwar, and Úlfar Erlingsson. Scalable private learning with PATE. In *International Conference on Learning Representations (ICLR)*, 2018.
 
-[38] Lucas Rosenblatt, Xiaoyan Liu, Samira Pouyanfar, Eduardo de Leon, Anuj Desai, and Joshua Allen. Differentially private synthetic data: Applied evaluations and enhancements. *arXiv preprint arXiv:2011.05537*, 2020.
+[38] Diane Ridgeway, Mary F. Theofanos, Terese W. Manley, and Christine Task. Challenge design and lessons learned from the 2018 differential privacy challenges. *NIST Technical Note 2151*, 2021.
 
-[39] Nabeel Seedat, Nicolas Huynh, Boris van Breugel, and Mihaela van der Schaar. Curated LLM: Synergy of LLMs and data curation for tabular augmentation in low-data regimes. In *International Conference on Machine Learning (ICML)*, 2024.
+[39] Lucas Rosenblatt, Xiaoyan Liu, Samira Pouyanfar, Eduardo de Leon, Anuj Desai, and Joshua Allen. Differentially private synthetic data: Applied evaluations and enhancements. *arXiv preprint arXiv:2011.05537*, 2020.
 
-[40] Reza Shokri, Marco Stronati, Congzheng Song, and Vitaly Shmatikov. Membership inference attacks against machine learning models. In *IEEE Symposium on Security and Privacy*, pp. 3–18, 2017.
+[40] Nabeel Seedat, Nicolas Huynh, Boris van Breugel, and Mihaela van der Schaar. Curated LLM: Synergy of LLMs and data curation for tabular augmentation in low-data regimes. In *International Conference on Machine Learning (ICML)*, 2024.
 
-[41] Joshua Snoke, Gillian M. Raab, Beata Nowok, Chris Dibben, and Aleksandra Slavković. General and specific utility measures for synthetic data. *Journal of the Royal Statistical Society: Series A*, 181(3):663–688, 2018.
+[41] Reza Shokri, Marco Stronati, Congzheng Song, and Vitaly Shmatikov. Membership inference attacks against machine learning models. In *IEEE Symposium on Security and Privacy*, pp. 3–18, 2017.
 
-[42] Theresa Stadler, Bristena Oprisanu, and Carmela Troncoso. Synthetic data: Anonymisation groundhog day. In *USENIX Security Symposium*, pp. 1451–1468, 2022.
+[42] Joshua Snoke, Gillian M. Raab, Beata Nowok, Chris Dibben, and Aleksandra Slavković. General and specific utility measures for synthetic data. *Journal of the Royal Statistical Society: Series A*, 181(3):663–688, 2018.
 
-[43] Beata Strack, Jonathan P. DeShazo, Chris Gennings, Juan L. Olmo, Sebastian Ventura, Krzysztof J. Cios, and John N. Clore. Impact of HbA1c measurement on hospital readmission rates: Analysis of 70,000 clinical database patient records. *BioMed Research International*, 2014:781670, 2014.
+[43] Theresa Stadler, Bristena Oprisanu, and Carmela Troncoso. Synthetic data: Anonymisation groundhog day. In *USENIX Security Symposium*, pp. 1451–1468, 2022.
 
-[44] Marika Swanberg, Ryan McKenna, Edo Roth, Albert Cheu, and Peter Kairouz. Is API access to LLMs useful for generating private synthetic tabular data? *arXiv preprint arXiv:2502.06555*, 2025.
+[44] Beata Strack, Jonathan P. DeShazo, Chris Gennings, Juan L. Olmo, Sebastian Ventura, Krzysztof J. Cios, and John N. Clore. Impact of HbA1c measurement on hospital readmission rates: Analysis of 70,000 clinical database patient records. *BioMed Research International*, 2014:781670, 2014.
 
-[45] Yuchao Tao, Ryan McKenna, Michael Hay, Ashwin Machanavajjhala, and Gerome Miklau. Benchmarking differentially private synthetic data generation algorithms. *arXiv preprint arXiv:2112.09238*, 2021.
+[45] Marika Swanberg, Ryan McKenna, Edo Roth, Albert Cheu, and Peter Kairouz. Is API access to LLMs useful for generating private synthetic tabular data? *arXiv preprint arXiv:2502.06555*, 2025.
 
-[46] Toan V. Tran and Li Xiong. Differentially private tabular data synthesis using large language models. *arXiv preprint arXiv:2406.01457*, 2024.
+[46] Yuchao Tao, Ryan McKenna, Michael Hay, Ashwin Machanavajjhala, and Gerome Miklau. Benchmarking differentially private synthetic data generation algorithms. *arXiv preprint arXiv:2112.09238*, 2021.
 
-[47] Toan Tran, Arturs Backurs, Zinan Lin, Victor Reis, Li Xiong, and Sergey Yekhanin. Differentially private synthetic data via APIs 4: Tabular data. In *International Conference on Machine Learning (ICML)*, 2026. arXiv:2606.08259.
+[47] Toan V. Tran and Li Xiong. Differentially private tabular data synthesis using large language models. *arXiv preprint arXiv:2406.01457*, 2024.
 
-[48] U.S. Department of Health and Human Services. Guidance regarding methods for de-identification of protected health information in accordance with the HIPAA Privacy Rule. Office for Civil Rights, 2012.
+[48] Toan Tran, Arturs Backurs, Zinan Lin, Victor Reis, Li Xiong, and Sergey Yekhanin. Differentially private synthetic data via APIs 4: Tabular data. In *International Conference on Machine Learning (ICML)*, 2026. arXiv:2606.08259.
 
-[49] Liyang Xie, Kaixiang Lin, Shu Wang, Fei Wang, and Jiayu Zhou. Differentially private generative adversarial network. *arXiv preprint arXiv:1802.06739*, 2018.
+[49] U.S. Department of Health and Human Services. Guidance regarding methods for de-identification of protected health information in accordance with the HIPAA Privacy Rule. Office for Civil Rights, 2012.
 
-[50] Chulin Xie, Zinan Lin, Arturs Backurs, Sivakanth Gopi, Da Yu, Huseyin A. Inan, Harsha Nori, Haotian Jiang, Huishuai Zhang, Yin Tat Lee, Bo Li, and Sergey Yekhanin. Differentially private synthetic data via foundation model APIs 2: Text. In *International Conference on Machine Learning (ICML)*, pp. 54531–54560, 2024.
+[50] Liyang Xie, Kaixiang Lin, Shu Wang, Fei Wang, and Jiayu Zhou. Differentially private generative adversarial network. *arXiv preprint arXiv:1802.06739*, 2018.
 
-[51] Lei Xu, Maria Skoularidou, Alfredo Cuesta-Infante, and Kalyan Veeramachaneni. Modeling tabular data using conditional GAN. In *Advances in Neural Information Processing Systems (NeurIPS)*, 2019.
+[51] Chulin Xie, Zinan Lin, Arturs Backurs, Sivakanth Gopi, Da Yu, Huseyin A. Inan, Harsha Nori, Haotian Jiang, Huishuai Zhang, Yin Tat Lee, Bo Li, and Sergey Yekhanin. Differentially private synthetic data via foundation model APIs 2: Text. In *International Conference on Machine Learning (ICML)*, pp. 54531–54560, 2024.
 
-[52] I-Cheng Yeh and Che-hui Lien. The comparisons of data mining techniques for the predictive accuracy of probability of default of credit card clients. *Expert Systems with Applications*, 36(2):2473–2480, 2009.
+[52] Lei Xu, Maria Skoularidou, Alfredo Cuesta-Infante, and Kalyan Veeramachaneni. Modeling tabular data using conditional GAN. In *Advances in Neural Information Processing Systems (NeurIPS)*, 2019.
 
-[53] Jun Zhang, Graham Cormode, Cecilia M. Procopiuc, Divesh Srivastava, and Xiaokui Xiao. PrivBayes: Private data release via Bayesian networks. *ACM Transactions on Database Systems*, 42(4):25:1–25:41, 2017.
+[53] I-Cheng Yeh and Che-hui Lien. The comparisons of data mining techniques for the predictive accuracy of probability of default of credit card clients. *Expert Systems with Applications*, 36(2):2473–2480, 2009.
+
+[54] Jun Zhang, Graham Cormode, Cecilia M. Procopiuc, Divesh Srivastava, and Xiaokui Xiao. PrivBayes: Private data release via Bayesian networks. *ACM Transactions on Database Systems*, 42(4):25:1–25:41, 2017.
 
 ---
 
@@ -2749,7 +2751,7 @@ internal tree and are available from the authors on request.
 **Environment.** Every table is produced under pandas ≥ 2.3 with the loader fix in
 [`src/datasets_extra.py`](https://github.com/Calyie/cortec/blob/main/src/datasets_extra.py). Both pandas 2.3.3 / scikit-learn 1.6.1 and pandas 3.0.3 / scikit-learn 1.9.0
 agree to within 0.002 on every cell; the residual is a scikit-learn tree-seeding difference, not a data
-defect. scikit-learn is pinned below 1.9 for `diffprivlib` [20] compatibility. We state the pin rather than leave
+defect. scikit-learn is pinned below 1.9 for `diffprivlib` [21] compatibility. We state the pin rather than leave
 it implicit because a later pandas silently changed how a missing value renders, which moved a
 published baseline from 0.019 to 0.110 with no test failing.
 
@@ -3574,13 +3576,13 @@ than documented as advice, and a deployment should read it as part of that secti
 
 | Control | Implementation | Standard |
 |---|---|---|
-| Stated DP parameters | variant (pure ε-DP, central), δ = 0, neighbouring relation (add/remove, unbounded), **privacy unit**, composition rules, mechanism, ε per stage, **ε per person** | NIST SP 800-226 [33] |
-| Auditable accounting | `PrivacyLedger.spend()` is the sole source of noise scales; every query records ε, sensitivity, composition rule and partition key; ledger **seals** after release | NIST SP 800-226 [33] |
-| Documented gaps | floating-point Laplace (Mironov [31]), pretraining provenance, privacy unit, uncharged-suppression assumption if opted into — carried **in the release audit itself**, not only in this table | NIST SP 800-226 [33] §"where the guarantee does not hold" |
-| Documented utility claim in the release package | Stage C **utility transmission bound**: bounded claim at stated confidence and stated ε_cert. **Not a disclosure review** — it measures fitness for use, not disclosure risk | NIST SP 800-188 [32] (governance and documentation) |
-| Re-identification risk | aggregates over cells of ≥ n_min; **zero exact matches** measured on all four datasets; four attacks validated on a positive control | ISO/IEC 27559 [22], ISO/IEC 20889 [21] |
-| Data protection by design | private data never leaves Zone 1; prompt carries only `R` | GDPR [15] Art. 25 / Recital 26 |
-| Expert determination route | DP release (ε stated per person) + measured re-identification evidence — **not** the Stage C bound, which speaks to utility only | HIPAA Expert Determination [48] |
+| Stated DP parameters | variant (pure ε-DP, central), δ = 0, neighbouring relation (add/remove, unbounded), **privacy unit**, composition rules, mechanism, ε per stage, **ε per person** | NIST SP 800-226 [34] |
+| Auditable accounting | `PrivacyLedger.spend()` is the sole source of noise scales; every query records ε, sensitivity, composition rule and partition key; ledger **seals** after release | NIST SP 800-226 [34] |
+| Documented gaps | floating-point Laplace (Mironov [32]), pretraining provenance, privacy unit, uncharged-suppression assumption if opted into — carried **in the release audit itself**, not only in this table | NIST SP 800-226 [34] §"where the guarantee does not hold" |
+| Documented utility claim in the release package | Stage C **utility transmission bound**: bounded claim at stated confidence and stated ε_cert. **Not a disclosure review** — it measures fitness for use, not disclosure risk | NIST SP 800-188 [33] (governance and documentation) |
+| Re-identification risk | aggregates over cells of ≥ n_min; **zero exact matches** measured on all four datasets; four attacks validated on a positive control | ISO/IEC 27559 [23], ISO/IEC 20889 [22] |
+| Data protection by design | private data never leaves Zone 1; prompt carries only `R` | GDPR [16] Art. 25 / Recital 26 |
+| Expert determination route | DP release (ε stated per person) + measured re-identification evidence — **not** the Stage C bound, which speaks to utility only | HIPAA Expert Determination [49] |
 | No training on inputs | contractual, via the tenant-isolated platform | vendor terms / BAA |
 
 **The Expert Determination row deliberately excludes Stage C.** HIPAA Expert Determination requires a
@@ -3981,10 +3983,10 @@ record them because the first two are the kind that make a bound worthless:
 what could be wrong: a Monte Carlo over 200 independent noise draws asserts that the empirical violation
 rate is ≤ α.
 
-**What the bound report emits, per NIST SP 800-226 [33].** Variant (pure ε-DP, central), δ = 0, neighbouring
+**What the bound report emits, per NIST SP 800-226 [34].** Variant (pure ε-DP, central), δ = 0, neighbouring
 relation (add or remove one record, unbounded DP), **privacy unit**, composition rules, mechanism,
 ε_release, ε for the transmission bound, ε total per row, max rows per person, and **ε per person**. Plus the declared
-gaps that standard asks for explicitly: floating-point Laplace sampling is vulnerable to the Mironov [31]
+gaps that standard asks for explicitly: floating-point Laplace sampling is vulnerable to the Mironov [32]
 (2012) attack and a PHI deployment needs a discrete or snapping sampler, which this implementation does
 not have, the library we use draws its uniforms from a cryptographically secure source, so the noise
 is unpredictable, but the output is still a double and the representation gap Mironov exploits remains;
@@ -5053,7 +5055,7 @@ allocation itself.
 
 **Advanced composition would loosen this bound, not tighten it.** It is natural to assume that a tighter accountant, zero-concentrated DP [6], or advanced
 composition, "would only help". At CoRTeC's parameters that is false in two ways. Advanced
-composition (Dwork–Rothblum–Vadhan [13]) scales as `√(2k ln 1/δ)·ε₀ + k·ε₀(e^{ε₀}−1)` rather than `k·ε₀`,
+composition (Dwork–Rothblum–Vadhan [14]) scales as `√(2k ln 1/δ)·ε₀ + k·ε₀(e^{ε₀}−1)` rather than `k·ε₀`,
 which improves on basic composition only once `k` is large. At Adult's per-query ε₀ = 1/15 = 0.0667
 the crossover is **k = 27**. CoRTeC's longest sequential chain on Adult is **15**, fourteen attribute
 histograms plus the class balance, which is Algorithm 1's `q` and is why ε₀ is 1/15, and **18** once
@@ -5069,7 +5071,7 @@ crossover, and an earlier version of this table put the chain at 9, which unders
 | 27 | 1/15 | 1.800 | 1.786 | crossover |
 | 50 | 1/15 | 3.333 | 2.492 | yes |
 
-And it yields **(ε, δ)-DP** [13] where we currently offer **pure ε-DP**, a weaker guarantee type, and pure DP
+And it yields **(ε, δ)-DP** [14] where we currently offer **pure ε-DP**, a weaker guarantee type, and pure DP
 is what regulated deployments generally prefer, since there is no failure probability to explain. The
 chain is short *because* parallel composition across disjoint cohorts and cells does the work. The design
 that stretches the budget is also what makes tighter composition unnecessary.
