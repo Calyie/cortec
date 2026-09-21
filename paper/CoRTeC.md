@@ -18,7 +18,7 @@ Code and papers: [Calyie/cortec](https://github.com/Calyie/cortec) (research har
 > Most of our own measurements were run against the public developer APIs, because those were
 > available to us; the arms of the shipped configuration (§7.12) ran through Vertex AI. §6.2 states
 > this and measures what the surface costs: the same release generated through Vertex AI and
-> through the public API gives the same fidelity and the same downstream utility to within
+> through the public API gives the same fidelity and the same downstream utility (the accuracy of a model trained on the synthetic data and tested on real data) to within
 > draw-to-draw noise on the primary clinical dataset. Every model figure in this paper is a
 > measurement of the model, not an endorsement of the endpoint we used.
 >
@@ -40,19 +40,15 @@ Code and papers: [Calyie/cortec](https://github.com/Calyie/cortec) (research har
 ## Abstract
 
 Differentially private (DP) synthetic tabular data lets institutions train models on, and share,
-records they cannot release. The mechanisms in deployment today, MST and AIM, are selected on
-marginal fidelity because that is the metric their papers report; neither reports downstream
-predictive utility. We show that this choice is consequential: on UCI Adult at ε = 2.0 these mechanisms train
-models 0.14 to 0.17 AUC below a real sample of the same size (0.09 to 0.18 across the three
-datasets of §7.12), and real data with its target column
+records they cannot release. The mechanisms in deployment today, MST and AIM, are selected on marginal fidelity (how closely the marginals, the distributions of single columns and of small groups of columns, match the real data) because that is the metric their papers report; neither reports downstream
+predictive utility. We show that this choice is consequential: on UCI Adult at ε = 2.0 (the privacy budget; smaller is stronger) these mechanisms train
+models 0.14 to 0.17 AUC below a real sample of the same size (0.09 to 0.18 across the three datasets of §7.12; AUC is the area under the ROC curve, the utility measure used throughout), and real data with its target column
 permuted passes a 90% marginal-similarity bar. We present CoRTeC, a DP synthesis mechanism that
 spends its privacy budget on the quantities a downstream model needs. A single release stage
-publishes, per publicly stratified cohort, one DP histogram per attribute and per outcome class, the
-DP class balance, and a DP table of target rates over a disjoint cell partition, which by parallel
-composition costs one query per level regardless of cell count and yields 6.7× more budget per
+publishes, per publicly stratified cohort (a group of records defined by attribute bands fixed before the data is seen), one DP histogram per attribute and per outcome class, the DP class balance (the share of each outcome), and a DP table of target rates over a disjoint cell partition (nested subgroups defined by one, two or three attributes; each subgroup is a cell), which by parallel composition (statistics on non-overlapping groups each spend the full budget rather than sharing it) costs one query per level regardless of cell count and yields 6.7× more budget per
 released statistic than a natural implementation. A frozen, un-finetuned language model then
 generates records from that release alone. Because the generator never sees a private record,
-generation is post-processing: unlimited records cost no further budget, and the model may run on a
+generation is post-processing (a computation on the release alone, which adds no privacy cost): unlimited records cost no further budget, and the model may run on a
 tenant-isolated enterprise endpoint or an air-gapped host under the same guarantee. An
 auto-configurator derives the release from the schema and the budget. Two post-processing steps
 close the gap between what the release carries and what the generator returns: each batch is told
@@ -61,17 +57,14 @@ three times the rows it needs and keeps those whose cell counts match the releas
 The headline result is bounded. On UCI Adult at n = 300 and matched ε, models trained on CoRTeC's
 output are statistically indistinguishable from models trained on a real sample of the same size
 (AUC differences of +0.007, −0.003 and +0.012; all p > 0.18), while AIM and MST are 0.14 to 0.17 AUC
-lower after Holm–Bonferroni correction. The result replicates on a finance dataset, where an
+lower after Holm–Bonferroni correction (for multiple testing). The result replicates on a finance dataset, where an
 earlier release design had fallen short, once the release carries one histogram per outcome class.
-Under the shipped configuration CoRTeC's 1-way marginal error sits within 0.005 of MST, the most
+Under the shipped configuration CoRTeC's 1-way marginal error (the error in each single column's distribution) sits within 0.005 of MST, the most
 accurate marginal method we ran (0.029 against 0.024 on Adult, 0.029 against 0.028 on finance,
 0.015 against 0.024 on NHANES), below a real sample of the same size on all three, and ahead of
-AIM, on finance on the reduced 12-column schema that is the only one AIM completes on; its 2-way
-error sits on the real sample's on Adult; the remaining bound is the release's own distance from the private data. We further show that
-whether a forced private relationship survives synthesis depends on the mechanism family (MST slope
-0.998, PATE-CTGAN 0.054); that enabling reasoning in the generator moves conditional error 3.8×
-(0.173 to 0.045) while downstream AUC cannot detect the difference; and that four
-membership-inference attacks validated on a positive control reach a strongest advantage of 0.048
+AIM, on finance on the reduced 12-column schema that is the only one AIM completes on; its 2-way error (over pairs of columns) sits on the real sample's on Adult; the remaining bound is the release's own distance from the private data. We further show that
+whether a forced private relationship survives synthesis (that is, reappears in the synthetic output) depends on the mechanism family (MST slope 0.998, PATE-CTGAN 0.054); that enabling reasoning in the generator (the model's option to think through a request before answering) moves conditional error (the error in the outcome rate within each subgroup) 3.8×
+(0.173 to 0.045) while downstream AUC cannot detect the difference; and that four membership-inference attacks (which try to tell whether a record was in the private data) validated on a positive control (real records passed off as synthetic, which the attacks must catch) reach a strongest advantage (true-positive rate minus false-positive rate) of 0.048
 against a permitted 0.762, with zero exact matches. We catalogue twenty-seven measurement artifacts
 that each produced a plausible but wrong conclusion, and release two Apache-2.0 implementations that
 enforce every guarantee in code.
@@ -94,9 +87,8 @@ The marginal-based synthesisers, MST and AIM, are evaluated on marginal workload
 it; they were built for published tables and contingency reports, and on those they are hard to
 beat. The DP-trained generative models are evaluated on downstream utility and, at the budgets and
 schema sizes we test, do not preserve the target's base rate. The methods that do reach real-data
-utility, the ones that fine-tune a language model, either have no privacy guarantee or train on the
-private data under DP-SGD [1], which is expensive and places the private data on the training hardware.
-And Private Aggregation of Teacher Ensembles (PATE), which would sidestep this, requires a public
+utility, the ones that fine-tune a language model, either have no privacy guarantee or train on the private data under DP-SGD [1] (gradient descent with clipped and noised updates), which is expensive and places the private data on the training hardware.
+And Private Aggregation of Teacher Ensembles (PATE; an ensemble of teachers trained on disjoint shards of the private data, whose noised votes label a public dataset), which would sidestep this, requires a public
 transfer set drawn from approximately the same distribution as the private data. Where privacy
 protection matters most, in a hospital's encounter records or a bank's default history, that set
 does not exist: institution-specific coding, local case mix and proprietary product structure mean
@@ -130,7 +122,7 @@ silently.
 **The result the paper is built on, and the size of the claim.** At matched ε and matched sample size
 on UCI Adult at n = 300, models trained on CoRTeC's synthetic records are statistically
 indistinguishable from models trained on a real sample of the same size: differences of +0.007,
-−0.003 and +0.012 AUC across three students, with the gap bounded inside ±0.027 and every p > 0.18.
+−0.003 and +0.012 AUC across three students (the classifiers trained on the synthetic data), with the gap bounded inside ±0.027 and every p > 0.18.
 The equivalence is claimed at that dataset and that size only. Under the earlier release design it
 narrowed to 94% of real-sample utility on finance (§F.3); a histogram per outcome in the release
 closes the gap on two of three students (§7.11), and the shipped configuration, which adds
@@ -146,11 +138,11 @@ conditional-fidelity advantage replicates and widens, by a factor of 7.6 on hosp
 while the aggregate-utility advantage narrows.
 
 **What CoRTeC does not do.** For most of this project it was not the most accurate method on the
-marginal benchmarks: MST recorded lower 1-way total variation on every dataset we ran. The shipped
+marginal benchmarks: MST recorded lower 1-way total variation (half the summed absolute difference between two histograms) on every dataset we ran. The shipped
 configuration (§7.12) sits within 0.005 of MST on that measure on Adult and finance and below it
 on NHANES, leads AIM, and its 2-way error sits on a real sample's on Adult; what remains is the
 release's own distance from the data.
-AIM still records the lowest error on all three of its own 3-way workloads at adequate `n`. That
+AIM still records the lowest error on all three of its own 3-way workloads (sets of three-column marginals) at adequate `n`. That
 is structural rather than a shortfall: AIM's adaptive measurement selection optimises exactly that
 workload under the budget, so retaining the lead there is what its design predicts, and we did not
 set out to close it. A 1-way error below a real sample's describes an output smoother than a
@@ -189,7 +181,7 @@ For the research community:
    output is selected from a threefold pool by raking and refinement over every released cell.
    On Adult and finance the output's 1-way error falls to within 0.005 of the most accurate
    marginal method and below a real sample of the same size, with downstream utility unchanged at
-   the real-sample floor; the steps are separated and each is measured (§3.3, §7.12).
+   the real-sample floor (the accuracy of a model trained on a real sample of the same size); the steps are separated and each is measured (§3.3, §7.12).
 3. **A head-to-head against the deployed mechanisms with the statistics stated properly**: bootstrap
    confidence intervals, Holm–Bonferroni correction across the full family of tests, effect sizes with
    intervals, and the attainable floor of every rank test reported beside its p-value (§7.2).
@@ -200,9 +192,9 @@ For the research community:
    among the baselines and explains how excellent 1-way fidelity coexists with poor downstream utility
    (§7.3.1).
 6. **Isolation of generator configuration as a first-order variable.** A controlled single-flag
-   comparison moves conditional fidelity 3.8× within one model, and configuration does not override
+   comparison moves conditional fidelity (how closely the outcome rate within each subgroup matches the private data) 3.8× within one model, and configuration does not override
    capability in either direction (§7.5).
-7. **A utility transmission bound on transmitted conditional structure**, standards-aligned, computed
+7. **A utility transmission bound on transmitted conditional structure** (a DP bound on the gap between private and synthetic subgroup rates), standards-aligned, computed
    under DP, and refusing to report a verdict when it cannot discriminate. It bounds utility, never
    privacy (§7.9).
 8. **A reproducibility account of the measurement artifacts encountered**, each of which produced a
@@ -3413,7 +3405,7 @@ a generated table is post-processing and costs no budget (`paper/audit/regen_cre
 **Against AIM, the conditional lead survives correction under either release, and the utility lead
 survives under the class-conditional one.** Each CoRTeC arm is tested as its own Holm family of
 fourteen (two baselines, seven metrics). Under the pooled release CoRTeC's conditional error on seen
-groups is 2.8× lower than AIM's (0.030 against 0.083, adjusted p = 0.0014, Hedges' g = −4.7), but its
+groups is 2.8× lower than AIM's (0.030 against 0.083, adjusted p = 0.0014, Hedges' g (a standardized effect size) = −4.7), but its
 downstream leads, +0.080 TSTR-LR, +0.042 GBM and +0.020 RF, do not survive (adjusted p = 0.058, 0.16,
 0.67), even at five draws against five. Under the class-conditional release they do: +0.091 on LR,
 +0.070 on RF and +0.091 on GBM, adjusted p = 0.040, 0.025 and 0.010, g = 2.5 to 3.6, at three draws
