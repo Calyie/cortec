@@ -939,7 +939,7 @@ from useless data, using the shuffled-target control on Adult:
 
 The shuffled control has no usable feature-to-target relationship (TSTR 0.458, near chance) and yet
 records 95.7% 1-way similarity, passing a 90% bar. Permuting one column of fifteen leaves every
-marginal intact. Two-way is scored over all 105 column pairs, and there the pair is 0.107 and 0.110,
+marginal intact. Two-way is scored over all 105 column pairs, and there the pair is 0.106 and 0.112,
 so a 90% two-way bar rejects both, including real data drawn from the private distribution itself: a
 marginal criterion cannot separate good from useless, and tightening it far enough to exclude the
 useless case also excludes a genuine sample. A criterion that fails real data is not a usable
@@ -2081,8 +2081,8 @@ CoRTeC, MST and the floors are re-scored on those 12 columns for that comparison
 | *12-column schema: real sample, n = 300* | *3* | *0.038* | *0.090* | *0.059* | *0.045* | *0.682* | *0.722* | *0.709* |
 
 The finance picture is the Adult picture. 1-way error, 0.029, is within 0.001 of MST's 0.028
-(the two do not separate) and below the real sample's; 2-way error, 0.125, is below AIM's 0.136
-and MST's 0.230 and above the sample's 0.099; conditional error on seen and held-out groups is
+(the two do not separate) and below the real sample's; 2-way error, 0.125, is below MST's 0.230
+and above the sample's 0.099, and on the 12-column schema it is 0.107 against AIM's 0.136; conditional error on seen and held-out groups is
 below the sample's on both. The tree students sit on the real-sample floor (0.731 against 0.727,
 0.712 against 0.717) and logistic regression is 0.015 short (0.680 against 0.695, p = 0.033 at
 three draws against three), which is where §7.11's Fable arm also left it. On the 12-column
@@ -4122,7 +4122,7 @@ one than a release-level count of four values implied.
 
 Generation costs are measured from the token counts each vendor reported over our own runs, priced at
 list rates; they are indicative rather than a benchmark. The shipped configuration's row is the
-NHANES, Adult and finance runs of §7.12 through Vertex AI (nine draws, $8.2 in all): the
+NHANES, Adult and finance runs of §7.12 (nine draws, eight through Vertex AI and one through the public API, $16.6 in all): the
 exact-count prompt roughly doubles the reasoning tokens a call spends, and the pool multiplies the
 rows generated per row kept. They **exclude** the reasoning-suppressed
 configurations of §7.5, because those produce output at or below the no-information floor and their
