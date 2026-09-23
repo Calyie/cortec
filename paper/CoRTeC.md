@@ -1415,13 +1415,13 @@ same prompts, n = 300, three draws per release, scored under the same protocol
 | *real sample, n = 300* | *3* | *0.041* | *0.099* | *0.059* | *0.045* | *0.695* | *0.727* | *0.717* |
 | **CoRTeC, class-conditional release** (Gemini 3.5 Flash) | **3** | 0.051 | **0.126** | 0.040 | **0.037** | **0.680** | **0.712** | **0.704** |
 | CoRTeC, pooled release (Gemini 3.5 Flash) | 3 | 0.055 | 0.133 | **0.039** | 0.039 | 0.651 | 0.662 | 0.662 |
-| CoRTeC, pooled release (Fable 5, §F.3's arm) | 5 | 0.067 | 0.141 | 0.030 | 0.048 | 0.652 | 0.674 | 0.664 |
+| CoRTeC, pooled release (Fable 5, §F.3's arm, re-scored under this table's protocol) | 5 | 0.067 | 0.157 | 0.030 | 0.048 | 0.652 | 0.673 | 0.664 |
 | *permuted target (no-information floor)* | *3* | *0.040* | *0.100* | *0.137* | *0.059* | *0.514* | *0.482* | *0.481* |
 | gap, class-conditional − pooled (Gemini) | | −0.004 | −0.007 | +0.000 | −0.002 | **+0.029** | **+0.050** | **+0.042** |
 | Welch p | | 0.38 | 0.20 | 0.97 | 0.79 | **0.007** | **0.017** | **0.029** |
 | Hedges' g | | −0.65 | −1.01 | +0.03 | −0.20 | +3.45 | +4.01 | +2.44 |
 
-**Three findings.** First, the pooled Gemini arm reproduces the pooled Fable 5 arm: 0.651 / 0.662 / 0.662 against 0.652 / 0.674 / 0.664 across vendors. That is the direct confirmation of §F.3.1's reading: the ceiling was the release's.
+**Three findings.** First, the pooled Gemini arm reproduces the pooled Fable 5 arm: 0.651 / 0.662 / 0.662 against 0.652 / 0.673 / 0.664 across vendors. That is the direct confirmation of §F.3.1's reading: the ceiling was the release's.
 
 Second, the class-conditional release raises every student, by +0.029, +0.050 and +0.042 AUC, with effect sizes of 2.4 to 4.0 pooled standard deviations. The hypothesis came from Step 1 and concerned the three utility students. Holm over that family gives adjusted p = 0.021, 0.034, 0.034, all three surviving. Holm over all seven metrics, the family this paper uses where a comparison was not pre-specified, leaves only TSTR-LR (adjusted p = 0.048), and we report both. Fidelity is unchanged under this generator. The four fidelity gaps are within draw-to-draw spread (p ≥ 0.20).
 
@@ -2615,7 +2615,7 @@ during this work, and each is enforced in code rather than documented as advice.
    **(b) Aggregate to one row per person before Stage A** only when a per-patient quantity is what you actually want. It fixes `k` exactly, but it *changes the estimand*, and nothing downstream will tell you so.
    **(c) Failing either, report `ε_person = max_rows · ε_row`** rather than the per-row number, and make no per-person claim.
    After capping, re-check released-cell coverage (step 5). Capping shrinks cells, and cells that fall under `n_min` stop being released. **This step is the answer to the ε_person = 80 figure of §4.4, and it is enforced rather than recommended.** [`certify.py`](https://github.com/Calyie/cortec/blob/main/certify.py) requires `--max-rows-per-person` and will not produce a bound report without it. The reference implementations refuse a declared privacy unit whose `ε_person` is vacuous unless the caller acknowledges it into the audit trail.
-3. **Choose ε and n.** Output quality is flat over ε ∈ [0.3, 8] (§7.6), so pick the tightest budget your regulator will accept. It costs almost nothing.
+3. **Choose ε and n.** Output quality was essentially unchanged over ε ∈ [0.3, 8] on Diabetes 130 (81,410 records). On NHANES (2,999 records) the shipped configuration loses a fifth of its utility between ε = 2 and ε = 0.3, and the release's own noise-to-signal ratio predicts this before generation (§7.6, §H.2). Pick the tightest budget your regulator will accept, and read the release-time check of step 5 before generating.
 4. **Run Stage A once.** Store `R` and its audit trail as the controlled artefact. Hash it. Note that `R` **cannot be regenerated**. The noise source is cryptographically secure and ignores any seed you set, which we verified directly. The stored artefact is therefore the only copy of that release. Every draw and every comparison must reuse it by file, not by re-running Stage A.
 5. **Check the release before generating.** Is the finest conditional table non-empty? Is the
    noise/signal ratio below 1? How many cells cleared `n_min`, and **for each conditioning column,
