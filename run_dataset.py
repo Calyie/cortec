@@ -21,14 +21,17 @@ warnings.filterwarnings("ignore")
 sys.path.insert(0, ".")
 from src.dataset_spec import get_spec, available
 import src.datasets_extra  # noqa: F401  (registers diabetes + credit)
-try:                                  # internal contamination variant; not in the public tree
-    import src.datasets_obfuscated  # noqa: F401  (registers adult_obf)
-except ImportError:
-    pass
 import src.datasets_regulated  # noqa: F401  (six untouched regulated benchmarks)
 import src.datasets_synthetic  # noqa: F401  (renal_registry — the contamination control)
 import src.datasets_clinical  # noqa: F401  (NHANES + MIMIC-III demo)
 import src.datasets_auto  # noqa: F401  (auto-configured variants, see src/autoconfig.py)
+# Any further `src/datasets_*.py` module present registers itself here, so a dataset variant kept
+# outside this tree needs no edit to the driver.
+import importlib as _importlib, pkgutil as _pkgutil
+import src as _src
+for _m in _pkgutil.iter_modules(_src.__path__):
+    if _m.name.startswith("datasets_"):
+        _importlib.import_module(f"src.{_m.name}")
 from src.generic_pipeline import release_statistics
 from sklearn.model_selection import train_test_split
 

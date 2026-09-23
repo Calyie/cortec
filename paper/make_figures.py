@@ -382,7 +382,7 @@ def fig_model_grid():
 # ── Figure 4: privacy–utility curve ──────────────────────────────────────────────────
 def fig_epsilon():
     data = {}
-    # NHANES under the shipped configuration (regen_nhanes_eps.py); Diabetes 130 as the fallback
+    # NHANES under the shipped configuration (the ε sweep of §7.6); Diabetes 130 as the fallback
     if all(os.path.exists(f"results/nhanes_eps_shipped/eval_eps{t}.json") for t in ("0p3", "1", "2", "8")):
         for e, t in {0.3: "0p3", 1.0: "1", 2.0: "2", 8.0: "8"}.items():
             data[e] = json.load(open(f"results/nhanes_eps_shipped/eval_eps{t}.json"))
