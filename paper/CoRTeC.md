@@ -466,7 +466,7 @@ release. An undeclared unit is handled differently. `k` cannot be computed witho
 ### 4.5 Verified accounting, and what the allocation achieves
 
 The budget is verified by instrumentation rather than by re-deriving a model of it.
-`TestActualEpsilonSpend` patches the Laplace mechanism inside `release_statistics` and tallies what is spent. It asserts exactly 2.0 on the auto-configured Adult, NHANES and diabetes specs, and exactly
+A test patches the Laplace mechanism inside `release_statistics` and tallies what is spent. It asserts exactly 2.0 on the auto-configured Adult, NHANES and diabetes specs, and exactly
 ε_total at ε = 0.5, 2.0 and 8.0, with per-cohort query counts adapting correctly to 15-, 10- and
 19-column schemas. This replaced an earlier verifier that re-derived the budget from hardcoded
 parameters and so would have passed even if the pipeline diverged from that model.
@@ -759,8 +759,7 @@ place of four declared levels, and all 4,000 of its categorical values are absen
 
 The diagnostic this control specifies is whether the CoRTeC-to-header-only gap changes on data with
 no public presence. Against the matched control it does not: 0.057 on Adult (0.849 against 0.792)
-and 0.054 here (0.685 against 0.630), a ratio of 0.95 (`paper/audit/regen_renal_matched.py`,
-`results/renal_matched_eval.json`). Measured on like controls, CoRTeC's advantage over an ungrounded
+and 0.054 here (0.685 against 0.630), a ratio of 0.95. Measured on like controls, CoRTeC's advantage over an ungrounded
 model is about 0.055 AUC on both datasets, whether the model holds a strong prior about the data or
 none: CoRTeC's margin over a matched ungrounded model does not shrink when the prior is removed.
 The prior's contribution on Adult is visible in the controls' fidelity, not in CoRTeC's margin:
@@ -830,8 +829,8 @@ A non-significant difference is not by itself evidence of equivalence. What make
 equivalence claim is that the confidence interval on the gap is tight: the data exclude any
 advantage or deficit larger than about 0.027 AUC on all three students. Within that resolution, a
 model trained on CoRTeC's synthetic records performs as one trained on real records of the same
-quantity. Both arms are drawn from `results/adult_unified_eval.json`, and
-`paper/audit/regen_equivalence_table.py` recomputes every cell.
+quantity. Both arms are drawn from the same stored per-draw evaluation, and every cell is recomputed
+from it.
 
 The claim is bounded, and the boundary is stated here beside it. It is established on one dataset at one
 sample size. It does not hold on finance, where the pooled-release arm reaches TSTR-LR 0.652
@@ -841,8 +840,7 @@ nowhere else.
 **Result 1′: the same claim, remade with the full-categorical prompt under the corrected mechanism.** The arm above was generated before the rate-mechanism correction of §4.3, step (iv),
 and so carries `(ε_L, δ)`-DP on its conditional levels. After the correction we regenerated the
 headline from a fresh release under the corrected two-count mechanism, with the full-categorical
-prompt on the cohort-wise path, five draws, same model, same ε, same evaluator and split
-(`paper/audit/regen_adult_corrected_arm.py`, `results/adult_corrected_arm_eval.json`):
+prompt on the cohort-wise path, five draws, same model, same ε, same evaluator and split:
 
 | student | CoRTeC, corrected release (5 draws) | real sample, n = 300 | difference | 95% CI on the difference | Welch p |
 |---|---|---|---|---|---|
@@ -867,8 +865,8 @@ comparison as one family of 14 tests and applying Holm–Bonferroni [20]:
 | MST | TSTR-GBM | 0.856 | 0.681 | **+0.174** | 4.4 × 10⁻⁵ | **4.4 × 10⁻⁴** | 9.7 [5.1, 14.3] |
 | AIM | TSTR-RF | 0.870 | 0.700 | **+0.170** | 3.2 × 10⁻⁴ | **2.4 × 10⁻³** | 5.7 [2.8, 8.6] |
 
-Every cell is recomputed from the per-draw records in `results/adult_unified_eval.json` by
-`paper/audit/regen_holm_family.py`, so the two tables cannot disagree. Adjusted p-values are Holm's
+Every cell is recomputed from the same per-draw records as the equivalence table above, so the
+two tables cannot disagree. Adjusted p-values are Holm's
 step-down values, which take a running maximum down the ranked list. AIM / TSTR-RF is rank 8 of 14 by raw p and inherits its adjusted value from rank 7. A reader recomputing it from the six
 utility rows alone will get 2.9 × 10⁻³ and should not. The rank-based Mann–Whitney statistic also
 reaches p = 0.0043 on all six, its smallest attainable value at 6 versus 5 draws. We report that attainable floor beside every rank p-value throughout, because at small group sizes it is the design
@@ -944,8 +942,8 @@ At adequate `n`, AIM records the lowest error on its own workloads. Adult, n = 1
 | CoRTeC (Fable 5) | 0.054 | 0.116 | 0.305 | 0.389 | 0.357 |
 | PATE-CTGAN | 0.357 | 0.538 | 1.190 | 1.363 | 1.336 |
 
-Every value is regenerated from the stored synthetic sets and written to
-`results/workload_table_n1950.json`, three draws per method averaged per draw. The `skewed` workload's 256 sampled triples, seed and column order are stored with it, and the auditor re-derives the workload from those parameters and requires an exact match. On the metric AIM is built for and evaluated on, AIM records the lowest error on all three of its own workloads. CoRTeC records the second-lowest, below MST's and PATE-CTGAN's. At n = 300 the same comparison gives CoRTeC lower error than AIM on the `target` workload. That ordering inverts at adequate `n` because the small-sample floor masks AIM's advantage. High-order marginal comparisons at small `n` are therefore not trustworthy.
+Every value is regenerated from the stored synthetic sets with `workload_error.py`, three draws per
+method averaged per draw. The `skewed` workload's 256 sampled triples, seed and column order are stored with the evaluation, and the number audit re-derives the workload from those parameters and requires an exact match. On the metric AIM is built for and evaluated on, AIM records the lowest error on all three of its own workloads. CoRTeC records the second-lowest, below MST's and PATE-CTGAN's. At n = 300 the same comparison gives CoRTeC lower error than AIM on the `target` workload. That ordering inverts at adequate `n` because the small-sample floor masks AIM's advantage. High-order marginal comparisons at small `n` are therefore not trustworthy.
 
 ![Figure 5](figures/fig04_fidelity_utility_axes.png)
 
@@ -1021,7 +1019,7 @@ On Diabetes 130 the released rates were 0.004 / 0.506 / 0.996 and CoRTeC produce
 98.6%. The NHANES row is the primary clinical dataset under an auto-configured release, and it shows where the relationship travels. The auto-configurator coarsens race/ethnicity into three groups and pools the forced group with white_nh in the conditional table, so the table carries no rate for it. The class-conditional histogram blocks do: the released race histogram of each outcome class within the cohort, from which P(diabetes | black_nh) follows by Bayes' rule. That is the rate the row is scored against. The released rates were 0.008 / 0.469 / 0.970 and CoRTeC produced
 0.0% / 44.6% / 100.0% over 60 to 65 rows per point (Gemini 3.5 Flash, n = 300, one sweep).
 
-The unconditioned control on NHANES needs one extra step. A model given only column names writes "Non-Hispanic Black" rather than the dataset's code, so its labels were mapped onto the codes by meaning before the rate was read (`paper/audit/nhanes_header_control.py`). Over 36 such rows it reports a diabetes rate of 63.9% against a true 15.4%, the same flat, wrong number the control gives everywhere else. The finance sweep is replicated at a second, independently drawn seed whose slope falls on the other side of unity, so the deviation is sampling noise rather than systematic bias.
+The unconditioned control on NHANES needs one extra step. A model given only column names writes "Non-Hispanic Black" rather than the dataset's code, so its labels were mapped onto the codes by meaning before the rate was read. Over 36 such rows it reports a diabetes rate of 63.9% against a true 15.4%, the same flat, wrong number the control gives everywhere else. The finance sweep is replicated at a second, independently drawn seed whose slope falls on the other side of unity, so the deviation is sampling noise rather than systematic bias.
 
 The unconditioned control is the comparison that matters in this table. It emits the same number at every target, 98.5% on healthcare against a true rate of 21.4%. That establishes that CoRTeC's output tracks the released statistics rather than the model's prior. The control's error is always in the same direction and is
 largest on the clinical data, the domain furthest from a web-trained model's experience. No amount of downstream AUC reveals this, because AUC is rank-based and the direction is right. That is a concrete reason a readmission probability or a default rate must be validated on a conditional measure.
@@ -1173,7 +1171,7 @@ than ε = 8 costs almost nothing. Equally, spending more budget gains nothing. C
 
 **The same sweep on NHANES, under the shipped configuration, is not flat.** NHANES has 2,999 training records against Diabetes 130's 81,410, and its auto-configured release spends each cohort's budget over ten queries and two outcome classes. At ε = 0.3 the per-query budget is therefore 0.024, and the Laplace scale on a histogram bin is 42 records inside cohorts of 314 to 1,900. One
 draw at each of ε = 0.3, 1 and 8 (n = 300, pool 2×) beside the three draws of §7.12 at ε = 2, and
-MST refitted at each budget (`paper/audit/regen_nhanes_eps.py`, `results/nhanes_eps_shipped/`):
+MST refitted at each budget:
 
 | NHANES, n = 300 | method | ε = 0.3 | ε = 1 | ε = 2 | ε = 8 |
 |---|---|---|---|---|---|
@@ -1388,7 +1386,7 @@ Computational and monetary cost is tabulated in §H.8.
 
 §F.3.1 diagnosed the finance shortfall to the release rather than the model. The generator carried the one conditioned variable exactly and *fabricated* the relationship of every other column to the target. The fabricated columns lowered downstream AUC where the same columns raise it on real data. A pooled cohort histogram cannot carry that relationship. It says what a cohort looks like, not how its defaulters differ from its non-defaulters. §3.3's line 7 replaces it with one histogram block per (cohort, outcome) wherever both outcomes clear `n_min`, at the same ε per query, the two blocks composing in parallel. Here we test whether that release change moves the result, in three steps that separate the information in the release from what the generator does with it.
 
-**Step 1: the release alone, decoded with no model.** Each release, pooled as before and class-conditional, is decoded by independent sampling. A cohort is drawn by its released size. Under the pooled release the outcome comes from the released conditional table and every other column from the cohort's histogram. Under the class-conditional release the outcome comes from the cohort's class balance and every other column from that outcome's block. No language model, no prior, nothing a histogram does not contain. Five decodes each, at the pipeline's ε and `n_min`, on finance and on Adult, scored under the protocol of §6 (`paper/audit/release_sufficiency.py`). 10 of 12 cohorts clear `n_min` for both outcomes on each dataset.
+**Step 1: the release alone, decoded with no model.** Each release, pooled as before and class-conditional, is decoded by independent sampling. A cohort is drawn by its released size. Under the pooled release the outcome comes from the released conditional table and every other column from the cohort's histogram. Under the class-conditional release the outcome comes from the cohort's class balance and every other column from that outcome's block. No language model, no prior, nothing a histogram does not contain. Five decodes each, at the pipeline's ε and `n_min`, on finance and on Adult, scored under the protocol of §6. 10 of 12 cohorts clear `n_min` for both outcomes on each dataset.
 
 | release, decoded naively | 1-way TV ↓ | 2-way TV ↓ | cond. seen ↓ | cond. held-out ↓ | TSTR-LR ↑ | TSTR-RF ↑ | TSTR-GBM ↑ |
 |---|---|---|---|---|---|---|---|
@@ -1407,8 +1405,7 @@ The pooled release, decoded the same way, gives the same utility as the generate
 
 **Step 2: the same generator on both releases.** One finance release of each kind at ε = 2.0,
 `n_min` = 150, the hand-tuned hierarchy of §F.3, levels (0, 3); Gemini 3.5 Flash, cohort-wise, the
-same prompts, n = 300, three draws per release, scored under the same protocol
-(`paper/audit/regen_class_conditional.py`, `results/class_conditional_eval.json`). The pooled arm was generated through Vertex AI and the class-conditional arm through the public developer API (two draws) and Vertex AI (one draw). §6.2 measured the two surfaces at parity, and the arm's Vertex draw is within 0.004 AUC of its public draws on every student.
+same prompts, n = 300, three draws per release, scored under the same protocol. The pooled arm was generated through Vertex AI and the class-conditional arm through the public developer API (two draws) and Vertex AI (one draw). §6.2 measured the two surfaces at parity, and the arm's Vertex draw is within 0.004 AUC of its public draws on every student.
 
 | condition, finance n = 300 | draws | 1-way TV ↓ | 2-way TV ↓ | cond. seen ↓ | cond. held-out ↓ | TSTR-LR ↑ | TSTR-RF ↑ | TSTR-GBM ↑ |
 |---|---|---|---|---|---|---|---|---|
@@ -1431,8 +1428,7 @@ still resolvable on LR and RF (Welch p = 0.043 and 0.008) and not on GBM (p = 0.
 
 **Step 3: the headline generator.** The same release design through Claude Fable 5, three draws from
 one class-conditional finance release, beside the five-draw pooled-release arm of §F.3 that every
-finance comparison in this paper was first run against
-(`paper/audit/regen_class_conditional_fable.py`, `results/credit_cc_fable_eval.json`):
+finance comparison in this paper was first run against:
 
 | condition, finance n = 300 | draws | 1-way TV ↓ | 2-way TV ↓ | cond. seen ↓ | cond. held-out ↓ | TSTR-LR ↑ | TSTR-RF ↑ | TSTR-GBM ↑ |
 |---|---|---|---|---|---|---|---|---|
@@ -1449,7 +1445,7 @@ The tree students replicate the Gemini result and reach the real-sample floor: R
 One measure moves against the change under this generator. Held-out conditional error rises from 0.048 to 0.057 (p = 0.007, adjusted 0.036), 0.012 above the real-sample floor, where under Gemini it did not move. The per-outcome blocks give the generator more to honour per cohort, and the cost on this generator appears on the conditional families the release does not name. We report it as a cost of the design, not as noise. On the 12-column schema, where AIM completes, the same arm's three students score above AIM's after correction, which the pooled arm's did not (§F.3).
 
 **The Adult check.** The class-conditional release changes the histograms every Adult arm was
-generated from, so we generated two Fable 5 draws from one class-conditional Adult release, through the same pipeline as the finance arms (`results/adult_cc_fable_eval.json`), against the same floors as §7.5's ladder. TSTR is 0.846 / 0.885 / 0.873 against a real sample's 0.830 / 0.870 / 0.840. 1-way TV is 0.053 and conditional error on seen groups 0.039, against the floor's 0.043 and 0.062. Two draws is a check rather than a result, and it is stated as one. The release change does not cost Adult its equivalence, and both draws are at or above every figure §7.2 reports for the pooled arms.
+generated from, so we generated two Fable 5 draws from one class-conditional Adult release, through the same pipeline as the finance arms, against the same floors as §7.5's ladder. TSTR is 0.846 / 0.885 / 0.873 against a real sample's 0.830 / 0.870 / 0.840. 1-way TV is 0.053 and conditional error on seen groups 0.039, against the floor's 0.043 and 0.062. Two draws is a check rather than a result, and it is stated as one. The release change does not cost Adult its equivalence, and both draws are at or above every figure §7.2 reports for the pooled arms.
 
 **Scope, stated.** Two datasets, two generators, three and two draws per arm. The direction and the size of the utility gain replicate across generators on finance. The cost on held-out conditional error appears under one generator and not the other. Adult is a two-draw check. §H.9 sweeps the ε split and `n_min` around the shipped values with the naive decoder and finds nothing that improves on the defaults outside draw-to-draw spread. The change therefore ships with the release parameters every other arm used.
 
@@ -1461,10 +1457,9 @@ Every CoRTeC arm above was generated from a prompt that stated the released dist
 shares and kept every row the generator returned. §3.3 describes the two Stage-B changes the reference implementations now ship by default. Each batch is told the exact number of rows it must produce per bin, per category and per outcome, updated after every accepted batch. The pipeline generates three times the rows it needs and keeps the `n` whose cell counts match the release. Both are post-processing of the release, so neither costs privacy budget. Both are built on the class-conditional release of §7.11 with the conditional table's share of the budget at one fifth.
 
 This section measures the whole configuration under the protocol of §6 against the same floors,
-ceiling and baselines as §7.2 and §7.3, with Gemini 3.5 Flash through Vertex AI as the generator
-(`paper/audit/regen_cortec_v2.py`, `results/cortec_v2_eval.json`). The question is no longer how CoRTeC compares with the marginal methods on their own statistic; §7.3 answered that for the earlier arms. It is where the output now lies relative to the one bound that no decoder can move: the release's own distance from the private data.
+ceiling and baselines as §7.2 and §7.3, with Gemini 3.5 Flash through Vertex AI as the generator. The question is no longer how CoRTeC compares with the marginal methods on their own statistic; §7.3 answered that for the earlier arms. It is where the output now lies relative to the one bound that no decoder can move: the release's own distance from the private data.
 
-**That bound first.** A release at ε = 2.0 with a fifth of the budget on the conditional table has 1-way total variation 0.020 against the training data on Adult and 0.013 on finance, under the public bins. The same releases with half the budget on the table record 0.029 and 0.017 (`paper/audit/pool_rake_selection.py`, `results/cortec_v2_ablation.json`). No output decoded from the release can be expected to do better than that against real data. A 300-record real sample records 0.043 and 0.041 on the same measure, so the release carries less marginal error than a sample of the size we generate.
+**That bound first.** A release at ε = 2.0 with a fifth of the budget on the conditional table has 1-way total variation 0.020 against the training data on Adult and 0.013 on finance, under the public bins. The same releases with half the budget on the table record 0.029 and 0.017. No output decoded from the release can be expected to do better than that against real data. A 300-record real sample records 0.043 and 0.041 on the same measure, so the release carries less marginal error than a sample of the size we generate.
 
 **Adult.** Three draws from one class-conditional release, hand-tuned hierarchy, `n_min` = 150,
 n = 300, beside the arms of §7.2 and §7.3:
@@ -1530,7 +1525,7 @@ In §7.3 the marginal methods recorded lower 1-way error than the earlier arms b
 **NHANES, auto-configured.** The turn-key case: a release the auto-configurator derived with no
 hand-tuned hierarchy (three age cohorts, two conditional levels over `age_years`, `diastolic_bp`
 and `race_ethnicity`, as in §F.1), generated cohort-wise from a 2× pool at n = 300, three draws,
-against the floors at the same size (`results/cortec_v2_nhanes_auto_eval.json`):
+against the floors at the same size:
 
 | condition, NHANES n = 300 | draws | 1-way TV ↓ | 2-way TV ↓ | cond. seen ↓ | cond. held-out ↓ | TSTR-LR ↑ | TSTR-RF ↑ | TSTR-GBM ↑ |
 |---|---|---|---|---|---|---|---|---|
@@ -1557,8 +1552,7 @@ decision on every stored arm.
 NHANES is also the one clinical dataset on which AIM completes (3,749 rows, ten columns: 58 s to fit). It therefore carries the healthcare head-to-head of Figure 4, with MST, AIM and PATE-CTGAN fitted on NHANES at the same ε and binning and sampled at the same n. CoRTeC records the better value against all three on every measure except conditional error over seen groups, where MST's 0.004 and CoRTeC's 0.006 do not separate. At three draws against three, the differences that survive Holm over the seven-metric family are: held-out conditional error against MST and AIM; 1-way and 2-way error against MST and PATE-CTGAN; and the random-forest student against MST and AIM (+0.086 and +0.082). The other utility differences do not survive, although most are at or below p = 0.05 before correction (+0.05 to +0.09 AUC over MST, +0.06 to +0.16 over AIM). The family table has the numbers. The utility ordering on this dataset is a signal at this draw count on two students and a corrected result on one.
 
 **What each step contributes, on one release.** The two Stage-B steps were separated on the Adult
-release by scoring the same generated rows before and after selection
-(`paper/audit/regen_v2_ablation.py`):
+release by scoring the same generated rows before and after selection:
 
 | Adult, one class-conditional release, three pools, Gemini 3.5 Flash | 1-way TV ↓ | 2-way TV ↓ | cond. seen ↓ | cond. held-out ↓ | TSTR-LR ↑ | TSTR-RF ↑ | TSTR-GBM ↑ |
 |---|---|---|---|---|---|---|---|
@@ -1785,8 +1779,7 @@ The defaults, reached through one call, `generate_selected(release, n_rows)`, ar
 conditional target table and relabels a marginal synthesiser's output to match it, with no model
 server in the dependency tree. Its claim is deliberately narrower than §8.2's. It corrects one axis, it reports whether the correction helped, and it tells the user to keep their budget when it did not.
 
-**Test suites**: 200 passed / 7 skipped / 1 xfailed in the research harness, 136 in `cortec`, 26 in
-`cortec-hybrid`. Every regression test is named after the defect it prevents, and each was verified
+**Test suites**: 136 in `cortec` and 26 in `cortec-hybrid`. Every regression test is named after the defect it prevents, and each was verified
 to fail against the pre-fix code. What building them changed in this paper, and what the tools
 enforce and still do not, are in Appendix J.
 
@@ -1945,7 +1938,7 @@ internal tree and are available from the authors on request.
 it implicit because a later pandas silently changed how a missing value renders, which moved a
 published baseline from 0.019 to 0.110 with no test failing.
 
-**Privacy accounting** is verified by instrumentation. `TestActualEpsilonSpend` patches the Laplace mechanism inside the release path and tallies what is genuinely spent, asserting exactly ε_total on three auto-configured specs and at three budgets. This replaced an earlier verifier that re-derived the budget
+**Privacy accounting** is verified by instrumentation. A test patches the Laplace mechanism inside the release path and tallies what is genuinely spent, asserting exactly ε_total on three auto-configured specs and at three budgets. The reference implementation's own suite carries the same discipline: `test_the_scale_actually_drawn_is_the_scale_the_ledger_charged` records the scales actually passed to the random-number generator and requires each to be one the ledger charged, and `test_release_spends_exactly_the_declared_budget_not_merely_less` and `test_autoconfigured_release_still_closes_the_budget_exactly` require a release to account for exactly the declared budget rather than merely staying within it. This replaced an earlier verifier that re-derived the budget
 from hardcoded parameters and would have passed even if the pipeline diverged from that model.
 
 **Datasets** are fetched from public sources and cached with row-count validation. NHANES is fetched from
@@ -1963,8 +1956,8 @@ python3 run_dataset.py --dataset credit --stage generate --backend anthropic --m
 
 and `--no-class-conditional` produces the pooled release the earlier arms used. A release already
 present in `--outdir` is reused rather than redrawn, so further draws cost no privacy budget. Every
-table is scored by `evaluate_generic.py --dataset <name> --spec-json <arms> --seed 42`, and the
-`regen_*.py` scripts under `paper/audit/` hold the exact arm specifications behind each table.
+table is scored by `evaluate_generic.py --dataset <name> --spec-json <arms> --seed 42`; the exact arm
+specifications behind each table are retained with the per-draw records (see *What is published*).
 
 **Total commercial spend** for every experiment reported here was approximately $220 as metered. We report it as an estimate rather than a balance for the reasons in §H.8. The shipped-configuration arms, the second-vendor pool and the NHANES sweeps of this revision account for about $68 of it.
 
@@ -1987,40 +1980,24 @@ table is scored by `evaluate_generic.py --dataset <name> --spec-json <arms> --se
 | Baselines | [`run_baselines_v2.py`](https://github.com/Calyie/cortec/blob/main/run_baselines_v2.py) | MST / AIM / DP-CTGAN / PATE-CTGAN / PATE-GAN at matched ε and matched n |
 | Evaluation | [`evaluate_generic.py`](https://github.com/Calyie/cortec/blob/main/evaluate_generic.py) | marginal, conditional (seen and held-out) and utility metrics with automatic floor/ceiling rows and an unmatched-n warning |
 | AIM's metric | [`workload_error.py`](https://github.com/Calyie/cortec/blob/main/workload_error.py) | 3-way workload error over `all-3way`, `target`, `skewed` |
-| pMSE | `pmse.py` | pMSE ratio with a permutation null (internal; not in the public repository)|
 | Transmission | [`run_misalignment_generic.py`](https://github.com/Calyie/cortec/blob/main/run_misalignment_generic.py) | Definition 1 on any dataset and backend |
 | Baseline transmission | [`run_baseline_transmission.py`](https://github.com/Calyie/cortec/blob/main/run_baseline_transmission.py) | the family-separation experiment of §7.4.1 |
-| Model grid | `run_model_grid.py` | the capability and family sweep of §H.15.3 (internal; not in the public repository)|
 | Privacy sweep | [`run_epsilon_sweep.py`](https://github.com/Calyie/cortec/blob/main/run_epsilon_sweep.py), [`report_epsilon_sweep.py`](https://github.com/Calyie/cortec/blob/main/report_epsilon_sweep.py) | release → generate → baselines → evaluate per ε |
 | Statistics | [`head_to_head.py`](https://github.com/Calyie/cortec/blob/main/head_to_head.py), [`significance_test.py`](https://github.com/Calyie/cortec/blob/main/significance_test.py) | bootstrap CIs, Welch and Mann–Whitney with the attainable floor, Hedges' g with CI, Holm–Bonferroni over the family |
 | Mechanism decomposition | [`explain_utility_gap.py`](https://github.com/Calyie/cortec/blob/main/explain_utility_gap.py) | the I(X;Y) / I(X;X) / rule-cosine decomposition of §7.3.1 |
 | Membership inference | [`membership_inference.py`](https://github.com/Calyie/cortec/blob/main/membership_inference.py) | four attacks with a validated positive control, plus the ε sweep |
 | Classification profile | [`classification_report.py`](https://github.com/Calyie/cortec/blob/main/classification_report.py) | accuracy/precision/recall/F1/AUC/AP, confusion matrices, TPR at fixed FPR, out-of-sample thresholding |
-| Rejected remediation | `calibrate_generation.py` | kept as the record of §H.14's negative result (internal; not in the public repository)|
 | Figures | [`paper/make_figures.py`](https://github.com/Calyie/cortec/blob/main/paper/make_figures.py), [`paper/make_fig07_enterprise_ladder.py`](https://github.com/Calyie/cortec/blob/main/paper/make_fig07_enterprise_ladder.py) | regenerate every figure from the result JSON; no figure number is typed by hand. Figure 8 has its own script because it is the one figure scoped to enterprise platforms only (§H.15.3) |
 | Reference tool | `tools/cortec/`, **in the companion [`cortec-framework`](https://github.com/Calyie/cortec-framework) repository**, as `cortec/` | the mechanism as an installable package: hash-locked prompts, capability gating, auditable ledger, output property test |
 | Reference tool | `tools/cortec-hybrid/`, **in `cortec-tools`**, as `cortec-hybrid/` | the model-free conditional correction of §8.2. The two repositories reference each other; the parity audit below reads both and refuses to run if it cannot find the tools (`CORTEC_TOOLS`, or a side-by-side clone) |
-| **Number audit** | `paper/audit/audit_paper_numbers.py` | re-derives every headline number in this paper from the result files and fails on any drift |
-| Regeneration scripts | `paper/audit/regen_*.py`, `paper/audit/coverage_census.py`, `paper/audit/within_group_replication.py`, `paper/audit/leak_ratio_check.py`, `paper/audit/noised_count_impact.py` | rebuild the tables they name, so each is reproducible rather than transcribed |
-| Paper/tool parity | `paper/audit/verify_paper_tool_parity.py` | asserts each review item is fixed in the paper *and* in the shipped tools |
-| Pre-correction rate mechanism | `paper/audit/rate_scale_dp_gap.py`, `results/rate_scale_dp_gap.json` | computes, by direct integration, the (ε, δ) guarantee the reported tables carry under the pre-A1 data-dependent-scale rate mechanism (§4.3); δ = 1.5 × 10⁻⁷ at the n_min = 150 floor. `paper/audit/regen_hybrid_table_unified.py` and `paper/audit/regen_adult_transmission_pooled.py` (covered by the `regen_*` row) rebuild §8.2 under the §6.4 evaluator and pool the Adult transmission sweep for §7.4 and Figure 6 |
-| Corrected-mechanism headline arm (§7.2, Result 1′) | `paper/audit/regen_adult_corrected_arm.py`, `results/adult_corrected_arm_eval.json`, `results/v5_corrected/`, `results/v5_corrected_d2/` | scores the five draws generated from a fresh release under the corrected two-count mechanism with `evaluate_generic.score` on the §7.2 split, after first re-scoring the shipped arm and refusing to proceed unless the stored records reproduce to 4 decimals; writes the paired comparison against the real sample and the original headline arm |
-| Appendix F.1, regenerated | `paper/audit/regen_f1_nhanes.py`, `results/f1_nhanes_eval.json`, `results/classification_report_nhanes.json`, `results/cert_nhanes_cohortwise.json`, `results/nh_nmin0_cohortwise/`, `results/nh_nmin0_cohortwise_d2/` | one command regenerates every F.1.1 and F.1.2 number for configurations A, B and C from the stored draws against the corrected NHANES reference; the cohort-wise arm C (two draws on A's release) and its Stage C bound are new |
-| §7.1.3 matched control on the registry | `paper/audit/regen_renal_matched.py`, `results/renal_matched_eval.json`, `results/_renal_matched_spec.json`, `results/l12_renal_matched/`, `results/l12_renal_matched_d2/` | scores the matched header-only control (two draws, Gemini 3.5 Flash, n = 1,000) on the `l12_renal` release beside the CoRTeC arm and the unmatched control, and computes the matched and unmatched CoRTeC-to-control gaps on both datasets; the arm that retired the 4.8× factor |
-| §6.2 surface parity (public API vs Vertex AI) | `paper/audit/regen_surface_parity.py`, `results/surface_parity_eval.json`, `results/_surface_parity_spec.json`, `results/nh_nmin0_cohortwise_d3/`, `results/nh_vertex_d0/`, `results/nh_vertex_d1/` | scores the same NHANES release, model, prompts and n generated through the vendor's public developer API and through Vertex AI, three draws each, under the paper's protocol; asserts by md5 that all six draws share one release; reports the surface gap beside the draw-to-draw spread with Welch's p and Hedges' g per metric |
-| §7.11 release sufficiency (no model) | `paper/audit/release_sufficiency.py`, `results/release_sufficiency_credit.json`, `results/release_sufficiency_adult.json` | builds the pooled and the class-conditional release of finance and Adult at the pipeline's ε from the same training split, decodes each by independent sampling with no language model (cohort by released size; under the pooled release the outcome from the released conditional table and every other column from the cohort's histogram, under the class-conditional release the outcome from the cohort's class balance and every other column from that outcome's block), five decodes each, and scores them under the paper's protocol beside the floors |
-| §7.12 NHANES head-to-head baselines | `run_dataset.py --dataset nhanes_auto --stage baselines`, `results/nhanes_baselines/` | MST, AIM and PATE-CTGAN fitted on NHANES at ε = 2, public binning, n = 300, three draws each; scored by `paper/audit/regen_cortec_v2.py` beside the shipped configuration |
-| §7.6 NHANES ε sweep, shipped configuration | `paper/audit/regen_nhanes_eps.py`, `results/nhanes_eps_shipped/eps{0.3,1,8}/`, `results/nhanes_eps_shipped/eps{0.3,1,8}_baselines/`, `results/nhanes_eps_shipped/eval_eps{0p3,1,2,8}.json` | one shipped-configuration draw per budget from an auto-configured release at that ε (pool 2×), MST refitted at each budget, scored with the floors; Figure 9 reads the four evaluation files |
-| §7.4 NHANES inversion sweep | `run_misalignment_generic.py --dataset nhanes_auto --group-col race_ethnicity --group-values black_nh --cohort-filter age_years_c1`, `paper/audit/nhanes_misalign_summary.py`, `results/nhanes_misalign/` | the forced-rate sweep on NHANES; the summariser computes the released rate from the class-conditional blocks, because the auto-configured table pools black_nh with white_nh |
-| §H.17 sub-bin values | `paper/audit/regen_within_bin.py`, `results/within_bin_redraw.json`, `src/generic_pipeline.py::release_subbin_values`, `paper/audit/reselect_all.py` | every stored CoRTeC arm scored with the generator's sub-bin values and with the shipped rule applied; the rule is the default of `select_to_release` in both implementations (`sub_bin="generator"` disables it), and `paper/audit/reselect_all.py` re-selects every stored pool through the shipped path |
-| §7.4.1 NHANES transmission by mechanism family | `run_baseline_transmission.py --dataset nhanes_auto`, `results/nhanes_baseline_transmission/transmission.json` | MST and PATE-CTGAN on the same forced relationship at the same ε; Figure 7 reads it |
-| §7.12 the shipped configuration, arms and statistics | `paper/audit/regen_cortec_v2.py`, `results/cortec_v2_eval.json`, `results/cortec_v2_{adult,credit,credit_aim12,nhanes_auto}_eval.json`, `results/adult_v2_gemini/`, `results/adult_v2_gemini_d2/`, `results/adult_v2_opus/`, `results/credit_v2_gemini/`, `results/credit_v2_gemini_d2/`, `results/nhanes_v2_gemini/` (each holds the release, the generated pools and the selected draws) | scores the shipped-configuration arms (class-conditional release at a 0.2 share, exact-count batches, selection from a 3× pool) under the paper's protocol beside AIM, MST and the floors, with Welch p, Hedges' g and Holm per dataset family; `run_dataset.py --quota --pool-factor 3 --cond-frac 0.2` reproduces a draw |
-| §7.11 class-conditional release through Fable 5, and the Adult check | `paper/audit/regen_class_conditional_fable.py`, `results/credit_cc_fable_eval.json`, `results/credit_cc_fable/`, `results/credit_cc_fable_d2/`, `results/adult_cc_fable_eval.json`, `results/adult_cc_fable/`, `results/adult_cc_fable_d2/` | scores three Claude Fable 5 draws from one class-conditional finance release against §F.3's pooled-release arm, MST, PATE-CTGAN and the floors, with Welch p, Hedges' g and Holm per metric; the Adult file holds two Fable 5 draws from one class-conditional Adult release beside the same floors |
-| §H.9 release-parameter sweep (no model) | `paper/audit/release_sweep.py`, `results/release_sweep_credit.json`, `results/release_sweep_adult.json` | builds both release kinds at every point of a `cond_frac` × `n_min` grid, decodes each by independent sampling five times and scores under the paper's protocol |
-| §7.11 class-conditional release, matched generator test | `paper/audit/regen_class_conditional.py`, `results/class_conditional_eval.json`, `results/credit_cc/`, `results/credit_cc_d2/`, `results/credit_cc_d3/`, `results/credit_pooled/`, `results/credit_pooled_d2/` | scores three Gemini 3.5 Flash draws from the class-conditional finance release against three from the pooled one, same hierarchy, ε, n and prompts, under the paper's protocol; Welch p and Hedges' g per metric |
-| §F.3 AIM on the 12-column finance schema | `paper/audit/regen_credit_aim12.py`, `results/credit_aim12_eval.json`, `results/credit_aim12/` (five AIM fits, their wall times and the dropped columns), [`src/datasets_extra.py`](https://github.com/Calyie/cortec/blob/main/src/datasets_extra.py) (`credit_aim12`) | scores AIM's five fits beside CoRTeC's five draws, MST's and PATE-CTGAN's three and the real floors, every arm on the same 12 columns; Holm over the fourteen CoRTeC-vs-AIM and CoRTeC-vs-MST comparisons; refuses to write unless the stored 2026-09-11 evaluation reproduces on every metric the evaluator has not since changed |
-| §7.1.2 matched control | [`src/generic_pipeline.py`](https://github.com/Calyie/cortec/blob/main/src/generic_pipeline.py), [`src/prompts.py`](https://github.com/Calyie/cortec/blob/main/src/prompts.py) (`build_matched_header_only_prompt`), `results/matched_header_only_ablation/` | CoRTeC's prompt with the released arrays deleted, built by stripping CoRTeC's own output and refusing to return if any released quantity survives |
-| Tests | `test_cortec.py`, `tools/*/tests/` | 208 + 136 + 26, each named after the defect it prevents |
+| Number audit and regeneration | retained internally (Appendix A) | every headline number is re-derived from the per-draw records and every table is rebuilt from them rather than transcribed; a parity check asserts that the paper and the shipped tools agree on every parameter and rule; the scripts and the records are available from the authors on request |
+| §7.12 NHANES head-to-head baselines | `run_dataset.py --dataset nhanes_auto --stage baselines` | MST, AIM and PATE-CTGAN fitted on NHANES at ε = 2, public binning, n = 300, three draws each, scored beside the shipped configuration |
+| §7.4 NHANES inversion sweep | `run_misalignment_generic.py --dataset nhanes_auto --group-col race_ethnicity --group-values black_nh --cohort-filter age_years_c1` | the forced-rate sweep on NHANES; the released rate is computed from the class-conditional blocks, because the auto-configured table pools black_nh with white_nh |
+| §H.17 sub-bin values | [`src/generic_pipeline.py`](https://github.com/Calyie/cortec/blob/main/src/generic_pipeline.py) (`release_subbin_values`) | every stored CoRTeC arm scored with the generator's sub-bin values and with the shipped rule applied; the rule is the default of `select_to_release` in both implementations (`sub_bin="generator"` disables it) |
+| §7.4.1 NHANES transmission by mechanism family | `run_baseline_transmission.py --dataset nhanes_auto` | MST and PATE-CTGAN on the same forced relationship at the same ε; Figure 7 reads its output |
+| §F.3 AIM on the 12-column finance schema | [`src/datasets_extra.py`](https://github.com/Calyie/cortec/blob/main/src/datasets_extra.py) (`credit_aim12`) | the 12-column schema on which AIM completes; AIM's five fits are scored beside CoRTeC's five draws, MST's and PATE-CTGAN's three and the real floors, every arm on the same 12 columns, with Holm over the fourteen CoRTeC-vs-AIM and CoRTeC-vs-MST comparisons |
+| §7.1.2 matched control | [`src/generic_pipeline.py`](https://github.com/Calyie/cortec/blob/main/src/generic_pipeline.py), [`src/prompts.py`](https://github.com/Calyie/cortec/blob/main/src/prompts.py) (`build_matched_header_only_prompt`) | CoRTeC's prompt with the released arrays deleted, built by stripping CoRTeC's own output and refusing to return if any released quantity survives |
+| Tests | `cortec/tests/` and `cortec-hybrid/tests/` in the companion repository | 136 + 26, each named after the defect it prevents |
 
 ---
 
@@ -2067,7 +2044,7 @@ band with reasoning verifiably not firing (§7.5, verified by the instrumentatio
 
 **The same profile on the shipped configuration.** Re-run on the three shipped Adult draws of
 §7.12 (Gemini 3.5 Flash, pooled to 900 records, with the real-sample reference drawn at the same
-size; [`classification_report.py`](https://github.com/Calyie/cortec/blob/main/classification_report.py), `results/classification_report_shipped.json`, drawn as
+size; [`classification_report.py`](https://github.com/Calyie/cortec/blob/main/classification_report.py), drawn as
 `paper/figures/fig12_classification_shipped.png`, the classification figure of the arXiv paper):
 
 | trained on | precision | recall | F1 | AUC | avg. precision |
@@ -2178,12 +2155,12 @@ requested. An alternative rule additionally requires each cell to clear the rele
 which produces a coarser table with full coverage. Both were built and both were run, because the first rule looks wrong on its face: NHANES releases only 4 of 27 cells.
 
 **What configuration A is, stated precisely, because §7.10 refuses it.** A is the level-3
-auto-configured release at `n_min = 150` (`results/nh_nmin0`, Gemini 3.5 Flash, 600 rows, two
+auto-configured release at `n_min = 150` (Gemini 3.5 Flash, 600 rows, two
 draws), the same release §7.10 reports as catastrophic. Its four surviving cells hold 780 of 3,749 records (20.8%). All four lie in a single diastolic-blood-pressure band and a single race/ethnicity group, spanning four of six age bands. That is the 25.4% per-column band coverage §7.10 computes, and the per-column 90% guard the shipped tool applies refuses this release.
 
 We checked its output directly rather than infer it. Across both draws the synthetic race/ethnicity column contains only two of the six groups (non-Hispanic white 0.55, non-Hispanic black 0.45) and no record at all in the 50–60 age band. Every number attributed to A in this appendix (the table below, the classification report of F.1.2, the Stage C bound of F.1.4 and the summary of F.1.5) was therefore computed on a synthetic cohort with no Asian, Mexican-American, other-Hispanic or multiracial records. An earlier version of this appendix stated that A's cells covered "~77% of records" and concluded "we therefore ship A". The coverage figure was not reproducible from any stored artefact and is withdrawn. The recommendation is reversed below.
 
-**Three arms, one release.** Configurations A and B are the two cell-wise releases. C is the cohort-wise path run on A's own release: the same four-cell conditional table shown to the same model, but with rows generated per cohort rather than per released cell, so no band of any conditioning column can be silent. The generator is Gemini 3.5 Flash at n = 600, with two draws for A and B and three for C (the same three draws §6.2's surface comparison scores, so the two sections agree to the draw). Every number in this appendix is regenerated from the stored draws by `paper/audit/regen_f1_nhanes.py` (`results/f1_nhanes_eval.json`, `results/classification_report_nhanes.json`), against the corrected 3,749-row reference of defect 20:
+**Three arms, one release.** Configurations A and B are the two cell-wise releases. C is the cohort-wise path run on A's own release: the same four-cell conditional table shown to the same model, but with rows generated per cohort rather than per released cell, so no band of any conditioning column can be silent. The generator is Gemini 3.5 Flash at n = 600, with two draws for A and B and three for C (the same three draws §6.2's surface comparison scores, so the two sections agree to the draw). Every number in this appendix is regenerated from the stored draws against the corrected 3,749-row reference of defect 20:
 
 | condition | draws | 1-way TV ↓ | 2-way TV ↓ | cond. seen ↓ | cond. held-out ↓ | TSTR-LR ↑ | TSTR-RF ↑ | TSTR-GBM ↑ |
 |---|---|---|---|---|---|---|---|---|
@@ -2254,9 +2231,7 @@ positive control of real training records passed off as synthetic:
 | *positive control, 1,800 real records leaked (C's reference)* | *0.871* | *+0.587* | *0.736* | *0.737* | *0.763* |
 | *chance* | *0.500* | *0.000* | *0.001* | *0.010* | *0.100* |
 
-Every row is regenerated from the stored draws by `paper/audit/regen_f1_nhanes.py`
-(`results/classification_report_nhanes.json`, attack block), against the corrected reference of
-defect 20. The NHANES positive controls are the strongest of any dataset in this paper (attack AUC 0.787 and 0.871 against roughly 0.62 elsewhere), which makes the nulls correspondingly better evidenced. The attack has ample power on this schema and finds nothing at the aggregate level against any configuration. Every AUC is within 0.021 of chance.
+Every row is regenerated from the stored draws against the corrected reference of defect 20. The NHANES positive controls are the strongest of any dataset in this paper (attack AUC 0.787 and 0.871 against roughly 0.62 elsewhere), which makes the nulls correspondingly better evidenced. The attack has ample power on this schema and finds nothing at the aggregate level against any configuration. Every AUC is within 0.021 of chance.
 
 The low-false-positive operating points are where the arms differ, and we report each rather than average them. At 0.1% every arm is within four records of chance (C at exactly 0.000, A at 0.005, B at 0.003, against 0.001). At 1% A is below chance (0.008 against 0.010) while C and B are above it, 0.013 and 0.021, three and eleven records in a thousand. B's excess is the largest here. It is the same configuration that §F.1.1 shows transmitting no more conditional structure than permuted data outside its own release. Both are limits on B, and both are stated. C, the deployable configuration, is at chance on two of the three operating points and three records above it on the third. Its control, with 1,800 leaked records, separates at 0.736 on the same point. The regime matters because an attack that is
 confidently right about a few individuals is the one that harms someone.
@@ -2273,7 +2248,7 @@ cells, all covered:
 | *real-sample ceiling (held-out draw)* | *0.0671* (A's run) · *0.0745* (C's run) | *yes* |
 | *permuted-target floor* | *0.2076* (A's run) · *0.2194* (C's run) | **no** |
 
-The ceiling passes and the floor does not in both runs, so the test discriminates and a verdict is issued each time. The two verdicts differ. The cell-wise arm clears the bound; the cohort-wise arm does not. The reason is visible in its cells (`results/cert_nhanes_cohortwise.json`). In the 50–60-year cell, 24 of its 48 synthetic rows are positive against a private rate of 0.197, so the bound on that cell is 0.33. Cohort-wise generation pins each cohort's marginals and shows the model the conditional table, but nothing forces the rate *inside* a fine cell to match it. Cell-wise generation does exactly that, which is why it reduced conditional rate error 77× in §3.3 and why it clears here.
+The ceiling passes and the floor does not in both runs, so the test discriminates and a verdict is issued each time. The two verdicts differ. The cell-wise arm clears the bound; the cohort-wise arm does not. The reason is visible in its cells. In the 50–60-year cell, 24 of its 48 synthetic rows are positive against a private rate of 0.197, so the bound on that cell is 0.33. Cohort-wise generation pins each cohort's marginals and shows the model the conditional table, but nothing forces the rate *inside* a fine cell to match it. Cell-wise generation does exactly that, which is why it reduced conditional rate error 77× in §3.3 and why it clears here.
 
 This is the trade-off §F.1.1 named. C is representative and trains the better model. A transmits the fine-cell rates and is not representative. A deployment that needs the bound needs
 a cell-wise release the guard passes, B on this schema, or the coverage the guard demands.
@@ -2439,11 +2414,9 @@ n = 300, ε = 2.0, 5 CoRTeC draws against 3 per baseline.
 
 The pooled-release arm is the one every finance comparison below was first run against, and its Holm family stands as computed. Over the 14 comparisons on this dataset its TSTR-LR exceeds MST's (+0.073, adjusted p = 0.0029, g = 4.2) and its TSTR-RF (+0.065, adjusted p = 0.014, g = 4.3). On TSTR-GBM the raw difference of +0.053 does not survive (adjusted p = 0.159). MST records the lower 1-way TV (adjusted p = 1.3 × 10⁻⁶, g = 19.0). CoRTeC records the lower 2-way TV (adjusted p = 2.0 × 10⁻⁶) and held-out conditional TV (adjusted p = 0.0082).
 
-The class-conditional row is the same generator on the release §7.11 introduces. Against the pooled arm it gains +0.049 on RF and +0.052 on GBM (Welch p = 0.0004 and 0.002, Holm over seven 0.001 and 0.011), and +0.018 on LR (p = 0.089, not significant). Its held-out conditional error rises by +0.008 (p = 0.007, Holm 0.036), the one fidelity measure it moves
-(`paper/audit/regen_class_conditional_fable.py`, `results/credit_cc_fable_eval.json`).
+The class-conditional row is the same generator on the release §7.11 introduces. Against the pooled arm it gains +0.049 on RF and +0.052 on GBM (Welch p = 0.0004 and 0.002, Holm over seven 0.001 and 0.011), and +0.018 on LR (p = 0.089, not significant). Its held-out conditional error rises by +0.008 (p = 0.007, Holm 0.036), the one fidelity measure it moves.
 
-**AIM, on the schema it converges on.** AIM does not complete on the full 15-column credit schema. §F.2.2's ablation localised the cause to the six high-cardinality amount columns, and dropping three of them (`PAY_AMT1–3`) lets it fit in 16–29 minutes. We therefore ran AIM at five seeds on that 12-column schema and scored every arm on the same 12 columns: CoRTeC's five draws, MST's and PATE-CTGAN's three, and the real floors. The comparison is therefore like-for-like. Dropping columns from a generated table is post-processing and costs no budget (`paper/audit/regen_credit_aim12.py`,
-`results/credit_aim12_eval.json`):
+**AIM, on the schema it converges on.** AIM does not complete on the full 15-column credit schema. §F.2.2's ablation localised the cause to the six high-cardinality amount columns, and dropping three of them (`PAY_AMT1–3`) lets it fit in 16–29 minutes. We therefore ran AIM at five seeds on that 12-column schema and scored every arm on the same 12 columns: CoRTeC's five draws, MST's and PATE-CTGAN's three, and the real floors. The comparison is therefore like-for-like. Dropping columns from a generated table is post-processing and costs no budget:
 
 | condition (12-column schema) | draws | 1-way TV ↓ | 2-way TV ↓ | cond. seen ↓ | cond. held-out ↓ | TSTR-LR ↑ | TSTR-RF ↑ | TSTR-GBM ↑ |
 |---|---|---|---|---|---|---|---|---|
@@ -2917,7 +2890,7 @@ marginal effects are 21× and 35× the larger standard deviation, so no plausibl
 explains them. Conditional error on seen cells separates cleanly (4.7×, p = 0.005). But held-out conditional error does not separate at three draws (1.4×, p = 0.12), and neither does TSTR-LR (0.9×, p = 0.26). We had previously quoted both as part of the cell-wise penalty and now report them as unresolved. TSTR-RF and TSTR-GBM show cell-wise *worse* by 0.034 and 0.041, which is the direction
 §7.10 predicts and is marginal at this sample size (p = 0.036 and 0.062, uncorrected). In summary, cell-wise generation on this release is decisively worse on every *fidelity* measure
 and directionally worse on downstream utility without resolving at n = 3.
-`paper/audit/regen_cohort_vs_cell.py` regenerates the table.
+The table is regenerated from the stored draws.
 
 **What this still leaves open.** The three-draw arms are one model on one dataset. The catastrophic case replicates across two vendors, the repair replicates across two vendors on the second dataset, and the per-column prediction holds across four conditional configurations. We are therefore confident in the mechanism and the direction. The Adult and Diabetes arms remain at one to two draws each, and their effect sizes are quoted without measured spread. The per-column floor is calibrated against eleven per-column measurements spanning two datasets, whose highest failure is 0.858 and lowest pass 0.911. 90% lies inside that five-point gap. The gap is genuine but narrow, and its lower end is the ambiguous `number_inpatient` case. The floor's exact position therefore remains a judgement, a much better-supported one than a release-level count of four values implied.
 
@@ -2952,9 +2925,9 @@ a real and decisive advantage at the scale of millions of records. CoRTeC's rele
 
 ### H.9 Release parameters around the shipped values, decoded with no model
 
-§7.11's Step 1 decodes a release by independent sampling and scores the result under the paper's protocol. That makes it a free way to ask whether the release parameters every arm uses, the conditional share of the budget (`cond_frac` = 0.5) and the support floor (`n_min` = 150), are near the best available. `paper/audit/release_sweep.py` builds the pooled and the class-conditional
+§7.11's Step 1 decodes a release by independent sampling and scores the result under the paper's protocol. That makes it a free way to ask whether the release parameters every arm uses, the conditional share of the budget (`cond_frac` = 0.5) and the support floor (`n_min` = 150), are near the best available. The sweep builds the pooled and the class-conditional
 release at each point of a grid, `cond_frac` ∈ {0, 0.2, 0.35, 0.5} by `n_min` ∈ {100, 150}, five
-decodes each, on finance and on Adult (`results/release_sweep_{credit,adult}.json`). At
+decodes each, on finance and on Adult. At
 `cond_frac` = 0 no conditional table is released and the decoder takes the outcome from the cohort's
 class balance.
 
@@ -2998,7 +2971,7 @@ is 3.2% (five of 158 rows). Per-cell exposure does track the conditioning column
 patient appearing across the release, not by any single statistic being theirs.
 
 The summary is therefore narrow. The bound is vacuous. The architecture cannot detect the condition that makes it vacuous. What protects the individual released statistics is the shape of this dataset rather than a property of the mechanism.
-`paper/audit/group_privacy_concentration.py` reproduces the table.
+The table is computed from the dataset's patient identifiers.
 
 **The mitigation is a required pre-processing step, taken before Stage A, and it is exact rather than
 approximate.** Reducing `k` reduces `ε_person = k · ε_row` by construction. It is pure preprocessing, and the mechanism is untouched. This is the answer to the ε_person = 80 figure, and we state it as a requirement rather than a suggestion. On unaggregated longitudinal encounter data, reducing the privacy unit before Stage A is a prerequisite for running CoRTeC, not an optional hardening step.
@@ -3018,7 +2991,7 @@ does not change the quantity being estimated. Aggregating to one row per person 
 At a matched ε_person of 2.0, capping is 6.3× more accurate than aggregating (0.0123 against 0.0780). A deployment that can accept ε_person = 6.0 reaches 0.0030, within a factor of 2.3 of the unmitigated release, at a guarantee 13× stronger. Aggregation's error is almost entirely bias
 rather than noise, which is the signature of a changed estimand rather than of a lossy mechanism.
 Released-cell coverage stays above the 0.90 guard floor (§7.10) throughout. §G.3's deployment checklist, step 2, carries the ordering this implies.
-`paper/audit/privacy_unit_mitigations.py` reproduces the table.
+The table is computed from the same records.
 
 Aggregation remains correct for privacy and is the right choice when a per-patient quantity is what the deployment actually wants. But it is a modelling decision, and treating it as a privacy workaround is how a deployment silently changes what it is measuring. We did not re-run §F.2 on a patient-level schema, because doing so would answer a different question. CoRTeC on 71,518 aggregated patient records is not a harder or more longitudinal problem than CoRTeC on any other 1-row-per-person dataset, of which we already report ten.
 The encounter-level run is kept because encounter-level data is what hospitals actually hold, and the
@@ -3030,8 +3003,7 @@ honest way to report it is with its group-privacy factor attached.
 The measurement behind §6.2's statement that the surface does not change the result.
 
 **Measured: the surface does not change the result.** The capability half of §6.2's statement is testable, so
-we tested it on the primary clinical dataset. We used one NHANES release, the auto-configured release of §F.1, verified identical by checksum across all six draws. It was generated by the same model, Gemini 3.5 Flash, with the same prompts and n = 600, in the deployable cohort-wise configuration. Three draws went through the vendor's public developer API and three through Gemini on Vertex AI inside a Google Cloud project (a service account holding only `roles/aiplatform.user`). The only variable is the surface. Scored under this paper's protocol, with its floors and ceiling
-(`paper/audit/regen_surface_parity.py`, `results/surface_parity_eval.json`):
+we tested it on the primary clinical dataset. We used one NHANES release, the auto-configured release of §F.1, verified identical by checksum across all six draws. It was generated by the same model, Gemini 3.5 Flash, with the same prompts and n = 600, in the deployable cohort-wise configuration. Three draws went through the vendor's public developer API and three through Gemini on Vertex AI inside a Google Cloud project (a service account holding only `roles/aiplatform.user`). The only variable is the surface. Scored under this paper's protocol, with its floors and ceiling:
 
 | condition | draws | 1-way TV ↓ | 2-way TV ↓ | cond. seen ↓ | cond. held-out ↓ | TSTR-LR ↑ | TSTR-RF ↑ | TSTR-GBM ↑ |
 |---|---|---|---|---|---|---|---|---|
@@ -3302,7 +3274,7 @@ The floor therefore lies between a highest failing measurement of 0.858 and a lo
 
 One caveat applies. The 0.858 case is the weaker of the two. Its band was erased exactly as the rule predicts, but the column's *total* variation improved on net (0.069 against cohort-wise 0.166). Refusing the cell path there therefore trades a real erasure for a real gain.
 The floor's position is a judgement about which of those matters more, taken now over five points
-rather than thirty-one. `paper/audit/coverage_census.py` regenerates the table.
+rather than thirty-one.
 
 Below the floor the research pipeline falls back to cohort-wise and says so. The shipped tool refuses outright, names the safe alternative and the knob (`n_min`, conditional level) that changes coverage, and requires an explicit `allow_low_coverage=True` to proceed. Both also name the columns the released cells fail to span, because that is the actionable part. On the two releases above the diagnosis reads "age_years (4 of 6 bands), diastolic_bp (1 of 5 bands)" and "diastolic_bp (1 of 5 bands)" respectively. That is exactly the set of columns measured to be damaged in each. Three regression tests cover it, each
 verified to fail when its fix is reverted.
@@ -3323,8 +3295,7 @@ carries only a pooled block, the generator's placement is the only carrier of th
 is kept. Integer columns draw integers inside the bin. No bin count changes under the release's bins, so under them 1-way, 2-way and conditional error are unchanged by construction. The evaluator's right-closed bins count edge integers differently (§6.4, defect 27), which is the 0.003 the table shows on Adult's 1-way error. The rule has no parameter.
 
 Applied to every
-stored CoRTeC arm, with the values the generator produced beside the values the rule produces
-(`paper/audit/regen_within_bin.py`, `results/within_bin_redraw.json`):
+stored CoRTeC arm, with the values the generator produced beside the values the rule produces:
 
 | arm | draws, n | TSTR-LR generator → release | TSTR-RF | TSTR-GBM | 1-way TV | real sample LR / RF / GBM |
 |---|---|---|---|---|---|---|
@@ -3454,8 +3425,7 @@ per-cohort record count, on every research release path. The second is confined 
 **The rate mechanism the tables were produced under is not pure ε-DP, and we state what it is.**
 Every release path, and an earlier version of step (iv) above, noised each cell's rate as a bounded
 mean at scale `1/(|c|·ε_L)` with `|c|` the *true* cell size. Under the add/remove adjacency this paper declares, `|c|` differs between neighbouring datasets. The two output densities are therefore Laplace at different scales, and their ratio is unbounded in one tail. The mechanism is `(ε_L, δ)`-DP per level, not `ε_L`-DP. We computed that `δ` exactly, by integrating the two densities over every
-neighbouring pair of cell sizes and every rate position (`paper/audit/rate_scale_dp_gap.py`,
-`results/rate_scale_dp_gap.json`). At the `n_min = 150` floor every reported release used, the
+neighbouring pair of cell sizes and every rate position. At the `n_min = 150` floor every reported release used, the
 worst case is `δ = 1.5 × 10⁻⁷`, at `ε_L` from 0.25 to 1.0, and it falls to numerically zero by
 `|c| = 400`. That is the guarantee the CoRTeC rows of this paper's tables actually carry: pure
 `ε = 2.0` on the marginals and `(ε_L, 1.5 × 10⁻⁷)` on each conditional level, with `δ` decaying
@@ -3498,8 +3468,8 @@ exact-count regime conferred no measurable advantage on any reported number, and
 produced under the fixed pipeline's accounting.
 
 **The control in that table is essential, and without it we would have reported the opposite.**
-Reassembling a draw by resampling with replacement reduces its diversity and inflates total variation on its own, by +0.008 to +0.019 here, between 16 and 37 times the effect being measured. Run without a matched exact-count control, NHANES appears to shift by +0.037. We would have had to report that as the leak's benefit, and it would have been an artefact of our own estimator. `paper/audit/noised_count_impact.py`
-regenerates both tables.
+Reassembling a draw by resampling with replacement reduces its diversity and inflates total variation on its own, by +0.008 to +0.019 here, between 16 and 37 times the effect being measured. Run without a matched exact-count control, NHANES appears to shift by +0.037. We would have had to report that as the leak's benefit, and it would have been an artefact of our own estimator. Both tables are regenerated with the control
+in place.
 
 **The prompt channel is bounded by argument, not by measurement.** The noise the fixed pipeline adds has sd 35.4 records, which across Adult's twelve released cohorts is 0.6% of the largest (6,038 records) and 10.1% of the smallest (350). The largest cohort's line would read `6073` instead of `6038`. An earlier version quoted three cohorts at 0.23–3.0%, figures that match none of the twelve. The worst case is what a reader needs, and it is ten percent. The number is context for a subpopulation description, not a quantity the model is asked to reproduce. The row count per call is set by the allocation, not by this field, and no released statistic is expressed relative to it. We therefore judge the channel immaterial, but judging is not measuring. Isolating it would require regenerating every table with noised counts, which we have not done. A reader who declines the argument should treat the affected tables as carrying that unquantified caveat. It applies to the research pipeline only. Both reference implementations noise and charge the counts, so no deployment inherits it.
 
