@@ -48,9 +48,11 @@ marginal methods pay once at fit time.
 Two findings hold whether or not CoRTeC is adopted.
 
 - **Both standard acceptance criteria are saturated.** Real data with its target column permuted
-  records 95.7% 1-way similarity and passes a 90% bar. An unconditioned prompt with no access to the
-  private data trains a logistic-regression student at 0.824 AUC against a matched real sample's
-  0.834.
+  records 95.7% 1-way similarity and passes a 90% bar. On Adult, an unconditioned prompt with no
+  access to the private data trains a logistic-regression student at 0.824 AUC against a matched real
+  sample's 0.834, AIM's 0.675 and MST's 0.690, so on a public benchmark neither criterion can tell a
+  mechanism that reads the release from one that recites its prior. The paper's inversion test
+  (Section 6.3) exists for that reason.
 - **Whether a private conditional relationship survives is a property of the mechanism family, not
   of holding a DP guarantee.** At identical ε = 2.0 on identical data, MST transmits a forced
   relationship at slope 0.998 and PATE-CTGAN at 0.054.
