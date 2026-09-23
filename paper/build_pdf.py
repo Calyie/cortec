@@ -657,6 +657,7 @@ print(markdown.markdown(src, extensions=exts))
 
     css = CSS + (PAPER_CSS if paper_mode else "")
     doc = (f"<!doctype html><html><head><meta charset='utf-8'>"
+           f"<meta name='author' content='Calister Nnona'>"
            f"<title>{_html.escape(title)}</title><style>{css}</style></head>"
            f"<body>{body}</body></html>")
 
