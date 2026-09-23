@@ -258,7 +258,7 @@ def main():
                     help="control = CoRTeC's prompt with the released arrays deleted (§7.1.2)")
     ap.add_argument("--no-class-conditional", dest="class_conditional", action="store_false",
                     default=True,
-                    help="release POOLED cohort histograms only (the pre-2026-09-18 release); the "
+                    help="release POOLED cohort histograms only (the earlier, pooled release); the "
                          "default releases one histogram block per (cohort, class) where both "
                          "classes clear n_min, at the same epsilon per query")
     ap.add_argument("--by-cell", dest="by_cell", action="store_true", default=True,

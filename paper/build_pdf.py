@@ -1,15 +1,15 @@
 """build_pdf.py — render a CoRTeC paper markdown file to a review-ready PDF.
 
-No pandoc on this machine, so the chain is: python-markdown (in the `ai` env, which is the only
-one with it) -> styled HTML -> the WeasyPrint CLI (installed against the system python). Keeping
-the two steps separate avoids needing one interpreter that has both.
+The chain is python-markdown -> styled HTML -> the WeasyPrint command. The two steps are kept
+separate so that no single interpreter needs both packages: the Markdown step runs in this
+interpreter when it has `markdown`, and otherwise in the one named by CORTEC_MARKDOWN_PYTHON.
 
 The styling targets *reviewability* rather than camera-ready: A4, a serif body, real page numbers,
 and — the part that actually matters here — tables that survive the page width. Several tables in
 this paper carry nine numeric columns, so they get a small monospaced-figure treatment and are
 allowed to shrink rather than overflow the margin.
 
-  python3 paper/build_pdf.py paper/CoRTeC_paper_v2.md paper/CoRTeC_paper_v2.pdf
+  python3 paper/build_pdf.py paper/CoRTeC_arxiv.md paper/CoRTeC_arxiv.pdf
 """
 from __future__ import annotations
 import html as _html
@@ -84,7 +84,7 @@ pre code { background: none; padding: 0; font-size: inherit; }
 table {
   border-collapse: collapse; width: 100%; margin: 2.2mm 0 2.6mm 0;
   font-size: 7.0pt; line-height: 1.22; table-layout: auto;
-  /* Review C3: `break-inside: avoid` on the whole table orphaned the Appendix B heading on a
+  /* An earlier version set `break-inside: avoid` on the whole table, which orphaned the Appendix B heading on a
      blank page, because a table taller than a page cannot be kept whole and is pushed to the
      next page entire. Let the TABLE break; keep each ROW intact; the header repeats via
      table-header-group. */
@@ -609,7 +609,7 @@ def inline_footnotes(body: str) -> str:
 
 
 def main() -> int:
-    src = Path(sys.argv[1] if len(sys.argv) > 1 else "paper/CoRTeC_paper_v2.md")
+    src = Path(sys.argv[1] if len(sys.argv) > 1 else "paper/CoRTeC_arxiv.md")
     dst = Path(sys.argv[2] if len(sys.argv) > 2 else src.with_suffix(".pdf"))
     text = src.read_text()
     report_mode = "<!-- paper-style: report -->" in text
@@ -619,19 +619,25 @@ def main() -> int:
     if paper_mode:
         text = preprocess_math_and_algorithms(text)
 
-    # python-markdown lives only in the `ai` env; shell out to it rather than importing.
+    # python-markdown renders the body. It runs in this interpreter when the package is importable
+    # here, and otherwise in the interpreter named by CORTEC_MARKDOWN_PYTHON.
     render = r'''
 import sys, markdown
 src = sys.stdin.read()
 exts = ["tables", "fenced_code", "attr_list", "sane_lists", "footnotes"] + sys.argv[1:]
 print(markdown.markdown(src, extensions=exts))
 '''
-    ai_py = Path.home() / "miniconda3/envs/ai/bin/python"
-    if not ai_py.exists():
-        print(f"!! {ai_py} not found — that is the only interpreter here with `markdown`")
-        return 1
+    try:
+        import markdown  # noqa: F401
+        md_py = sys.executable
+    except ImportError:
+        md_py = os.environ.get("CORTEC_MARKDOWN_PYTHON", "")
+        if not md_py or not Path(md_py).exists():
+            print("!! the `markdown` package is not installed for this interpreter: pip install "
+                  "markdown, or set CORTEC_MARKDOWN_PYTHON to an interpreter that has it")
+            return 1
     extra = ["smarty"] if paper_mode else []       # curly quotes and apostrophes, as typeset papers have
-    body = subprocess.run([str(ai_py), "-c", render, *extra], input=text, capture_output=True,
+    body = subprocess.run([md_py, "-c", render, *extra], input=text, capture_output=True,
                           text=True, check=True).stdout
 
     # mark up the figure captions so they can be styled apart from body text

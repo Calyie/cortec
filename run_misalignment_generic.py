@@ -21,7 +21,7 @@ The header-only control needs no run per point: its prompt never sees the privat
 draw is the control for every r.
 """
 from __future__ import annotations
-import argparse, json, subprocess, sys
+import argparse, json, sys
 from pathlib import Path
 
 import numpy as np

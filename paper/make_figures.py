@@ -166,7 +166,7 @@ NHANES_TRUTH = 0.1538   # diabetes rate of race_ethnicity = black_nh in the seed
 def fig_calibration():
     sets = [
         ("Census: Adult", "education → income", C["blue"],
-         # Review B7: the 6-point seed-42 file alone gave slope 1.023 while §7.4 reports the pooled
+         # An earlier version read the 6-point seed-42 file alone, which gave slope 1.023 while §7.4 reports the pooled
          # 3-seed / 14-point fit (1.063). Read the pooled artefact so figure and table agree.
          "results/misalignment_pooled_adult.json", "dp_released_mean", 0.619),
         # the healthcare panel is NHANES, the primary clinical dataset (one row per person); the
@@ -239,7 +239,7 @@ def fig_calibration():
 # ── Figure 2: which fidelity axis predicts utility ───────────────────────────────────
 def fig_axes_independent():
     import pandas as pd
-    # Review B28 / A4: this read the OLD evaluator's points CSV and fitted the correlation over
+    # An earlier version read the old evaluator's points CSV and fitted the correlation over
     # nine conditions (35 points) while drawing seven, so the caption's count could not be checked
     # against the legend. Read the unified per-draw file §7 is audited against, keep ONLY the
     # conditions that are drawn, and print the count so the caption is written from the data.
@@ -449,7 +449,7 @@ def fig_epsilon():
 
 # ── Figure 5: the saturated fidelity criterion ───────────────────────────────────────
 def fig_saturation():
-    # Review A4: this figure read FINAL_comparison.json, the OLD evaluator (2-way over a 20-pair
+    # An earlier version of this figure read FINAL_comparison.json, the old evaluator (2-way over a 20-pair
     # sample), while §7.1.1's table is the unified evaluator over all 105 pairs. The two disagreed
     # (0.067 vs 0.106 on 2-way) and the suptitle hardcoded the stale percentages. Read the same
     # file the table is audited against, and compute the title from the data.
@@ -516,7 +516,7 @@ def fig_ablation():
         ("Parallel composition\n+ ε-free stratification", 0.0100, 0.0667,
          "ε available per released statistic", False),
     ]
-    # Review B16: these two rows were typed in by hand and disagreed with Appendix E's table
+    # Two rows here were once typed in by hand and disagreed with Appendix E's table
     # (0.054 -> 0.039 against the audited 0.052 -> 0.045; 0.705 -> 0.846 against a value that
     # appears in no §8.2 table). Read them from the same files the tables are audited against.
     u = json.load(open("results/adult_unified_eval.json")); u = u.get("results", u)

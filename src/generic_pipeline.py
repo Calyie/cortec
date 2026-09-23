@@ -1,8 +1,8 @@
 """
 generic_pipeline.py — Stage A and the prompt builders, driven by a DatasetSpec.
 
-These mirror `dp_cohorts.release_cohort_statistics` and `prompts.build_cortec_prompt` exactly,
-including every mechanism decision established on 2026-09-04 (CORTEC_MEMORY.md §13, §17, §23):
+Stage A and the prompt builders of the original Adult-only pipeline, generalised over a
+DatasetSpec. The mechanism decisions, described in sections 3 and 4 of the technical report:
 
   * cohorts come from the spec's PUBLIC stratification rule, so forming them costs eps = 0;
   * queries compose in PARALLEL across the disjoint cohorts, not by dividing by k;
@@ -14,7 +14,7 @@ including every mechanism decision established on 2026-09-04 (CORTEC_MEMORY.md �
     truncation to 4 categories accounted for essentially all of CoRTeC's fidelity gap.
 
 The Adult-specific modules are left untouched so existing Adult results stay reproducible;
-`test_generic_matches_adult` in the test suite pins the two paths together.
+the project's research test suite pins the two paths together.
 """
 from __future__ import annotations
 
@@ -185,7 +185,7 @@ def release_statistics(spec: DatasetSpec, raw_train: pd.DataFrame, *, epsilon_st
         # the pooled block did, and the pooled histogram is their noisy mixture -- post-processing,
         # released for free. Measured with a naive independent decoder and no model at all, this
         # release reaches the real-sample floor on two of three students where the pooled one
-        # trails it by 0.03-0.06 (paper/audit/release_sufficiency.py). Where either class falls
+        # trails it by 0.03-0.06 (technical report, section 7.11). Where either class falls
         # below n_min the cohort keeps the pooled block, a suppression decision of the kind the
         # accounting already documents.
         n_pos_true, n_neg_true = int(ys.sum()), int((~ys).sum())

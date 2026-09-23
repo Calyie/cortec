@@ -1,0 +1,72 @@
+{
+  "conditional_columns": [
+    "f7"
+  ],
+  "n_levels": 1,
+  "cells_at_finest": 4,
+  "records_per_cell": 250.0,
+  "epsilon_selection": 0.3826086956521739,
+  "epsilon_release": 1.617391304347826,
+  "coarsen": {
+    "f7": {
+      "(0.875, 1.0]": "g0",
+      "(0.25, 0.375]": "g0",
+      "(0.625, 0.75]": "g1",
+      "(-0.001, 0.125]": "g1",
+      "(0.375, 0.5]": "g2",
+      "(0.125, 0.25]": "g2",
+      "(0.5, 0.625]": "g3",
+      "(0.75, 0.875]": "g3"
+    }
+  },
+  "ranking": [
+    [
+      "f7",
+      0.1510471615028668
+    ],
+    [
+      "f3",
+      0.14073371628848982
+    ],
+    [
+      "f16",
+      0.09768857136019257
+    ],
+    [
+      "f6",
+      0.06978220667381259
+    ],
+    [
+      "f5",
+      0.06973817489880713
+    ],
+    [
+      "f17",
+      0.06541923760997487
+    ],
+    [
+      "f4",
+      0.0622411880874402
+    ],
+    [
+      "f8",
+      0.0462040708550867
+    ],
+    [
+      "f0",
+      0.03789577237219641
+    ],
+    [
+      "f18",
+      0.003621702960367148
+    ],
+    [
+      "f1",
+      0.001397416274245231
+    ]
+  ],
+  "notes": [
+    "m=11, median levels=8, |Y|=2, n=920 -> selection needs eps>=0.191 of the total; using 19%"
+  ],
+  "_provenance": "FROZEN from the original seeded derivation (AUTO_SEED=0) so the results reported in the paper remain reproducible against a recorded configuration. That seeded mechanism did NOT provide the epsilon_sel guarantee it charged; a fresh deployment derives this securely and gets a different configuration."
+}

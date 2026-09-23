@@ -1,7 +1,7 @@
 """
 run_epsilon_sweep.py — how does each method degrade as the privacy budget tightens?
 
-Every CoRTeC number in this project is at eps_total = 2.0 (CORTEC_MEMORY.md §28.3). That is a
+Every CoRTeC number in this project is at eps_total = 2.0. That is a
 single point on the privacy-utility curve, and it is not the point the baseline papers report:
 MST publishes at eps in {0.3, 1.0, 8.0} and AIM's "practical regime" is [0.1, 10]. A method that
 looks good at eps=2 can be useless at eps=0.3, which is where a cautious regulator would sit.
@@ -12,7 +12,7 @@ from a given release costs no further privacy.
 
 The sweep runs, per epsilon: DP release -> CoRTeC generation -> MST/PATE-CTGAN at the same
 epsilon -> full evaluation. AIM is excluded by default because its fit did not complete within
-two hours on these datasets (§28.1); pass it in --methods if there is time to spare.
+two hours on these datasets (technical report, section F.2.2); pass it in --methods if there is time to spare.
 
 The quantity to watch is NOT which method wins at each epsilon but how each one's error GROWS as
 epsilon shrinks. CoRTeC's conditional table has Laplace noise 1/(n_cell * eps), so its
@@ -22,8 +22,6 @@ degrade across all their measured marginals at once.
 from __future__ import annotations
 import argparse, json, subprocess, sys, time
 from pathlib import Path
-
-import numpy as np
 
 sys.path.insert(0, ".")
 
@@ -56,7 +54,7 @@ def main():
     root = Path(a.root or f"results/{a.dataset}_eps")
     root.mkdir(parents=True, exist_ok=True)
     log = root / "sweep.log"
-    py = "./venv/bin/python"
+    py = sys.executable
     spent = 0.0
 
     for eps in a.epsilons:

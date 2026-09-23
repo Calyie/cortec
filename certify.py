@@ -216,7 +216,7 @@ def certify(spec, real: pd.DataFrame, synth: pd.DataFrame, *, level: int,
     for cell, idx in groups.items():
         n_c = len(idx)
         p_true = float(ry.loc[idx].mean())
-        # Sensitivity bound is 1/n_min, NOT 1/n_c (review A1). Under add/remove-one adjacency the
+        # Sensitivity bound is 1/n_min, NOT 1/n_c (technical report, section 4.3). Under add/remove-one adjacency the
         # cell size is private, so a scale set from n_c is data-dependent and the mechanism is not
         # pure eps-DP. For a cell released in both neighbouring datasets both sizes are >= n_min,
         # so removing one record moves the mean by at most 1/(n-1) <= 1/n_min. n_min is public.

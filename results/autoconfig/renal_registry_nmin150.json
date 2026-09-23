@@ -1,0 +1,62 @@
+{
+  "conditional_columns": [
+    "patient_age",
+    "transport_mode"
+  ],
+  "n_levels": 2,
+  "cells_at_finest": 12,
+  "records_per_cell": 83.33333333333333,
+  "epsilon_selection": 0.1,
+  "epsilon_release": 1.9,
+  "coarsen": {
+    "patient_age": {
+      "(45.0, 55.0]": "g0",
+      "(17.999, 45.0]": "g0",
+      "(65.0, 75.0]": "g1",
+      "(55.0, 65.0]": "g1",
+      "(75.0, 95.0]": "g2"
+    }
+  },
+  "ranking": [
+    [
+      "patient_age",
+      0.016792792850260974
+    ],
+    [
+      "transport_mode",
+      0.015664093229990926
+    ],
+    [
+      "albumin_g_dl",
+      0.010364598773284502
+    ],
+    [
+      "sessions_per_week",
+      0.008554793991536951
+    ],
+    [
+      "months_on_dialysis",
+      0.006629039315863703
+    ],
+    [
+      "vascular_access",
+      0.005187486720387754
+    ],
+    [
+      "shift",
+      0.0041829418555881966
+    ],
+    [
+      "comorbidity_count",
+      0.0034157178128026854
+    ],
+    [
+      "facility_size",
+      0.0012904965290570511
+    ]
+  ],
+  "notes": [
+    "m=9, median levels=4, |Y|=2, n=16000 -> selection needs eps>=0.004 of the total; using 5%"
+  ],
+  "_provenance": "FROZEN from the original seeded derivation (AUTO_SEED=0) so the results reported in the paper remain reproducible against a recorded configuration. That seeded mechanism did NOT provide the epsilon_sel guarantee it charged; a fresh deployment derives this securely and gets a different configuration."
+}

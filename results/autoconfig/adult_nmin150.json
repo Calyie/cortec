@@ -1,0 +1,92 @@
+{
+  "conditional_columns": [
+    "marital_status",
+    "relationship"
+  ],
+  "n_levels": 2,
+  "cells_at_finest": 12,
+  "records_per_cell": 83.33333333333333,
+  "epsilon_selection": 0.1,
+  "epsilon_release": 1.9,
+  "coarsen": {
+    "marital_status": {
+      "Widowed": "g0",
+      "Never-married": "g0",
+      "Divorced": "g1",
+      "Married-civ-spouse": "g1",
+      "Separated": "g2",
+      "Married-spouse-absent": "g2",
+      "Married-AF-spouse": "g3"
+    },
+    "relationship": {
+      "Own-child": "g0",
+      "Not-in-family": "g0",
+      "Unmarried": "g1",
+      "Other-relative": "g1",
+      "Husband": "g2",
+      "Wife": "g2"
+    }
+  },
+  "ranking": [
+    [
+      "marital_status",
+      0.13096242050289866
+    ],
+    [
+      "relationship",
+      0.12771566282114719
+    ],
+    [
+      "native_country",
+      0.12253617864331634
+    ],
+    [
+      "education",
+      0.10231160832300061
+    ],
+    [
+      "education_num",
+      0.09879924084693952
+    ],
+    [
+      "capital_gain",
+      0.09456734715877729
+    ],
+    [
+      "age",
+      0.09416532910120509
+    ],
+    [
+      "occupation",
+      0.07194290760161243
+    ],
+    [
+      "capital_loss",
+      0.05552833325475631
+    ],
+    [
+      "hours_per_week",
+      0.03390419303878175
+    ],
+    [
+      "workclass",
+      0.03336211766811267
+    ],
+    [
+      "sex",
+      0.030737721564468592
+    ],
+    [
+      "race",
+      0.017120803053708205
+    ],
+    [
+      "fnlwgt",
+      0.007452268664867656
+    ]
+  ],
+  "notes": [
+    "m=14, median levels=9, |Y|=2, n=26048 -> selection needs eps>=0.010 of the total; using 5%"
+  ],
+  "_provenance": "FROZEN from the original seeded derivation (AUTO_SEED=0) so the results reported in the paper remain reproducible against a recorded configuration. That seeded mechanism did NOT provide the epsilon_sel guarantee it charged; a fresh deployment derives this securely and gets a different configuration."
+}

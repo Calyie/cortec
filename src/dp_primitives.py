@@ -1,9 +1,14 @@
 """
 dp_primitives.py
-Minimal, verifiable drop-in replacements for the two diffprivlib primitives
-dp_cohorts.py depends on (DPKMeans, Laplace). Implemented directly so the
-pipeline can run in network-restricted environments without changing any
-call site in dp_cohorts.py.
+Minimal, verifiable stand-ins for two diffprivlib primitives (Laplace, DPKMeans).
+
+`Laplace` is the fallback `generic_pipeline` and `hybrid_v2` use when diffprivlib is not
+installed. It draws from numpy's global generator and exists for offline testing; a release
+meant to carry its guarantee should be produced with diffprivlib present.
+
+`DPKMeans` is retained as the record of the DP k-means cohorting the method rejected in favour
+of a public stratification rule (technical report, section 3 and Appendix E). No published
+pipeline uses it.
 
 Both mechanisms are standard, well-documented DP building blocks:
 
@@ -45,12 +50,12 @@ class Laplace:
 
 class DPKMeans:
     """
-    Matches diffprivlib.models.KMeans's interface used in dp_cohorts.py:
+    Matches the diffprivlib.models.KMeans interface the rejected cohorting path used:
         DPKMeans(n_clusters=k, epsilon=eps, bounds=(lower_array, upper_array))
         .fit_predict(X) -> cluster labels
 
     Implementation: noisy Lloyd's algorithm.
-      - Data is assumed already scaled into `bounds` (dp_cohorts.py pre-scales to [0,1]^d
+      - Data is assumed already scaled into `bounds` (the caller pre-scales to [0,1]^d
         with PUBLIC bounds before calling this, matching diffprivlib's own convention).
       - Budget epsilon is split evenly across `n_iter` Lloyd iterations.
       - Each iteration: assign points to nearest centroid (non-private — centroids

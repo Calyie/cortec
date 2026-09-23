@@ -4,10 +4,12 @@ Calls a frozen LLM to generate synthetic tabular rows under two conditions:
   - HEADER-ONLY    (Condition A — baseline)
   - CoRTeC         (Condition B — conditioned on DP cohort statistics)
 
-Supports three backends:
-  --backend anthropic   Use Anthropic claude-sonnet-4-6 via API
-  --backend ollama      Use a local Ollama model (no API costs)
-  --backend mock        Rule-based mock — for pipeline testing without any LLM
+Supports five backends:
+  --backend anthropic   the Anthropic API
+  --backend openai      the OpenAI API
+  --backend gemini      the Gemini API, or Gemini on Vertex AI (CORTEC_GEMINI_SURFACE=vertex)
+  --backend ollama      a local Ollama model (no API costs; scientific controls only)
+  --backend mock        rule-based mock, for pipeline testing without any LLM
 
 The LLM is NEVER fine-tuned and NEVER sees raw private data.
 All private information arrives only through already-DP-protected statistics.
@@ -30,10 +32,10 @@ from src.prompts import (
     build_header_only_prompt,
     build_cortec_prompt,
 )
-from src.data_loader import COLUMN_NAMES, NUMERICAL_COLS, CATEGORICAL_COLS, TARGET_COL
+from src.data_loader import COLUMN_NAMES, NUMERICAL_COLS, TARGET_COL
 
 
-BackendType = Literal["anthropic", "ollama", "mock"]
+BackendType = Literal["anthropic", "openai", "gemini", "ollama", "mock"]
 
 
 def _level_bands(spec, cohort_stats: dict) -> tuple:
@@ -217,7 +219,7 @@ class LLMSyntheticGenerator:
 
     Parameters
     ----------
-    backend         : 'anthropic' | 'ollama' | 'mock'
+    backend         : 'anthropic' | 'openai' | 'gemini' | 'ollama' | 'mock'
     model           : model name (used for anthropic/ollama backends)
     rows_per_call   : how many rows to request per LLM call (keep ≤25 for reliability)
     max_retries     : retry parse failures this many times per call
@@ -251,7 +253,7 @@ class LLMSyntheticGenerator:
         self.ollama_num_predict = 8192
         self.ollama_num_ctx = 16384
 
-        # Fable 5 always uses thinking (can't be disabled) and bills those tokens; give headroom so the
+        # A reasoning model bills its thinking tokens against max_tokens; give headroom so the
         # thinking + CSV never truncates. Bigger rows_per_call amortises the per-call thinking overhead.
         # 3072 was not enough headroom: on the Adult release two consecutive calls each spent the
         # ENTIRE 3072 on reasoning and returned no CSV at all, which the parse guard correctly
@@ -265,11 +267,11 @@ class LLMSyntheticGenerator:
         self._openai_extra: dict = {}
         self._gemini_extra: dict = {}
 
-        # ── API spend guard (see CORTEC_MEMORY.md §13) ──────────────────────────────
+        # ── API spend guard (technical report, Appendix G.2) ────────────────────────
         # Results are inspected at every CHECK_EVERY-th call. If the calls are not
         # producing what we expect, the run aborts rather than continuing to spend
         # credits on output we are going to throw away.
-        # Inspect results after every 2 calls, not 5 (PI instruction, 2026-09-04): a schema or
+        # Inspect results after every 2 calls, not 5: a schema or
         # parsing fault should be caught on the second call, not the fifth. The diabetes
         # schema bug burned $3.34 before the 5-call window closed.
         self.CHECK_EVERY = 2
@@ -1008,7 +1010,7 @@ class LLMSyntheticGenerator:
             }
             hdrs = {"Host": self._ollama_host_override} if self._ollama_host_override else None
             # A reverse proxy in front of Ollama (e.g. `tailscale serve`) can impose its own
-            # request timeout — measured at ~60 s on the RunPod A100 pod, where a 25-row call
+            # request timeout — measured at ~60 s on one GPU pod, where a 25-row call
             # (58 s) returned 502 while a 15-row call (35 s) succeeded. A transient 5xx from the
             # proxy is not a reason to fail the whole run, so retry briefly with backoff. Keep
             # rows_per_call small enough that a single call stays well under the proxy timeout.

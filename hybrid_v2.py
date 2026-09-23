@@ -1,8 +1,8 @@
 """
 hybrid_v2.py — AIM for Goal 1 (marginals), CoRTeC's DP conditional structure for Goal 2.
 
-This supersedes `hybrid_aim_cortec.py`, whose two strategies both failed on 2026-09-04
-(CORTEC_MEMORY.md §9): `hard` destroyed the income signal carried by every feature outside
+This supersedes the first hybrid script, whose two strategies both failed (technical report,
+section 8.2): `hard` destroyed the income signal carried by every feature outside
 education/hours (in-sample AUC 0.676 -> 0.527), and `soft` bought a small AUC gain by halving
 the positive rate. Crucially, the NON-PRIVATE oracle of the same rule did no better, so the
 limit was the rule, not the DP noise.
@@ -30,12 +30,12 @@ Everything here is post-processing of two already-DP artifacts, so the hybrid's 
 is exactly that of the AIM run plus the CoRTeC release — zero additional budget.
 """
 from __future__ import annotations
-import argparse, json, sys
+import argparse, sys
 from pathlib import Path
 import numpy as np, pandas as pd
 
 sys.path.insert(0, ".")
-from src.data_loader import (NUMERICAL_COLS, CATEGORICAL_COLS, TARGET_COL, FEATURE_BOUNDS)
+from src.data_loader import NUMERICAL_COLS, TARGET_COL
 
 try:
     from diffprivlib.mechanisms import Laplace
@@ -132,7 +132,14 @@ def build_table(private: pd.DataFrame, level_idx: int, *, epsilon: float | None,
             if eps_per_level is None:
                 tbl[cell] = (rate, n)
             else:
-                # Sensitivity of a mean over n people is 1/n.
+                # Sensitivity of a mean over n people is 1/n. This is the mechanism the reported
+                # section 8.2 table was produced with (the report's regeneration script for that
+                # table calls this function). Its scale depends on the private cell size, so under
+                # add/remove-one adjacency it is not pure eps-DP; section 4.3 of the technical
+                # report computes the (eps, delta) guarantee it carries (delta = 1.5e-7 at
+                # n_min = 150). The shipped cortec-hybrid package releases the positive count and
+                # the noised support as two sensitivity-1 queries instead
+                # (cortec_hybrid.core.release_conditional_table).
                 noisy = Laplace(epsilon=eps_per_level, sensitivity=1.0 / n).randomise(rate)
                 tbl[cell] = (float(np.clip(noisy, 0.0, 1.0)), n)
         tables.append((li, tbl))

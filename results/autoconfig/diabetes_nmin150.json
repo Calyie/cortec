@@ -1,0 +1,119 @@
+{
+  "conditional_columns": [
+    "discharge_disposition_id",
+    "number_inpatient"
+  ],
+  "n_levels": 2,
+  "cells_at_finest": 16,
+  "records_per_cell": 62.5,
+  "epsilon_selection": 0.1,
+  "epsilon_release": 1.9,
+  "coarsen": {
+    "discharge_disposition_id": {
+      "16": "g0",
+      "13": "g0",
+      "24": "g0",
+      "17": "g0",
+      "9": "g0",
+      "5": "g0",
+      "1": "g0",
+      "2": "g1",
+      "18": "g1",
+      "3": "g1",
+      "6": "g1",
+      "11": "g1",
+      "7": "g1",
+      "25": "g1",
+      "22": "g2",
+      "28": "g2",
+      "4": "g2",
+      "23": "g2",
+      "27": "g2",
+      "19": "g2",
+      "12": "g2",
+      "10": "g3",
+      "14": "g3",
+      "15": "g3",
+      "20": "g3",
+      "8": "g3"
+    }
+  },
+  "ranking": [
+    [
+      "discharge_disposition_id",
+      0.06793353707401845
+    ],
+    [
+      "number_inpatient",
+      0.021805241800717055
+    ],
+    [
+      "age",
+      0.017000271318715992
+    ],
+    [
+      "race",
+      0.013142416185481192
+    ],
+    [
+      "time_in_hospital",
+      0.01283624600314836
+    ],
+    [
+      "admission_source_id",
+      0.01166700302007373
+    ],
+    [
+      "num_medications",
+      0.006248524199592439
+    ],
+    [
+      "number_emergency",
+      0.00543654730108773
+    ],
+    [
+      "number_outpatient",
+      0.004906601999885651
+    ],
+    [
+      "number_diagnoses",
+      0.004579961685333739
+    ],
+    [
+      "num_lab_procedures",
+      0.003276755728681604
+    ],
+    [
+      "num_procedures",
+      0.0014154064358064865
+    ],
+    [
+      "insulin",
+      0.000972561649219903
+    ],
+    [
+      "admission_type_id",
+      0.0008572307524057841
+    ],
+    [
+      "A1Cresult",
+      0.0006889967187512918
+    ],
+    [
+      "change",
+      0.00010162796384088641
+    ],
+    [
+      "gender",
+      5.849043043136223e-05
+    ],
+    [
+      "diabetesMed",
+      3.000363151047609e-05
+    ]
+  ],
+  "notes": [
+    "m=18, median levels=6, |Y|=2, n=81410 -> selection needs eps>=0.002 of the total; using 5%"
+  ],
+  "_provenance": "FROZEN from the original seeded derivation (AUTO_SEED=0) so the results reported in the paper remain reproducible against a recorded configuration. That seeded mechanism did NOT provide the epsilon_sel guarantee it charged; a fresh deployment derives this securely and gets a different configuration."
+}

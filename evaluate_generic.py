@@ -1,8 +1,8 @@
 """
 evaluate_generic.py — the full metric suite, driven by a DatasetSpec.
 
-Mirrors evaluate_suite.py (which is Adult-only through its evaluate_fidelity imports) so the
-healthcare and financial datasets are scored on exactly the same quantities:
+Generalises the original Adult-only evaluator so the healthcare and financial datasets are
+scored on exactly the same quantities:
 
   marginal fidelity   1-way and 2-way TV distance, binned with the spec's PUBLIC bins
   conditional fidelity  P(target | group) error on the groups the method IS told about

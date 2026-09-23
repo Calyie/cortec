@@ -1,13 +1,12 @@
 """Figure 7: enterprise-platform generators on one DP release.
 
-Lives in the repo because it produces a figure the paper ships. It previously sat in a scratch
-directory while `make_figures.py` wrote a DIFFERENT figure to the same filename, so whichever ran
-last decided what Figure 7 showed: and for a while the paper carried this figure under a caption
-describing the other one (open-weight models against parameter scale). `make_figures.py` no longer
-writes this path; see the note there.
+`make_figures.py` once wrote a different figure (open-weight models against parameter scale) to
+the same filename, so whichever script ran last decided what Figure 7 showed, and for a while the
+paper carried this figure under a caption describing the other one. `make_figures.py` now writes
+that figure under a superseded name; see the note there.
 """
 
-import json, sys, glob, os
+import json, os
 import numpy as np
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt

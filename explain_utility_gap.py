@@ -37,7 +37,7 @@ import pandas as pd
 
 warnings.filterwarnings("ignore")
 sys.path.insert(0, ".")
-from sklearn.metrics import mutual_info_score, roc_auc_score
+from sklearn.metrics import mutual_info_score
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import OneHotEncoder
 

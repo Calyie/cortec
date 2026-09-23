@@ -198,10 +198,6 @@ def main():
         import src.datasets_clinical   # noqa: F401
         import src.datasets_synthetic  # noqa: F401
         import src.datasets_auto       # noqa: F401  (auto-configured *_auto variants)
-        import src.datasets_extra       # noqa: F401
-        import src.datasets_regulated   # noqa: F401
-        import src.datasets_clinical    # noqa: F401  (nhanes, mimic3_demo)
-        import src.datasets_synthetic   # noqa: F401  (renal_registry)
         sp = get_spec(a.dataset)
         df = sp.loader()
         train, test = train_test_split(df, test_size=0.2, random_state=a.seed,

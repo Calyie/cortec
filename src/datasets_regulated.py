@@ -24,7 +24,7 @@ import zipfile
 import numpy as np
 import pandas as pd
 
-from src.dataset_spec import Band, DatasetSpec, register
+from src.dataset_spec import DatasetSpec, register
 from src.datasets_extra import _cached
 
 UCI = "https://archive.ics.uci.edu/ml/machine-learning-databases"

@@ -51,7 +51,7 @@ FEATURE_BOUNDS = {
 # many bins it has. Releasing mean and std separately cost two queries and — as measured on
 # 2026-09-04 — produced unusable std values at every realistic cohort size. The histogram
 # carries the whole shape instead, and mean/std can be derived from it for free by
-# post-processing. See CORTEC_MEMORY.md §13.
+# post-processing. See the technical report, section 3 (histograms, not moments).
 #
 # The edges are chosen from the PUBLIC schema and general domain knowledge (e.g. capital gains
 # are zero for most people, so a bin boundary at 1 is worth having), never from the private

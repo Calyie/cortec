@@ -1,12 +1,12 @@
 """
 dataset_spec.py — everything that is dataset-specific, in one object.
 
-The pipeline was written against UCI Adult and hard-codes it in six places: the column lists
-and bounds in `data_loader`, the education/hours stratification and the income conditional
-table in `dp_cohorts`, the income wording in `prompts`, the label validation in
-`llm_generator`, the group families in `evaluate_suite`, and the cell levels in `hybrid_v2`.
-Every CoRTeC result to date is therefore a result about one dataset, which is the single
-largest threat to the claims (CORTEC_MEMORY.md §22).
+The pipeline was written against UCI Adult and hard-coded it in several places: the column lists
+and bounds in `data_loader`, the education/hours stratification and the income conditional table
+of the original Adult release path, the income wording in `prompts`, the label validation in
+`llm_generator`, the group families of the original Adult evaluator, and the cell levels in
+`hybrid_v2`. Every early CoRTeC result was therefore a result about one dataset, which was the
+single largest threat to the claims (technical report, section 10).
 
 A DatasetSpec captures all of it so the same pipeline can run on any tabular dataset with a
 binary target. The Adult spec is built from the existing `data_loader` constants, so the
@@ -16,17 +16,16 @@ Two fields deserve explanation because they carry the method's assumptions:
 
   `stratify`   the PUBLIC rule that forms cohorts. Membership must be a deterministic function
                of each individual's own record and must not depend on the private data, or the
-               zero-cost claim for cohort formation breaks (CORTEC_MEMORY.md §13.2).
+               zero-cost claim for cohort formation breaks (technical report, section 4.3).
 
   `heldout_groups`  group families used to measure conditional fidelity that share NO column
                with `stratify` or with the conditional-table levels. Without this the
                generalisation metric is contaminated and a method that merely parrots its
-               released table scores well (CORTEC_MEMORY.md §17, the `cond_tv_unseen` problem).
+               released table scores well (technical report, section 6.4).
 """
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable
-import numpy as np
 import pandas as pd
 
 

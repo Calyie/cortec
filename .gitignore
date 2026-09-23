@@ -1,9 +1,9 @@
-# Secrets — NEVER commit
+# Secrets: never commit
 .secrets/
 *.env
 .env
 
-# Environment / caches
+# Environment and caches
 venv/
 .venv/
 __pycache__/
@@ -13,69 +13,13 @@ __pycache__/
 build/
 dist/
 
-# Datasets are fetched from public sources on first use and cached here, with
-# row-count validation. Regenerable, and not ours to redistribute.
+# Datasets are fetched from public sources on first use and cached here, with row-count
+# validation. Regenerable, and not ours to redistribute.
 data/
 
-# Synthetic output is regenerable; the JSON records the audits read are committed.
-results/**/*.csv
-results/**/*.log
-# Two exceptions: the audit reads these to hold the paper to what configuration A's output
-# actually contains (two of six race groups -- review A3). 600 rows each.
-!results/nh_nmin0/synthetic_cortec_draw0.csv
-!results/nh_nmin0/seed42_draw0.csv
-# The draws the audits and regeneration scripts score directly, so the paper's numbers are
-# re-derivable from the repository alone: the corrected-mechanism Adult arm (§7.2 Result 1′, five
-# draws of 300 rows), the cohort-wise NHANES arm (§F.1, two draws of 600 rows), and the matched
-# header-only control on the registry (§7.1.3, two draws of 1,000 rows).
-!results/v5_corrected/synthetic_cortec_draw0.csv
-!results/v5_corrected_d2/synthetic_cortec_draw*.csv
-!results/nh_nmin0_cohortwise/synthetic_cortec_draw0.csv
-!results/nh_nmin0_cohortwise_d2/synthetic_cortec_draw0.csv
-!results/l12_renal_matched/synthetic_header_only_draw0.csv
-!results/l12_renal_matched_d2/synthetic_header_only_draw0.csv
-# Inputs of the regeneration scripts' reproduction checks and comparisons: configuration B's two
-# NHANES draws (§F.1), the shipped Adult arm re-scored before the corrected arm is trusted (§7.2
-# Result 1′), and the registry arms the matched control is compared with (§7.1.3).
-!results/nh_nmin150/synthetic_cortec_draw0.csv
-!results/nh_nmin150/seed42_draw0.csv
-!results/v4_normal/synthetic_cortec_draw*.csv
-!results/l12_renal/synthetic_cortec_draw*.csv
-!results/l12_renal/synthetic_header_only_draw*.csv
-# §6.2 surface parity: the third public draw of configuration C and the three Vertex AI draws
-!results/nh_nmin0_cohortwise_d3/synthetic_cortec_draw0.csv
-!results/nh_vertex_d0/synthetic_cortec_draw0.csv
-!results/nh_vertex_d1/synthetic_cortec_draw*.csv
-# §F.3's AIM comparison on the 12-column schema: AIM's five fits, CoRTeC's five draws, MST's and PATE-CTGAN's three
-!results/credit_aim12/aim12_seed*.csv
-# §7.11 class-conditional release: the matched finance test (three class-conditional draws, three pooled)
-!results/credit_cc/synthetic_cortec_draw0.csv
-!results/credit_cc_d2/synthetic_cortec_draw0.csv
-!results/credit_cc_d3/synthetic_cortec_draw0.csv
-!results/credit_pooled/synthetic_cortec_draw0.csv
-!results/credit_pooled_d2/synthetic_cortec_draw*.csv
-!results/credit_cc_fable/synthetic_cortec_draw0.csv
-!results/credit_cc_fable_d2/synthetic_cortec_draw*.csv
-!results/adult_cc_fable/synthetic_cortec_draw0.csv
-!results/adult_cc_fable_d2/synthetic_cortec_draw0.csv
-!results/credit/synthetic_cortec_draw0.csv
-!results/credit_frontier_draws/synthetic_cortec_draw*.csv
-!results/credit_baselines/mst_seed*.csv
-!results/credit_baselines/patectgan_seed*.csv
-# §7.12 the shipped configuration: the selected draws and the pools they were selected from
-!results/adult_v2_gemini/synthetic_cortec_*.csv
-!results/adult_v2_gemini_d2/synthetic_cortec_*.csv
-!results/adult_v2_opus/synthetic_cortec_*.csv
-!results/credit_v2_gemini/synthetic_cortec_*.csv
-!results/credit_v2_gemini_d2/synthetic_cortec_*.csv
-!results/nhanes_v2_gemini/synthetic_cortec_*.csv
-!results/credit_v2_gemini_d3/synthetic_cortec_*.csv
-!results/adult_v2_opus_full/synthetic_cortec_*.csv
-
-# NHANES ε sweep, inversion sweep and transmission (section 7.4 / 7.6 / 7.12)
-!results/nhanes_eps_shipped/eps*/synthetic_cortec_*.csv
-!results/nhanes_eps_shipped/eps*_baselines/mst_seed*.csv
-!results/nhanes_misalign/r*/synthetic_cortec.csv
-!results/nhanes_baseline_transmission/*.csv
-!results/nhanes_baselines/*_seed*.csv
-!results/nhanes_header_only/*.csv
+# Run output is not published. The one exception is the frozen auto-configurations, which the
+# *_auto dataset specifications load by file and must never re-derive.
+results/*
+!results/autoconfig/
+results/autoconfig/*
+!results/autoconfig/*.json

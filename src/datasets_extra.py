@@ -4,7 +4,7 @@ settings CoRTeC is actually aimed at.
 
 Every CoRTeC result so far is on UCI Adult, a public census dataset where the LLM's prior
 happens to align with the truth — which is precisely NOT the target use case
-(CORTEC_MEMORY.md §6). These two datasets are the closest publicly available stand-ins:
+(technical report, section 7.4). These two datasets are the closest publicly available stand-ins:
 
   diabetes   Diabetes 130-US Hospitals, 1999-2008 (UCI 296). 101,766 real hospital encounters
              across 130 US hospitals: admission source, length of stay, lab and procedure
@@ -246,7 +246,7 @@ def credit_spec() -> DatasetSpec:
 #   * AIM's `target` workload on titanic uses `Survived` — the same label-centred workload
 #     shape our conditional machinery targets;
 #   * its total domain is ~9e7, tiny, so **AIM actually fits on it in seconds**, where AIM has
-#     failed to complete in 2-3 h on diabetes and credit (CORTEC_MEMORY.md §33.1). This is the
+#     failed to complete in 2-3 h on diabetes and credit (technical report, section F.2.2). This is the
 #     dataset that can finally give us a real CoRTeC-vs-AIM head-to-head on a second dataset;
 #   * at 1,309 records it is a genuine SMALL-DATA DP regime, which is realistic for the
 #     regulated settings CoRTeC targets (rare-disease cohorts, small institutions).

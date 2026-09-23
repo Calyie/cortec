@@ -31,11 +31,10 @@ warnings.filterwarnings("ignore")
 sys.path.insert(0, ".")
 
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (accuracy_score, precision_score, recall_score, f1_score,
                              log_loss, brier_score_loss,
                              roc_auc_score, roc_curve, confusion_matrix,
-                             precision_recall_curve, average_precision_score)
+                             average_precision_score)
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
@@ -191,10 +190,6 @@ def main():
         import src.datasets_clinical   # noqa: F401
         import src.datasets_synthetic  # noqa: F401
         import src.datasets_auto       # noqa: F401  (auto-configured *_auto variants)
-        import src.datasets_extra       # noqa: F401
-        import src.datasets_regulated   # noqa: F401
-        import src.datasets_clinical    # noqa: F401  (nhanes, mimic3_demo)
-        import src.datasets_synthetic   # noqa: F401  (renal_registry)
         sp = get_spec(a.dataset)
         df = sp.loader(); sp.validate(df)
         train, test = train_test_split(df, test_size=0.2, random_state=a.seed,

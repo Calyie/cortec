@@ -11,7 +11,7 @@ deterministic, its output distribution is a point mass, and the budget buys noth
 previously derived with a hardcoded `AUTO_SEED = 0`, which is exactly that failure.
 
 The configuration is therefore treated the same way as the DP release itself — **derived once and
-persisted as an artifact**. `get_spec("<name>_auto")` loads the stored configuration when one
+persisted as an artefact**. `get_spec("<name>_auto")` loads the stored configuration when one
 exists and only derives (and saves) a fresh one when it does not. That keeps a run reproducible
 against the configuration it actually used, without pretending the derivation is repeatable.
 """
@@ -45,7 +45,7 @@ AUTO_N_RECORDS = 1000
 #  condHeld are threshold-free and are unchanged -- which is the tell that only the thresholded
 #  metrics moved. The conclusion is the same either way: A leads B on acc, F1 and AUC.)
 # Coverage is not the objective; transmitted conditional structure is. Set CORTEC_AUTO_NMIN=150 to
-# get the coarser rule for the ablation. See CORTEC_MEMORY.md 55.
+# get the coarser rule for the ablation. See the technical report, Appendix F.1.
 AUTO_N_MIN = 0
 
 
@@ -60,7 +60,7 @@ def _load_or_derive(base, tr, n_min: int):
     """Load the persisted configuration for this dataset, or derive and persist one.
 
     Deriving costs privacy budget and, now that the selection noise is unseeded, produces a
-    different configuration each time. Persisting makes the configuration an artifact -- the same
+    different configuration each time. Persisting makes the configuration an artefact -- the same
     discipline the release follows -- so a result can be tied to the configuration that produced
     it instead of to a seed that never really controlled it.
     """

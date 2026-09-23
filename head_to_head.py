@@ -25,7 +25,6 @@ Usage:
 """
 from __future__ import annotations
 import argparse, json, math
-from itertools import combinations
 
 import numpy as np
 from scipy import stats

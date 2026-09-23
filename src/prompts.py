@@ -9,7 +9,7 @@ Prompt templates for the two generation conditions being compared:
   Condition B — CoRTeC:
       LLM sees DP-released per-cohort statistics as grounding signal.
       The hypothesis: richer conditioning → rows that better match the
-      private joint distribution → lower teacher vote entropy.
+      private joint distribution.
 """
 
 from __future__ import annotations
