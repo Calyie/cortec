@@ -31,9 +31,9 @@ forest and gradient boosting, with the gap bounded inside ±0.027 and every p > 
 
 That equivalence was first claimed at one dataset and one sample size, and we measured where it
 stopped. On the finance dataset the pooled release reaches TSTR-LR 0.652 against a matched real
-sample's 0.695, a significant shortfall. Releasing one histogram per outcome at the same ε takes the
-two tree students to the real-sample floor (§7.11). The configuration the tools now ship brings all
-three students within 0.015 AUC of the floor on both datasets, with 1-way marginal error within
+sample's 0.695, a significant shortfall. With one histogram per outcome at the same ε the
+two tree students reach the real-sample floor (§7.11). Under the configuration the tools now ship all
+three students are within 0.015 AUC of the floor on both datasets, with 1-way marginal error within
 0.005 of MST's and below a real sample of the same size (§7.12). That configuration is a
 class-conditional release with a fifth of the budget on the conditional table, batches told the
 exact counts they owe, and output selected from a threefold pool of generated rows. It is a result
@@ -86,7 +86,7 @@ The API is the `cortec` package's. The schema declares only public knowledge: th
 bounds, the bin edges and the target.
 
 ```python
-from cortec import Schema, Band, release_statistics, Generator
+from cortec import Schema, release_statistics, Generator
 
 schema = Schema(
     name="encounters",
@@ -107,7 +107,7 @@ synthetic = gen.generate_selected(release, n_rows=5000, pool_factor=3)   # Stage
 The conditional hierarchy is derived from the declared schema plus one DP-noised selection step. The
 release carries one histogram block per cohort and outcome class by default, with a fifth of the
 budget on the conditional table. Generation asks each batch for the exact counts it owes and keeps,
-from a threefold pool, the rows whose cell counts match the release (paper §3.3, §7.12).
+from a threefold pool, the rows whose cell counts match the release (technical report §3.3, §7.12).
 `release.json` is the controlled artefact: store it, hash it, and reuse it by file. Every further
 draw is free in ε.
 
