@@ -1779,7 +1779,7 @@ The defaults, reached through one call, `generate_selected(release, n_rows)`, ar
 conditional target table and relabels a marginal synthesiser's output to match it, with no model
 server in the dependency tree. Its claim is deliberately narrower than §8.2's. It corrects one axis, it reports whether the correction helped, and it tells the user to keep their budget when it did not.
 
-**Test suites**: 136 in `cortec` and 26 in `cortec-hybrid`. Every regression test is named after the defect it prevents, and each was verified
+**Test suites**: 151 in `cortec` and 28 in `cortec-hybrid`. Every regression test is named after the defect it prevents, and each was verified
 to fail against the pre-fix code. What building them changed in this paper, and what the tools
 enforce and still do not, are in Appendix J.
 
@@ -1998,7 +1998,7 @@ specifications behind each table are retained with the per-draw records (see *Wh
 | §7.4.1 NHANES transmission by mechanism family | `run_baseline_transmission.py --dataset nhanes_auto` | MST and PATE-CTGAN on the same forced relationship at the same ε; Figure 7 reads its output |
 | §F.3 AIM on the 12-column finance schema | [`src/datasets_extra.py`](https://github.com/Calyie/cortec/blob/main/src/datasets_extra.py) (`credit_aim12`) | the 12-column schema on which AIM completes; AIM's five fits are scored beside CoRTeC's five draws, MST's and PATE-CTGAN's three and the real floors, every arm on the same 12 columns, with Holm over the fourteen CoRTeC-vs-AIM and CoRTeC-vs-MST comparisons |
 | §7.1.2 matched control | [`src/generic_pipeline.py`](https://github.com/Calyie/cortec/blob/main/src/generic_pipeline.py), [`src/prompts.py`](https://github.com/Calyie/cortec/blob/main/src/prompts.py) (`build_matched_header_only_prompt`) | CoRTeC's prompt with the released arrays deleted, built by stripping CoRTeC's own output and refusing to return if any released quantity survives |
-| Tests | `cortec/tests/` and `cortec-hybrid/tests/` in the companion repository | 136 + 26, each named after the defect it prevents |
+| Tests | `cortec/tests/` and `cortec-hybrid/tests/` in the companion repository | 151 + 28, each named after the defect it prevents |
 
 ---
 
