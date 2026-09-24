@@ -3,7 +3,7 @@
 
 **Calister Nnona** (calisternnona@gmail.com)
 
-Code and papers: [Calyie/cortec](https://github.com/Calyie/cortec) (research harness, papers, figures) and [Calyie/cortec-framework](https://github.com/Calyie/cortec-framework) (the reference implementations).
+Code and papers: [Calyie/cortec](https://github.com/Calyie/cortec) (research harness, papers, figures) and [Calyie/cortec-framework](https://github.com/Calyie/cortec-framework) (the reference implementations). Archived record: DOI [10.5281/zenodo.22945316](https://doi.org/10.5281/zenodo.22945316).
 
 **2026-09-23**
 
