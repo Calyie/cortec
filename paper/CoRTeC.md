@@ -713,7 +713,12 @@ One release, Claude Fable 5, Adult, n = 300 per condition:
 |---|---|
 | **CoRTeC** | **0.000**, tracking the release |
 | matched header-only | **0.931**, more extreme than the real-world prior |
+| CoRTeC, GPT-5 at low reasoning, release under the current rule | **0.000**, tracking the release |
+| CoRTeC, GPT-5 at minimal reasoning, same release | 0.276 |
+| matched header-only control, GPT-5 at minimal reasoning, same release | **1.000** |
 | *real data, uninverted* | *0.619* |
+
+**On a second vendor, under the current release rule.** The test was repeated on GPT-5 with one fresh inverted release made under the `n_min` rule of Algorithm 1, so the release carries pure ε = 2, and the same three conditions. With reasoning at GPT-5's low level CoRTeC emits the high-income label for 0.000 of 24 advanced-degree holders, and every education band is within 0.07 of its released rate (0.119, 0.217 and 0.490 against released 0.129, 0.206 and 0.416). The matched control emits it for 1.000 of 52. At minimal reasoning CoRTeC emits it for 0.276 of 29, and over-emits the positive class in every band, by 0.13 to 0.26, while keeping graduates lowest: the inverted ordering transmits and the magnitudes do not, which is the reasoning effect of §7.5 on the hardest case. The minimal-reasoning control also returned only the CSV header, with no rows, on 4 of 22 calls; the generator's parse guard caught each one, and the raw text is now kept whenever it does.
 
 The matched control is told to match a table and to ignore world knowledge; it has no table, and
 answers from its prior. Since every other element of the two conditions is identical, the 0.93
@@ -1016,9 +1021,12 @@ range and re-releasing Stage A from the modified data:
 | domain | relationship forced | slope | MAE | unconditioned control | true rate | control error |
 |---|---|---|---|---|---|---|
 | census (Adult) | education → income | 1.063 [0.973, 1.168] · 3 seeds, 14 points | 0.055 | 88.3% | 61.9% | **+26 pp** |
+| census (Adult), GPT-5 at minimal reasoning, releases under the current rule | education → income | 0.992 · 1 seed, 5 points | 0.104 | not run | 61.9% | — |
 | **healthcare (Diabetes 130)** | prior admissions → 30-day readmission | **0.995** | **0.009** | **98.5%** | **21.4%** | **+77 pp** |
 | finance (credit) | repayment status → default | **0.962** / **1.010**, 2 seeds | 0.019 / 0.023 | 100.0% | 69.6% | **+30 pp** |
 | **healthcare (NHANES)**, auto-configured | race/ethnicity → diabetes | **1.041** | **0.020** | 63.9% | 15.4% | **+48 pp** |
+
+A one-seed repeat of the Adult sweep on GPT-5 at minimal reasoning, with every release made under the current rule, records slope 0.992 and a mean absolute error of 0.104 over the five forced points: 0.000 at a released 0.002 and 1.000 at 0.991, but 0.397, 0.574 and 0.952 at released 0.218, 0.405 and 0.792. On the natural release its graduates come out at 0.984 against a released 0.562. At minimal reasoning, then, the direction transmits and the interior magnitudes are pulled towards the prior, which is why Definition 1 reports both numbers; with reasoning on, the inversion test above transmits exactly.
 
 On Diabetes 130 the released rates were 0.004 / 0.506 / 0.996 and CoRTeC produced 0.0% / 52.0% /
 98.6%. The NHANES row is the primary clinical dataset under an auto-configured release, and it shows where the relationship travels. The auto-configurator coarsens race/ethnicity into three groups and pools the forced group with white_nh in the conditional table, so the table carries no rate for it. The class-conditional histogram blocks do: the released race histogram of each outcome class within the cohort, from which P(diabetes | black_nh) follows by Bayes' rule. That is the rate the row is scored against. The released rates were 0.008 / 0.469 / 0.970 and CoRTeC produced
@@ -1591,11 +1599,27 @@ below what a 300-record real sample achieves. §H.14 makes the same observation 
 through Claude Opus 5 as a cross-vendor check: one complete threefold pool (900 rows, 41 calls),
 selected to the release exactly as the Gemini pools were. The pool's 1-way error against the released histograms is 0.007, lower than the Gemini pools' 0.009 to 0.011. The selected draw reproduces the result: 1-way error 0.030, 2-way 0.110, conditional error 0.013 and 0.042, students 0.838, 0.870 and 0.825. Each is within 0.024 of the Gemini means, and the three students match the real-sample floor. One draw is a check rather than a replication, and it is stated as one.
 
+**A second vendor on finance and NHANES.** The shipped configuration was re-generated through GPT-5 on finance and NHANES, three draws each from the Gemini arm's own release file, so the generator is the only variable (the table below). The budget forced GPT-5's minimal reasoning level, at $0.25 per NHANES draw and $0.57 per finance draw against $0.10 a call with reasoning on, so the comparison is a vendor change and a reasoning change at once. On finance the result replicates: no measure separates the two vendors after correction, the random forest is 0.021 lower at a Holm-adjusted p of 0.22, and against the real-sample floor the only comparison near significance is the random forest, 0.016 short at an adjusted p of 0.053. On NHANES utility replicates and conditional fidelity does not: no student separates (adjusted p of 0.78 or above), but conditional error over seen groups is 0.038 against Gemini's 0.006 (p = 0.0055, adjusted 0.072) and 1-way error 0.031 against 0.015. That is the direction the reasoning result of §7.5 predicts. The selected minimal-reasoning draws carry 0.100 to 0.110 positives against the release's 0.138, where the Gemini draws carry 0.137: the pools match the release exactly in both cases, because the quota forces it, and the selection prefers GPT-5's negatives. One NHANES draw at GPT-5's low reasoning level, $2.70 for a pool that stopped at 572 of 600 rows and was selected offline, returns the conditional error to 0.011 and the positive rate to 0.130, with 2-way error 0.104, the lowest of any arm, while its tree students train lower, 0.664 and 0.640. One draw is a signal and is reported as one. The replication the result still needs is three reasoning-on draws under a second vendor.
+
+| condition | draws | 1-way TV ↓ | 2-way TV ↓ | cond. seen ↓ | cond. held-out ↓ | TSTR-LR ↑ | TSTR-RF ↑ | TSTR-GBM ↑ |
+|---|---|---|---|---|---|---|---|---|
+| **NHANES** | | | | | | | | |
+| CoRTeC (Gemini 3.5 Flash, reasoning on) | 3 | 0.015 | 0.119 | 0.006 | 0.036 | 0.752 | 0.732 | 0.711 |
+| CoRTeC (GPT-5, minimal reasoning) | 3 | 0.031 | 0.116 | 0.038 | 0.063 | 0.751 | 0.710 | 0.702 |
+| CoRTeC (GPT-5, low reasoning; one draw) | 1 | 0.020 | 0.104 | 0.011 | 0.069 | 0.727 | 0.664 | 0.640 |
+| *real sample, n = 300* | *3* | *0.034* | *0.081* | *0.015* | *0.036* | *0.773* | *0.728* | *0.716* |
+| **finance** | | | | | | | | |
+| CoRTeC (Gemini 3.5 Flash, reasoning on) | 3 | 0.029 | 0.125 | 0.014 | 0.022 | 0.680 | 0.731 | 0.712 |
+| CoRTeC (GPT-5, minimal reasoning) | 3 | 0.033 | 0.125 | 0.019 | 0.026 | 0.683 | 0.711 | 0.703 |
+| *real sample, n = 300* | *3* | *0.041* | *0.099* | *0.059* | *0.045* | *0.695* | *0.727* | *0.717* |
+
+On finance no comparison between the two vendors survives Holm correction over the fourteen-test family (random forest 0.711 against 0.731, p = 0.017, adjusted 0.22). On NHANES conditional error over seen groups, 0.038 against 0.006, reaches p = 0.0055 and an adjusted 0.072; no student separates. Against the real-sample floor the minimal-reasoning NHANES arm's 2-way error is the one comparison that survives (0.116 against 0.081, adjusted 0.023), and on finance the random forest is 0.016 short at an adjusted 0.053. Costs at minimal reasoning were $0.25 per NHANES draw and $0.57 per finance draw; the reasoning-on NHANES draw cost $2.70 and the reasoning-on inversion condition of §7.1.2 $1.39, at about $0.10 a call.
+
 An earlier attempt at this check is the reason both implementations now guard the pool. That run reached its spend cap twice before the pool was complete. The merged 691-row pool was unbalanced, with 63% of its rows in the two lowest-education cohorts against a released share of 40% and two cohorts holding seven rows each. Selection can only choose among rows that exist, so that draw carried the pool's imbalance (1-way error 0.049, students 0.808, 0.871 and 0.855) while every per-row check passed. Both implementations now check, before selecting, that every released
 cohort is covered by at least 1.1× the rows it owes, and the tool refuses a pool that is not
 (§J.2).
 
-**Scope.** One generator family carries the full result (Gemini 3.5 Flash, three draws per dataset, through Vertex AI), on two datasets with hand-tuned hierarchies and one auto-configured clinical dataset. On the clinical dataset the marginal and conditional results hold, and the linear student and 2-way error do not reach the floor. A second vendor reproduces the Adult result at one draw. The Holm families are the seven
+**Scope.** One generator family carries the full result (Gemini 3.5 Flash, three draws per dataset, through Vertex AI), on two datasets with hand-tuned hierarchies and one auto-configured clinical dataset. On the clinical dataset the marginal and conditional results hold, and the linear student and 2-way error do not reach the floor. A second vendor reproduces the Adult result at one draw, and the finance and NHANES results at three draws each at minimal reasoning, with NHANES conditional fidelity behind Gemini's (below). The Holm families are the seven
 metrics per baseline per dataset, as in §7.3. The cost is three times the generation spend of the
 earlier configuration and roughly twice the reasoning tokens per call on a model that plans the
 counts (§H.8). §H.9 is the free sweep of the release parameters around the shipped values. The change of the conditional share from a half to a fifth is taken from it.
@@ -1724,7 +1748,7 @@ One pattern recurred often enough to name. A fix applied at one site was repeate
    pure ε-DP.** Adult rests on six CoRTeC draws against five per baseline and is adequately powered. NHANES has two and three draws in Appendix F, healthcare five, finance five and three, and several scale and configuration arms have one or two. All draws within a condition come from a single DP release and a single generator, so they replicate the generation step rather than the whole pipeline. A full replication would re-run Stage A under fresh noise, which we have done only for the transmission sweeps. Draws from different generators are never pooled, because the generator
    is the variable under study in §7.5. Every release path noised each conditional cell's rate at a
    scale set from the true cell size (§4.3, step (iv)), so those tables carry `(ε_L, δ)`-DP per
-   conditional level with `δ = 1.5 × 10⁻⁷` at the `n_min = 150` floor. Every release path now implements the corrected two-count mechanism. Result 1′ (§7.2), the arms generated for §7.11 and every arm of §7.12 were generated under it. The replication list, in order, is: the three shipped arms under the current `n_min` rule (§4.3); three draws under a second vendor on finance and NHANES; and the remaining arms, beginning with the inversion and transmission sweeps, under the current release path.
+   conditional level with `δ = 1.5 × 10⁻⁷` at the `n_min = 150` floor. Every release path now implements the corrected two-count mechanism. Result 1′ (§7.2), the arms generated for §7.11 and every arm of §7.12 were generated under it. The inversion test and the Adult transmission sweep were repeated on GPT-5 under the current release path (§7.1.2, §7.4), and the finance and NHANES arms of §7.12 under a second vendor. The replication list, in order, is now: the three shipped arms under the current `n_min` rule (§4.3); three reasoning-on draws under a second vendor; and the remaining earlier-configuration arms under the current release path.
 
 3. **The transmission sweeps are single-seed on healthcare.** Each perturbs one relationship at three interior points, so the curve shape between endpoints rests on one measurement per model.
 

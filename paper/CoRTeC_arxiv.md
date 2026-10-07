@@ -461,7 +461,7 @@ That configuration differed from the shipped one in four ways. It released poole
 
 Every real dataset in Table 2 is a public benchmark, and the generators we deploy are closed-weight models whose pretraining corpus we cannot audit. Two objections follow, and the experiments that answer them are stated here, before the results, because a reader who holds either objection will otherwise read every table through it. The first is recitation: that the model reproduces records or marginals it has seen. The second is that the mechanism is a property of one vendor's model.
 
-Three controls answer the first. A constructed renal registry with no public presence (Section 6.3) keeps CoRTeC's margin over an ungrounded model unchanged, 0.054 against 0.057 on Adult, a ratio of 0.95, so the margin does not depend on the model having seen the data. An inversion test (Section 6.3) plants a relationship that contradicts the model's prior, advanced degrees paired with low income, and the output follows the private release, emitting the high-income label for 0.000 of advanced-degree holders where the same model without the release emits it for 0.931. A matched control gives the model CoRTeC's own prompt with the released arrays deleted, so that the release, and not the prompt's wording, is what the control lacks. The membership-inference attacks of Section 6.11, validated on a positive control, find no private record in the output. What these controls do not rule out is recall of a public benchmark's marginal distributions, and Section 10 says so.
+Three controls answer the first. A constructed renal registry with no public presence (Section 6.3) keeps CoRTeC's margin over an ungrounded model unchanged, 0.054 against 0.057 on Adult, a ratio of 0.95, so the margin does not depend on the model having seen the data. An inversion test (Section 6.3) plants a relationship that contradicts the model's prior, advanced degrees paired with low income, and the output follows the private release, emitting the high-income label for 0.000 of advanced-degree holders where the same model without the release emits it for 0.931; on a second vendor under the current release rule the same test gives 0.000 against 1.000. A matched control gives the model CoRTeC's own prompt with the released arrays deleted, so that the release, and not the prompt's wording, is what the control lacks. The membership-inference attacks of Section 6.11, validated on a positive control, find no private record in the output. What these controls do not rule out is recall of a public benchmark's marginal distributions, and Section 10 says so.
 
 The open-weight control answers the second. The transmission sweep of Section 6.4 was repeated on nine self-hosted open-weight models spanning six families; every family at or above 20B parameters transmits the planted relationship with a mean error of 0.10 or less (Appendix E). Those models are scientific controls on the mechanism and not a deployment proposal, for the reason Section 6.6 gives: on full-dataset generation their output is close to that of an unconditioned prompt.
 
@@ -657,7 +657,12 @@ With one release, Claude Fable 5 and $n$ = 300 per condition, CoRTeC emits the h
 |---|---|
 | **CoRTeC** | **0.000**, tracking the release |
 | matched header-only control | **0.931**, more extreme than the real-world prior |
+| CoRTeC, GPT-5 at low reasoning, release under the current rule | **0.000**, tracking the release |
+| CoRTeC, GPT-5 at minimal reasoning, same release | 0.276 |
+| matched header-only control, GPT-5 at minimal reasoning, same release | **1.000** |
 | *real data, uninverted* | *0.619* |
+
+**On a second vendor, under the current release rule.** The test was repeated on GPT-5 with one fresh inverted release made under the $n_{min}$ rule of Algorithm 1, so the release carries pure ε = 2, and the same three conditions. With reasoning at GPT-5's low level CoRTeC emits the high-income label for 0.000 of 24 advanced-degree holders, and every education band is within 0.07 of its released rate (0.119, 0.217 and 0.490 against released 0.129, 0.206 and 0.416). The matched control emits it for 1.000 of 52. At minimal reasoning CoRTeC emits it for 0.276 of 29, and over-emits the positive class in every band, by 0.13 to 0.26, while keeping graduates lowest: the inverted ordering transmits and the magnitudes do not, which is the reasoning effect of Section 6.6 on the hardest case. The minimal-reasoning control also returned only the CSV header, with no rows, on 4 of 22 calls; the generator's parse guard caught each one, and the raw text is now kept whenever it does.
 
 Evaluated on a held-out test set carrying the same inverted relationship, the model trained on header-only output is wrong for 72% of the inverted subgroup. Its aggregate AUC still exceeds CoRTeC's (0.730 against 0.670), because the subgroup is 7.9% of rows and the aggregate is dominated by the 92% where the prior is correct.
 
@@ -690,9 +695,12 @@ Table 13 shows that CoRTeC transmits, across three domains, with Stage A re-rele
 | domain | relationship forced | slope | MAE | unconditioned control | true rate |
 |---|---|---|---|---|---|
 | census (Adult) | education to income | 1.063 [0.973, 1.168]; 3 seeds, 14 points | 0.055 | 88.3% | 61.9% |
+| census (Adult), GPT-5 at minimal reasoning, releases under the current rule | education to income | 0.992; 1 seed, 5 points | 0.104 | not run | 61.9% |
 | healthcare (Diabetes 130) | prior admissions to 30-day readmission | 0.995 | 0.009 | 98.5% | 21.4% |
 | finance (credit) | repayment status to default | 0.962 / 1.010; 2 seeds | 0.019 / 0.023 | 100.0% | 69.6% |
 | **healthcare (NHANES)**, auto-configured | race/ethnicity to diabetes | **1.041** | **0.020** | 63.9% | 15.4% |
+
+A one-seed repeat of the Adult sweep on GPT-5 at minimal reasoning, with every release made under the current rule, records slope 0.992 and a mean absolute error of 0.104 over the five forced points: 0.000 at a released 0.002 and 1.000 at 0.991, but 0.397, 0.574 and 0.952 at released 0.218, 0.405 and 0.792. On the natural release its graduates come out at 0.984 against a released 0.562. At minimal reasoning, then, the direction transmits and the interior magnitudes are pulled towards the prior, which is why Definition 4 reports both numbers; with reasoning on, the inversion test above transmits exactly.
 
 ![Figure 6](figures/fig05_calibration.png)
 
@@ -809,6 +817,8 @@ The finding is that this measure cannot detect the difference. A practitioner ch
 | default | 3 | 0.040 ± 0.001 | 0.045 ± 0.007 | 0.802 ± 0.025 | 261k (94% of output) | $2.81 |
 
 Reasoning does not substitute for capability in either direction. Claude Sonnet 5 with reasoning verifiably firing on 34 of 34 calls reaches 0.128: a real improvement on its suppressed 0.154, but nearly three times the frontier band and only modestly clear of the no-information floor. Claude Opus 5 reaches 0.046 with reasoning verifiably off. What the band has in common is frontier-class capability. Reasoning produces a large within-model gain that a weaker model cannot convert into frontier output.
+
+**A second vendor on the shipped configuration.** The shipped configuration was re-generated through GPT-5 on finance and NHANES, three draws each from the Gemini arm's own release file, so the generator is the only variable (Table 34, Appendix F). The budget forced GPT-5's minimal reasoning level, at $0.25 per NHANES draw and $0.57 per finance draw against $0.10 a call with reasoning on, so the comparison is a vendor change and a reasoning change at once. On finance the result replicates: no measure separates the two vendors after correction, the random forest is 0.021 lower at a Holm-adjusted p of 0.22, and against the real-sample floor the only comparison near significance is the random forest, 0.016 short at an adjusted p of 0.053. On NHANES utility replicates and conditional fidelity does not: no student separates (adjusted p of 0.78 or above), but conditional error over seen groups is 0.038 against Gemini's 0.006 (p = 0.0055, adjusted 0.072) and 1-way error 0.031 against 0.015. That is the direction the reasoning result of Table 19 predicts. The selected minimal-reasoning draws carry 0.100 to 0.110 positives against the release's 0.138, where the Gemini draws carry 0.137: the pools match the release exactly in both cases, because the quota forces it, and the selection prefers GPT-5's negatives. One NHANES draw at GPT-5's low reasoning level, $2.70 for a pool that stopped at 572 of 600 rows and was selected offline, returns the conditional error to 0.011 and the positive rate to 0.130, with 2-way error 0.104, the lowest of any arm, while its tree students train lower, 0.664 and 0.640. One draw is a signal and is reported as one. The replication the result still needs is three reasoning-on draws under a second vendor.
 
 The practical guidance is:
 
@@ -1091,7 +1101,7 @@ Four practices caught these, and we recommend all four.
 
 ## 10. Limitations
 
-1. **The head-to-head is at $n$ = 300 under one generator family.** The shipped configuration is measured with Gemini 3.5 Flash at three draws per dataset. The cross-vendor check through Claude Opus 5 is one complete pool on Adult, and the powered six-draw equivalence test was run with Claude Fable 5 on the earlier release design. Three draws under a second vendor, and a second vendor on finance and NHANES, are the replications the result still needs. The replication list, in order, is: the three shipped arms under the current $n_{min}$ rule (Section 4.7); three draws under a second vendor on finance and NHANES; and the inversion and transmission sweeps of Sections 6.3 and 6.4 under the current release path, which implements the pure-ε mechanism. At $n$ = 1,000 on Adult the point estimates favour the real sample, and we state the equivalence claim at the size where it was demonstrated with adequate power.
+1. **The head-to-head is at $n$ = 300 under one generator family.** The shipped configuration is measured with Gemini 3.5 Flash at three draws per dataset. The cross-vendor check through Claude Opus 5 is one complete pool on Adult, and the powered six-draw equivalence test was run with Claude Fable 5 on the earlier release design. A second vendor, GPT-5 at minimal reasoning, reproduces the finance result at three draws and the NHANES utility result at three draws, with conditional fidelity behind Gemini's (Appendix F); one reasoning-on NHANES draw reduces that error from 0.038 to 0.011. The inversion test and the Adult transmission sweep were repeated on GPT-5 under the current release path, which implements the pure-ε mechanism (Sections 6.3 and 6.4). The replication list, in order, is now: the three shipped arms under the current $n_{min}$ rule (Section 4.7); three reasoning-on draws under a second vendor; and the remaining earlier-configuration arms under the current release path. At $n$ = 1,000 on Adult the point estimates favour the real sample, and we state the equivalence claim at the size where it was demonstrated with adequate power.
 
 2. **AIM enters the finance comparison only on a reduced schema and is absent from the hospital data.** Its fit exceeded three hours on the full 15-column finance schema and on Diabetes 130, against its own paper's 24-hour allowance. The cause is localised to the six high-cardinality amount columns. On NHANES it completes in under a minute, and Table 5 reports it there.
 
@@ -1436,3 +1446,21 @@ To establish that the mechanism is not a property of one vendor's model, the Dia
 | qwen2.5:7b-instruct | Alibaba | 7.6B | Q4_K_M | 0.208 | 0.406 | −0.422 |
 
 Every family tested at 20B parameters or above transmits the private relationship with a mean error of 0.10 or less: six families, one hosted model and six self-hosted ones. Every open-weight model here is 4-bit quantised, so the table compares quantised weights and not released models, and gemma2's 8,192-token training context is four times smaller than any other model's, so its weaker score is confounded with its context limit. Transmission fidelity is not generation fidelity: on full-dataset generation a self-hosted 70B model's output is close to indistinguishable from an unconditioned prompt on the metrics this method exists to improve, which is why the deployment proposal names enterprise platforms.
+
+## Appendix F. The Second-Vendor Replication
+
+**Table 34:** The shipped configuration generated through GPT-5 from the Gemini arms' own release files, scored under the protocol of Section 5.3 beside the Gemini arms and the real-sample floor. The minimal-reasoning arms are three draws; the low-reasoning NHANES arm is one draw from a pool that stopped at 572 of 600 rows at its spend cap and was selected offline.
+
+| condition | draws | 1-way TV ↓ | 2-way TV ↓ | cond. seen ↓ | cond. held-out ↓ | TSTR-LR ↑ | TSTR-RF ↑ | TSTR-GBM ↑ |
+|---|---|---|---|---|---|---|---|---|
+| **NHANES** | | | | | | | | |
+| CoRTeC (Gemini 3.5 Flash, reasoning on) | 3 | 0.015 | 0.119 | 0.006 | 0.036 | 0.752 | 0.732 | 0.711 |
+| CoRTeC (GPT-5, minimal reasoning) | 3 | 0.031 | 0.116 | 0.038 | 0.063 | 0.751 | 0.710 | 0.702 |
+| CoRTeC (GPT-5, low reasoning; one draw) | 1 | 0.020 | 0.104 | 0.011 | 0.069 | 0.727 | 0.664 | 0.640 |
+| *real sample, n = 300* | *3* | *0.034* | *0.081* | *0.015* | *0.036* | *0.773* | *0.728* | *0.716* |
+| **finance** | | | | | | | | |
+| CoRTeC (Gemini 3.5 Flash, reasoning on) | 3 | 0.029 | 0.125 | 0.014 | 0.022 | 0.680 | 0.731 | 0.712 |
+| CoRTeC (GPT-5, minimal reasoning) | 3 | 0.033 | 0.125 | 0.019 | 0.026 | 0.683 | 0.711 | 0.703 |
+| *real sample, n = 300* | *3* | *0.041* | *0.099* | *0.059* | *0.045* | *0.695* | *0.727* | *0.717* |
+
+On finance no comparison between the two vendors survives Holm correction over the fourteen-test family (random forest 0.711 against 0.731, p = 0.017, adjusted 0.22). On NHANES conditional error over seen groups, 0.038 against 0.006, reaches p = 0.0055 and an adjusted 0.072; no student separates. Against the real-sample floor the minimal-reasoning NHANES arm's 2-way error is the one comparison that survives (0.116 against 0.081, adjusted 0.023), and on finance the random forest is 0.016 short at an adjusted 0.053. Costs at minimal reasoning were $0.25 per NHANES draw and $0.57 per finance draw; the reasoning-on NHANES draw cost $2.70 and the reasoning-on inversion condition of Section 6.3 $1.39, at about $0.10 a call.

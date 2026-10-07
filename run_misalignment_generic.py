@@ -83,6 +83,10 @@ def main():
     ap.add_argument("--backend", default="anthropic",
                     choices=["anthropic", "ollama", "gemini", "openai", "mock"])
     ap.add_argument("--model", default="claude-fable-5")
+    ap.add_argument("--effort", default=None, choices=["low", "medium", "high", "xhigh", "max"],
+                    help="reasoning effort; 'low' maps to minimal on OpenAI and to a 128-token "
+                         "thinking budget on Gemini. Set it for every paid reasoning model: the "
+                         "vendor default spends most of the output budget on reasoning")
     ap.add_argument("--ollama-url", default="http://localhost:11434")
     ap.add_argument("--ollama-num-predict", type=int, default=None,
                     help="raise for reasoning models whose chain of thought consumes the budget")
@@ -141,6 +145,18 @@ def main():
         if a.ollama_num_predict:
             gen.ollama_num_predict = a.ollama_num_predict
             gen.ollama_num_ctx = max(gen.ollama_num_ctx, a.ollama_num_predict + 4096)
+        if getattr(a, 'effort', None):
+            # Each vendor spells "think less" differently (see run_cortec_gen.py): GPT-5 at its
+            # default spent 93% of its output on reasoning, 14.5x the cost per draw of minimal.
+            if a.backend == 'anthropic':
+                gen._anthropic_extra['output_config'] = {'effort': a.effort}
+            elif a.backend == 'openai':
+                gen._openai_extra['reasoning_effort'] = 'minimal' if a.effort == 'low' else a.effort
+            elif a.backend == 'gemini':
+                from google.genai import types
+                _budget = {'low': 128, 'medium': 1024, 'high': 4096}.get(a.effort, 128)
+                gen._gemini_extra['thinking_config'] = types.ThinkingConfig(thinking_budget=_budget)
+            print(f"  [cost] thinking effort = {a.effort} (backend={a.backend})", flush=True)
         # Ollama is self-hosted: no per-token cost, so the dollar cap does not apply.
         gen.budget_usd = None if a.backend == "ollama" else max(a.budget_usd - spent, 0.05)
         try:

@@ -729,6 +729,14 @@ class LLMSyntheticGenerator:
                       f"(total {sum(len(f) for f in frames)})")
             else:
                 print(f"  [{label}] call {attempts}: parse failed — retrying …")
+                # Keep the raw text when asked, so a parse failure can be read rather than guessed at
+                # (a vendor returning prose, a markdown table, a refusal or an empty body all print the
+                # same line above). Off unless CORTEC_PARSE_FAILURE_LOG names a file.
+                _dump = os.environ.get("CORTEC_PARSE_FAILURE_LOG")
+                if _dump:
+                    with open(_dump, "a") as _fh:
+                        _fh.write(f"\n===== [{label}] call {attempts} ({self.backend}/{self.model}) =====\n"
+                                  f"{(raw_text or '<empty>')[:4000]}\n")
             if self._window_calls >= self.CHECK_EVERY:
                 self._checkpoint()
             time.sleep(0.5)  # polite rate limiting

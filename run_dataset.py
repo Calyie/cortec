@@ -101,6 +101,22 @@ def stage_generate(spec, a, out: Path):
                                 rows_per_call=a.rows_per_call, spec=spec,
                                 ollama_url=a.ollama_url)
     gen.quota = bool(getattr(a, "quota", False)); gen.quota_seed = a.seed
+    if getattr(a, 'effort', None):
+        # Each vendor spells "think less" differently (see run_cortec_gen.py): GPT-5 at its
+        # default spent 93% of its output on reasoning, 14.5x the cost per draw of minimal.
+        if a.backend == 'anthropic':
+            gen._anthropic_extra['output_config'] = {'effort': a.effort}
+        elif a.backend == 'openai':
+            gen._openai_extra['reasoning_effort'] = 'minimal' if a.effort == 'low' else a.effort
+        elif a.backend == 'gemini':
+            from google.genai import types
+            _budget = {'low': 128, 'medium': 1024, 'high': 4096}.get(a.effort, 128)
+            gen._gemini_extra['thinking_config'] = types.ThinkingConfig(thinking_budget=_budget)
+        print(f"  [cost] thinking effort = {a.effort} (backend={a.backend})", flush=True)
+    if getattr(a, 'openai_reasoning_effort', None):
+        assert a.backend == 'openai', '--openai-reasoning-effort applies to the openai backend only'
+        gen._openai_extra['reasoning_effort'] = a.openai_reasoning_effort
+        print(f"  [cost] OpenAI reasoning_effort = {a.openai_reasoning_effort}", flush=True)
     if getattr(a, "anthropic_max_tokens", None):
         gen.anthropic_max_tokens = int(a.anthropic_max_tokens)
     if a.ollama_num_predict:
@@ -240,6 +256,14 @@ def main():
     ap.add_argument("--stage", required=True,
                     choices=["release", "generate", "baselines"])
     ap.add_argument("--backend", default="anthropic")
+    ap.add_argument("--openai-reasoning-effort", default=None,
+                    choices=["minimal", "low", "medium", "high"],
+                    help="vendor-native OpenAI reasoning level; overrides the --effort mapping, under which "
+                         "'low' means minimal. GPT-5's default (medium) cost 14.5x the minimal draw")
+    ap.add_argument("--effort", default=None, choices=["low", "medium", "high", "xhigh", "max"],
+                    help="reasoning effort; 'low' maps to minimal on OpenAI and to a 128-token "
+                         "thinking budget on Gemini. Set it for every paid reasoning model: the "
+                         "vendor default spends most of the output budget on reasoning")
     ap.add_argument("--model", default="claude-fable-5")
     ap.add_argument("--ollama-url", default="http://localhost:11434")
     ap.add_argument("--ollama-num-predict", type=int, default=None,
