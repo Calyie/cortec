@@ -93,21 +93,25 @@ def release_statistics(spec: DatasetSpec, raw_train: pd.DataFrame, *, epsilon_st
     out: list[dict] = []
     _n_blocks, _n_class_conditional = 0, 0   # histogram blocks released; cohorts split by class
 
-    for cid, (sname, idx) in enumerate(sorted(strata.groupby(strata).groups.items())):
+    _observed = {str(k): idx for k, idx in strata.groupby(strata).groups.items()}
+    for cid, sname in enumerate(spec.stratum_domain(raw_train)):
+        # Every cohort of the PUBLIC stratification domain is queried, present or not, and the
+        # n_min gate reads the NOISED count: the count query is charged (eps_counts, parallel
+        # across the disjoint cohorts) and comparing it with the public floor is post-processing.
+        # Gating on the exact count, as this path once did, was a data-dependent decision
+        # outside the accounted budget (technical report, section 4.3). The published size is
+        # the same noised count; it is at least n_min by construction of the gate, and the
+        # clamp states that. Without a floor, at eps = 0.3 on NHANES the 18-30 band's noised
+        # size once clipped to 0, it was allocated 1 of 600 rows, and the youngest age band
+        # vanished from the output while every per-row check passed.
+        idx = _observed.get(sname, raw_train.index[:0])
         n_c = len(idx)
-        if n_c < n_min:
-            print(f"  cohort {sname!r} too small ({n_c} < n_min={n_min}) — skipping")
+        _n_noisy = Laplace(epsilon=eps_counts, sensitivity=1.0).randomise(float(n_c))
+        if _n_noisy < n_min:
+            print(f"  cohort {sname!r}: noised size {_n_noisy:.0f} below n_min={n_min} — not released")
             continue
         sub = raw_train.loc[idx]
-        # Noised count. n_min gating above uses the TRUE count, which is a data-dependent choice
-        # of what to release; that is unchanged here and is accounted for where the release
-        # documents it. What must not happen is publishing the true count itself.
-        # The published size is clamped at n_min: a cohort is released only when it holds at least
-        # n_min records, so any lower published value is impossible under the release's own rule,
-        # and clamping is post-processing. Without it, at eps = 0.3 on NHANES the 18-30 band's
-        # noised size clipped to 0, it was allocated 1 of 600 rows, and the youngest age band
-        # vanished from the output while every per-row check passed.
-        _n_pub = int(max(n_min, round(Laplace(epsilon=eps_counts, sensitivity=1.0).randomise(float(n_c)))))
+        _n_pub = int(max(n_min, round(_n_noisy)))
         stats = {"cohort_id": cid, "cohort_name": str(sname), "cohort_size": _n_pub,
                  "numerical": {}, "categorical": {}, "class_balance": {}}
 
@@ -185,11 +189,11 @@ def release_statistics(spec: DatasetSpec, raw_train: pd.DataFrame, *, epsilon_st
         # the pooled block did, and the pooled histogram is their noisy mixture -- post-processing,
         # released for free. Measured with a naive independent decoder and no model at all, this
         # release reaches the real-sample floor on two of three students where the pooled one
-        # trails it by 0.03-0.06 (technical report, section 7.11). Where either class falls
-        # below n_min the cohort keeps the pooled block, a suppression decision of the kind the
-        # accounting already documents.
-        n_pos_true, n_neg_true = int(ys.sum()), int((~ys).sum())
-        if class_conditional and n_pos_true >= n_min and n_neg_true >= n_min:
+        # trails it by 0.03-0.06 (technical report, section 7.11). Where either class's NOISED
+        # count (the charged class-balance query above) falls below n_min the cohort keeps the
+        # pooled block: the decision is post-processing of a charged query, never a read of
+        # the exact class sizes.
+        if class_conditional and pos >= n_min and neg >= n_min:
             p_num, p_cat, p_fl = _blocks(sub[ys.values])
             q_num, q_cat, q_fl = _blocks(sub[~ys.values])
             w = pos / t if t > 0 else 0.5
@@ -230,11 +234,13 @@ def release_statistics(spec: DatasetSpec, raw_train: pd.DataFrame, *, epsilon_st
     cond_tables = {}
     for li in levels:
         keys = spec.level_keys(raw_train, li)
+        _obs = {str(k): idx for k, idx in keys.groupby(keys).groups.items()}
         tbl = {}
-        for cell, idx in keys.groupby(keys).groups.items():
+        for cell in spec.level_domain(raw_train, li):
+            # every cell of the level's PUBLIC domain is queried; which cells are released is
+            # decided below from the noised size, a noisy threshold at the public floor
+            idx = _obs.get(cell, raw_train.index[:0])
             n_sub = len(idx)
-            if n_sub < n_min:
-                continue
             # The rate is NOT noised directly. A bounded mean over |c| records has sensitivity
             # 1/|c| only when |c| is public; under add/remove-one adjacency |c| differs between
             # neighbouring datasets, so Lap(1/(|c|·ε)) has a DATA-DEPENDENT scale and is not pure
@@ -246,11 +252,13 @@ def release_statistics(spec: DatasetSpec, raw_train: pd.DataFrame, *, epsilon_st
             # so the level still costs eps_per_level in total (parallel across cells).
             eps_half = eps_per_level / 2.0
             pos_noisy = max(0.0, Laplace(epsilon=eps_half, sensitivity=1.0)
-                            .randomise(float(y.loc[idx].sum())))
+                            .randomise(float(y.loc[idx].sum()) if n_sub else 0.0))
             n_noisy = Laplace(epsilon=eps_half, sensitivity=1.0).randomise(float(n_sub))
-            # Algorithm 1, line 10': the denominator is floored at the PUBLIC n_min, not at 1 -- a
-            # cell is released only if it holds n_min records, so a noisy count below that floor is
-            # noise, and dividing by it would amplify the rate's error for no privacy reason.
+            if n_noisy < n_min:
+                continue        # not released: the noised size is below the public floor
+            # Algorithm 1, line 14: the denominator is floored at the PUBLIC n_min, not at 1 -- a
+            # cell is released only if its noised size reaches n_min, so the floor is already
+            # met and dividing by anything smaller would amplify the rate's error for nothing.
             tbl[str(cell)] = round(float(np.clip(pos_noisy / max(n_noisy, float(n_min)), 0.0, 1.0)), 4)
         cond_tables[li] = tbl
 
@@ -265,6 +273,9 @@ def release_statistics(spec: DatasetSpec, raw_train: pd.DataFrame, *, epsilon_st
                      # size) at this epsilon each; their ratio is the released rate
                      "per_cond_cell_query": eps_per_level / 2.0,
                      "levels_released": list(levels), "cohort_count_query": eps_counts,
+                     # every n_min decision compares a NOISED, charged count with the public
+                     # floor: post-processing, so no decision reads an exact private count
+                     "n_min_gate": "noisy threshold on the charged counts (post-processing)",
                      # partition structure of the marginal family: one histogram block per
                      # cohort, or two disjoint class blocks (parallel, same eps per query)
                      "marginal_blocks": _n_blocks, "class_conditional_cohorts": _n_class_conditional,

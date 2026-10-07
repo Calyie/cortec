@@ -147,11 +147,11 @@ DP_CAVEATS = [
     "This is a UTILITY TRANSMISSION BOUND computed under DP. It bounds how far the synthetic "
     "conditional structure can differ from the private one; it does NOT certify privacy, says "
     "nothing about re-identification risk, and must never be presented as a privacy audit.",
-    "WHICH cells enter the bound depends on private counts (a cell is included only if it "
-    "holds at least n_min records). That selection is data-dependent and is NOT charged to "
-    "epsilon here, exactly as the research pipeline treats cohort sizes as public (paper "
-    "limitation 5). A deployment that cannot make that assumption must charge the suppression "
-    "decision separately, as tools/cortec does via spend_suppression_counts.",
+    "WHICH cells enter the bound: with --release, the cells the release published, whose "
+    "selection the release made by a noisy threshold on its charged, noised counts (post-"
+    "processing), so the bound reads no exact private count to choose them. Without --release, "
+    "a cell is included only if it holds at least n_min private records; that selection is "
+    "data-dependent and is NOT charged to epsilon here.",
     "Cells for which the synthetic data supplies NO rows are scored at the trivial bound of 1.0. "
     "A bound therefore cannot be obtained by covering a convenient subset of the cells.",
 ]
@@ -180,7 +180,8 @@ def _cell_keys(spec, df: pd.DataFrame, level: int) -> pd.Series:
 
 def certify(spec, real: pd.DataFrame, synth: pd.DataFrame, *, level: int,
             epsilon: float, alpha: float = 0.05, n_min: int = 150,
-            rng: np.random.Generator | None = None) -> dict:
+            rng: np.random.Generator | None = None,
+            released_cells: list[str] | None = None) -> dict:
     """One-sided simultaneous DP bound on |p_c - q_c| across released cells.
 
     The `rng` argument controls only EXPERIMENTAL reproducibility; it must never be used for the
@@ -196,7 +197,15 @@ def certify(spec, real: pd.DataFrame, synth: pd.DataFrame, *, level: int,
     ry = spec.is_positive(real)
     sy = spec.is_positive(synth)
 
-    groups = {str(c): idx for c, idx in rk.groupby(rk).groups.items() if len(idx) >= n_min}
+    if released_cells is not None:
+        # Score exactly the cells the release published. Which cells those are was decided by
+        # the release (a noisy threshold on its charged counts), so choosing them here reads no
+        # exact private count. A released cell with no private record in this split is scored
+        # on a rate of 0 plus its noise, never silently dropped.
+        _obs = {str(c): idx for c, idx in rk.groupby(rk).groups.items()}
+        groups = {str(c): _obs.get(str(c), real.index[:0]) for c in released_cells}
+    else:
+        groups = {str(c): idx for c, idx in rk.groupby(rk).groups.items() if len(idx) >= n_min}
     if not groups:
         return {"level": level, "epsilon_spent": epsilon, "alpha": alpha, "n_cells": 0,
                 "n_cells_covered": 0, "n_cells_uncovered": 0, "n_cells_thin": 0,
@@ -215,7 +224,7 @@ def certify(spec, real: pd.DataFrame, synth: pd.DataFrame, *, level: int,
     out = []
     for cell, idx in groups.items():
         n_c = len(idx)
-        p_true = float(ry.loc[idx].mean())
+        p_true = float(ry.loc[idx].mean()) if n_c else 0.0
         # Sensitivity bound is 1/n_min, NOT 1/n_c (technical report, section 4.3). Under add/remove-one adjacency the
         # cell size is private, so a scale set from n_c is data-dependent and the mechanism is not
         # pure eps-DP. For a cell released in both neighbouring datasets both sizes are >= n_min,
@@ -254,7 +263,8 @@ def certify(spec, real: pd.DataFrame, synth: pd.DataFrame, *, level: int,
 
 
 def certify_with_controls(spec, train, test, synth, *, level, epsilon, alpha=0.05,
-                          n_min=150, seed=0, tolerance=0.15) -> dict:
+                          n_min=150, seed=0, tolerance=0.15,
+                          released_cells: list[str] | None = None) -> dict:
     """Bound the synthetic data, plus a real-sample ceiling and a permuted-target floor."""
     rng = np.random.default_rng(seed)
     n = len(synth)
@@ -272,7 +282,8 @@ def certify_with_controls(spec, train, test, synth, *, level, epsilon, alpha=0.0
     res = {}
     for lab, d in conds.items():
         r = certify(spec, train, d, level=level, epsilon=epsilon, alpha=alpha,
-                    n_min=n_min, rng=np.random.default_rng(seed))
+                    n_min=n_min, rng=np.random.default_rng(seed),
+                    released_cells=released_cells)
         # bool(), not the numpy bool the comparison returns: json.dump(default=str) wrote that as
         # the STRING "False", which is truthy to every reader that does not compare it to a literal.
         # A compliance tool reading the report would have taken a failed verdict for a passed one.
@@ -311,6 +322,10 @@ def main() -> None:
                          "guarantee without it. Count it on your own data before running this.")
     ap.add_argument("--epsilon-release", type=float, default=2.0,
                     help="what the RELEASE already spent, so the report can state the TOTAL")
+    ap.add_argument("--release", default=None,
+                    help="the release (cohort_statistics.json) whose published cells are scored; "
+                         "without it a cell is included when it holds n_min private records, a "
+                         "data-dependent selection the caveats record")
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
 
@@ -323,6 +338,18 @@ def main() -> None:
         raise SystemExit(f"no files matched {a.synthetic}")
     synth = pd.concat([pd.read_csv(p) for p in paths], ignore_index=True)
     level = a.level if a.level is not None else len(spec.conditional_levels) - 1
+    released_cells = None
+    if a.release:
+        with open(a.release) as fh:
+            _rel = json.load(fh)
+        _first = _rel[0] if isinstance(_rel, list) else _rel
+        _tables = _first.get("conditional_target_levels") or {}
+        _tbl = _tables.get(str(level)) if _tables else None
+        if _tbl is None and level == len(spec.conditional_levels) - 1:
+            _tbl = _first.get("conditional_target")
+        if not _tbl:
+            raise SystemExit(f"{a.release} carries no conditional table at level {level}")
+        released_cells = sorted(_tbl.keys())
 
     print("=" * 100)
     print(f"STAGE C — UTILITY TRANSMISSION BOUND | {spec.name} | level {level} | "
@@ -333,7 +360,7 @@ def main() -> None:
 
     res = certify_with_controls(spec, train, test, synth, level=level, epsilon=a.epsilon,
                                 alpha=a.alpha, n_min=a.n_min, seed=a.seed,
-                                tolerance=a.tolerance)
+                                tolerance=a.tolerance, released_cells=released_cells)
     print(f"{'condition':26s} {'cells':>6s} {'cov':>5s} {'uncov':>6s} {'thin':>5s} "
           f"{'mean':>7s} {'worst':>7s} {'within bound':>13s}")
     for lab in ("synthetic", "real-sample [CEILING]", "permuted-target [FLOOR]"):
@@ -432,6 +459,7 @@ def main() -> None:
             "dataset": a.dataset, "level": level, "epsilon_transmission_bound": a.epsilon,
             "alpha": a.alpha, "tolerance": a.tolerance, "n_min": a.n_min, "seed": a.seed,
             "synthetic_files": paths, "n_synthetic_rows": int(len(synth)),
+            "cells_from_release": a.release,
             "epsilon_release": a.epsilon_release,
             "noise_source": "cryptographically secure, unseeded — this bound is ONE draw "
                             "and re-running will not reproduce these bounds",

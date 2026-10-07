@@ -130,6 +130,38 @@ class DatasetSpec:
     def is_positive(self, df: pd.DataFrame) -> pd.Series:
         return df[self.target_col].astype(str).str.strip() == self.positive_class
 
+    # ── public domains ───────────────────────────────────────────────────────────
+    # The release queries EVERY cohort and EVERY cell the public rules can produce, present in
+    # the data or not, and gates each on its noised count. Iterating only over the groups
+    # present in the data would make the set of queried groups itself a function of the
+    # data, which pure epsilon-DP does not allow (technical report, section 4.3).
+    def _band_domain(self, b: Band, df: pd.DataFrame) -> list[str]:
+        if b.edges is not None:
+            return list(b.labels or [f"{b.edges[i]:g}-{b.edges[i+1]:g}"
+                                     for i in range(len(b.edges) - 1)])
+        if b.groups:
+            return list(b.groups.keys()) + ["other"]
+        # a bare categorical band: the category list is the public domain the release already
+        # treats as declared (every histogram block keeps every category)
+        return sorted(df[b.col].astype(str).str.strip().unique().tolist())
+
+    def stratum_domain(self, df: pd.DataFrame) -> list[str]:
+        """Every cohort key the public stratification rule can produce, sorted."""
+        if not self.stratify:
+            return ["*"]
+        import itertools
+        return sorted(" & ".join(t) for t in
+                      itertools.product(*[self._band_domain(b, df) for b in self.stratify]))
+
+    def level_domain(self, df: pd.DataFrame, level: int) -> list[str]:
+        """Every cell key one conditional level can produce, sorted."""
+        bands = self.conditional_levels[level]
+        if not bands:
+            return ["*"]
+        import itertools
+        return sorted("|".join(t) for t in
+                      itertools.product(*[self._band_domain(b, df) for b in bands]))
+
 
 # ── registry ────────────────────────────────────────────────────────────────────────
 _REGISTRY: dict[str, Callable[[], DatasetSpec]] = {}
