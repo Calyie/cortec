@@ -100,7 +100,11 @@ def stage_generate(spec, a, out: Path):
     gen = LLMSyntheticGenerator(backend=a.backend, model=a.model,
                                 rows_per_call=a.rows_per_call, spec=spec,
                                 ollama_url=a.ollama_url)
-    gen.quota = bool(getattr(a, "quota", False)); gen.quota_seed = a.seed
+    gen.quota = bool(getattr(a, "quota", False))
+    # the apportionment seed is the run seed unless pinned: pinned, draws split across processes with
+    # different run seeds still apportion the same cohort targets, so every model sees the same counts
+    gen.quota_seed = a.seed if getattr(a, "quota_seed", None) is None else int(a.quota_seed)
+    gen.quota_by_class = not bool(getattr(a, "no_quota_by_class", False))
     if getattr(a, 'effort', None):
         # Each vendor spells "think less" differently (see run_cortec_gen.py): GPT-5 at its
         # default spent 93% of its output on reasoning, 14.5x the cost per draw of minimal.
@@ -112,6 +116,8 @@ def stage_generate(spec, a, out: Path):
             from google.genai import types
             _budget = {'low': 128, 'medium': 1024, 'high': 4096}.get(a.effort, 128)
             gen._gemini_extra['thinking_config'] = types.ThinkingConfig(thinking_budget=_budget)
+        elif a.backend == 'ollama':
+            gen.ollama_think = a.effort          # gpt-oss: low, medium or high
         print(f"  [cost] thinking effort = {a.effort} (backend={a.backend})", flush=True)
     if getattr(a, 'openai_reasoning_effort', None):
         assert a.backend == 'openai', '--openai-reasoning-effort applies to the openai backend only'
@@ -147,7 +153,16 @@ def stage_generate(spec, a, out: Path):
                 # pool_factor x n pool, keep the n rows whose marginals match the release.
                 # Post-processing of the release; costs pool_factor x the generation spend, no ε.
                 from src.generic_pipeline import select_to_release
-                pool = gen.generate_cortec(cs, n_total=int(round(a.pool_factor * a.n_synthetic)))
+                _prior = None
+                _pp_prev = out / "partial_generated_rows.csv"
+                if d == 0 and getattr(a, "resume_partial", False) and _pp_prev.exists():
+                    # a run stopped by a spending cap left its generated rows here; the first draw
+                    # of this run completes that pool instead of paying for those rows again
+                    _prior = pd.read_csv(_pp_prev)
+                    print(f"  --resume-partial: {len(_prior)} rows from {_pp_prev} enter draw {d}")
+                pool = gen.generate_cortec(cs, n_total=int(round(a.pool_factor * a.n_synthetic)), prior=_prior)
+                if _prior is not None:
+                    _pp_prev.rename(out / f"partial_generated_rows.resumed_draw{d}.csv")
                 pp = out / f"synthetic_cortec_pool{d}.csv"
                 pool.to_csv(pp, index=False)
                 df = select_to_release(spec, cs, pool, a.n_synthetic, seed=a.seed + d)
@@ -253,6 +268,9 @@ def stage_baselines(spec, a, out: Path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dataset", required=True, choices=available() + ["diabetes", "credit"])
+    ap.add_argument("--resume-partial", action="store_true",
+                    help="complete the first draw's pool from the partial_generated_rows.csv an aborted run "
+                         "left in --outdir (same release, same seed); the file is renamed once used")
     ap.add_argument("--stage", required=True,
                     choices=["release", "generate", "baselines"])
     ap.add_argument("--backend", default="anthropic")
@@ -294,6 +312,14 @@ def main():
     ap.add_argument("--anthropic-max-tokens", type=int, default=None,
                     help="output budget per Anthropic call (thinking counts against it); above "
                          "8192 the call streams")
+    ap.add_argument("--quota-seed", type=int, default=None,
+                    help="seed of the exact-count apportionment (default: --seed); pin it when draws run as separate "
+                         "processes so every process, and every model, is asked for the same cohort targets")
+    ap.add_argument("--no-quota-by-class", action="store_true",
+                    help="with --quota: state the exact counts as totals only (the v3 and earlier prompts). By "
+                         "default, in cohorts that carry class blocks, the counts are also stated per outcome "
+                         "(the positives' rows per bin from the positive block, the negatives' from the negative "
+                         "block), so the class-specific marginals are enforced, not only read")
     ap.add_argument("--quota", action="store_true",
                     help="cohort-wise path: give every batch exact per-column counts apportioned "
                          "from the release instead of shares to match")

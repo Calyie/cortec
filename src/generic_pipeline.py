@@ -390,7 +390,7 @@ def _apportion(probs, n: int, rng) -> np.ndarray:
     return base
 
 
-def batch_quotas(spec: DatasetSpec, cohort_stats: dict, n_rows: int, rng) -> dict:
+def batch_quotas(spec: DatasetSpec, cohort_stats: dict, n_rows: int, rng, by_class: bool = False) -> dict:
     """Exact per-column counts for one batch of `n_rows`, apportioned from the released
     histograms: the number of positives from the class balance, and for every column the number
     of rows per bin (numerical, public edges) or per category. Where the release carries class
@@ -398,60 +398,109 @@ def batch_quotas(spec: DatasetSpec, cohort_stats: dict, n_rows: int, rng) -> dic
     negative block, and the batch total per column is their sum. Reads only the release, so
     handing these counts to the generator is post-processing."""
     cb = cohort_stats["class_balance"]
-    k = int(_apportion([float(cb.get(spec.positive_class, 0.5)), float(cb.get(spec.negative_class, 0.5))], n_rows, rng)[0])
-    by_class = cohort_stats.get("by_class") or {}
-    parts = ([(k, by_class[spec.positive_class]), (n_rows - k, by_class[spec.negative_class])]
-             if by_class and spec.positive_class in by_class and spec.negative_class in by_class
-             else [(n_rows, cohort_stats)])
+    pos, neg = spec.positive_class, spec.negative_class
+    k = int(_apportion([float(cb.get(pos, 0.5)), float(cb.get(neg, 0.5))], n_rows, rng)[0])
+    blocks = cohort_stats.get("by_class") or {}
+    have_blocks = bool(blocks) and pos in blocks and neg in blocks
+    parts = ([(pos, k, blocks[pos]), (neg, n_rows - k, blocks[neg])] if have_blocks
+             else [(None, n_rows, cohort_stats)])
     quotas = {"positives": k, "n": n_rows, "numerical": {}, "categorical": {}}
+    # With `by_class`, the counts are also stated per outcome: the positives' rows per bin from
+    # the positive block and the negatives' from the negative block, whose sums are the totals
+    # below. Stating them separately pins the class-specific marginals the release carries, which
+    # the totals alone leave to the generator's reading of the class blocks; it is the same
+    # apportionment, so it carries no more than the release does.
+    per = {cls: {"n": m, "numerical": {}, "categorical": {}} for cls, m, _ in parts if cls is not None}
     for col in spec.numerical_cols:
         edges = cohort_stats["numerical"][col]["bin_edges"]
+        labels = [f"{edges[i]:g}–{edges[i+1]:g}" for i in range(len(edges) - 1)]
         counts = np.zeros(len(edges) - 1, int)
-        for m, blk in parts:
+        for cls, m, blk in parts:
             if m > 0:
-                counts += _apportion(blk["numerical"][col]["dp_hist"], m, rng)
-        quotas["numerical"][col] = [(f"{edges[i]:g}–{edges[i+1]:g}", int(c)) for i, c in enumerate(counts) if c > 0]
+                part = _apportion(blk["numerical"][col]["dp_hist"], m, rng)
+                counts += part
+                if cls is not None:
+                    per[cls]["numerical"][col] = [(lab, int(c)) for lab, c in zip(labels, part) if c > 0]
+        quotas["numerical"][col] = [(lab, int(c)) for lab, c in zip(labels, counts) if c > 0]
     for col in spec.categorical_cols:
         cats = list(cohort_stats["categorical"][col].keys())
         counts = np.zeros(len(cats), int)
-        for m, blk in parts:
+        for cls, m, blk in parts:
             if m > 0:
                 pr = blk["categorical"][col]
-                counts += _apportion([float(pr.get(c, 0.0)) for c in cats], m, rng)
+                part = _apportion([float(pr.get(c, 0.0)) for c in cats], m, rng)
+                counts += part
+                if cls is not None:
+                    per[cls]["categorical"][col] = [(c, int(v)) for c, v in zip(cats, part) if v > 0]
         quotas["categorical"][col] = [(c, int(v)) for c, v in zip(cats, counts) if v > 0]
+    if by_class and have_blocks:
+        quotas["by_class"] = per
     return quotas
 
 
-def cohort_quota_targets(spec: DatasetSpec, cohort_stats: dict, n_rows: int, rng) -> dict:
+def cohort_quota_targets(spec: DatasetSpec, cohort_stats: dict, n_rows: int, rng, by_class: bool = False) -> dict:
     """Integer target counts for a WHOLE cohort's n_rows: positives, and per column the rows per
     bin / per category, apportioned once from the release. Batches then request the remaining
     counts, so a batch that returns more or fewer valid rows than asked does not break the
-    cohort's totals: the next batch absorbs the difference."""
-    q = batch_quotas(spec, cohort_stats, n_rows, rng)
-    return {"n": n_rows, "positives": q["positives"],
-            "numerical": {c: dict(v) for c, v in q["numerical"].items()},
-            "categorical": {c: dict(v) for c, v in q["categorical"].items()}}
+    cohort's totals: the next batch absorbs the difference. With `by_class` and a cohort that
+    carries class blocks, the same targets are also kept per outcome (see batch_quotas)."""
+    q = batch_quotas(spec, cohort_stats, n_rows, rng, by_class=by_class)
+    out = {"n": n_rows, "positives": q["positives"],
+           "numerical": {c: dict(v) for c, v in q["numerical"].items()},
+           "categorical": {c: dict(v) for c, v in q["categorical"].items()}}
+    if "by_class" in q:
+        out["by_class"] = {cls: {"n": v["n"], "numerical": {c: dict(x) for c, x in v["numerical"].items()},
+                                 "categorical": {c: dict(x) for c, x in v["categorical"].items()}}
+                           for cls, v in q["by_class"].items()}
+    return out
 
 
 def emitted_counts(spec: DatasetSpec, cohort_stats: dict, df: pd.DataFrame) -> dict:
     """What a batch actually contributed, in the same keys as cohort_quota_targets."""
     # a batch can come back without a column the parser could not find; count what is there and
     # let the next batch's remaining counts absorb the rest (a missing target once crashed a run)
-    pos = int(spec.is_positive(df).sum()) if spec.target_col in df.columns else 0
-    out = {"n": len(df), "positives": pos, "numerical": {}, "categorical": {}}
-    for c in spec.numerical_cols:
-        if c not in df.columns:
-            continue
-        edges = cohort_stats["numerical"][c]["bin_edges"]
-        e = np.asarray(edges, float); v = pd.to_numeric(df[c], errors="coerce").fillna(e[0]).values
-        idx = np.clip(np.digitize(v, e[1:-1]), 0, len(e) - 2)
-        cnt = np.bincount(idx, minlength=len(e) - 1)
-        out["numerical"][c] = {f"{edges[i]:g}–{edges[i+1]:g}": int(k) for i, k in enumerate(cnt) if k}
-    for c in spec.categorical_cols:
-        if c not in df.columns:
-            continue
-        out["categorical"][c] = {str(k): int(v) for k, v in df[c].astype(str).str.strip().value_counts().items()}
+    def _counts(frame: pd.DataFrame) -> dict:
+        o = {"n": len(frame), "numerical": {}, "categorical": {}}
+        for c in spec.numerical_cols:
+            if c not in frame.columns:
+                continue
+            edges = cohort_stats["numerical"][c]["bin_edges"]
+            e = np.asarray(edges, float); v = pd.to_numeric(frame[c], errors="coerce").fillna(e[0]).values
+            idx = np.clip(np.digitize(v, e[1:-1]), 0, len(e) - 2)
+            cnt = np.bincount(idx, minlength=len(e) - 1)
+            o["numerical"][c] = {f"{edges[i]:g}–{edges[i+1]:g}": int(k) for i, k in enumerate(cnt) if k}
+        for c in spec.categorical_cols:
+            if c not in frame.columns:
+                continue
+            o["categorical"][c] = {str(k): int(v) for k, v in frame[c].astype(str).str.strip().value_counts().items()}
+        return o
+    out = _counts(df)
+    if spec.target_col in df.columns:
+        is_pos = spec.is_positive(df).values.astype(bool)
+        out["positives"] = int(is_pos.sum())
+        # the same counts per outcome, so a per-class quota can be absorbed batch by batch
+        out["by_class"] = {spec.positive_class: _counts(df[is_pos]), spec.negative_class: _counts(df[~is_pos])}
+    else:
+        out["positives"] = 0
+        out["by_class"] = {spec.positive_class: _counts(df.iloc[:0]), spec.negative_class: _counts(df.iloc[:0])}
     return out
+
+
+def absorb_counts(done: dict, e: dict) -> None:
+    """Add one batch's emitted counts (see emitted_counts) into the cohort's running totals, per
+    column and, when present, per outcome. The per-outcome part is what lets remaining_quotas ask
+    each batch for what each class still owes; without it every batch would re-apportion the whole
+    class target and the small bins of the minority class would never be reached."""
+    def _add(into: dict, frm: dict) -> None:
+        into["n"] = into.get("n", 0) + int(frm.get("n", 0))
+        for kind in ("numerical", "categorical"):
+            for c, cnt in frm.get(kind, {}).items():
+                d = into.setdefault(kind, {}).setdefault(c, {})
+                for k, v in cnt.items():
+                    d[k] = d.get(k, 0) + int(v)
+    _add(done, e); done["positives"] = done.get("positives", 0) + int(e.get("positives", 0))
+    for cls, part in (e.get("by_class") or {}).items():
+        _add(done.setdefault("by_class", {}).setdefault(cls, {"n": 0, "numerical": {}, "categorical": {}}), part)
 
 
 def remaining_quotas(spec: DatasetSpec, target: dict, done: dict, b: int, rng) -> dict:
@@ -466,7 +515,32 @@ def remaining_quotas(spec: DatasetSpec, target: dict, done: dict, b: int, rng) -
         return [(k, int(c)) for k, c in zip(keys, counts) if c > 0]
     pos_rem = max(target["positives"] - done["positives"], 0); rows_rem = max(target["n"] - done["n"], 0)
     k = int(round(b * pos_rem / rows_rem)) if rows_rem > 0 else 0
-    q = {"n": b, "positives": min(max(k, 0), b), "numerical": {}, "categorical": {}}
+    k = min(max(k, 0), b)
+    q = {"n": b, "positives": k, "numerical": {}, "categorical": {}}
+    if target.get("by_class"):
+        # per outcome: what each class still owes, scaled to that class's share of this batch; the
+        # batch totals are then the sums over the two outcomes, so the two statements agree
+        def _scale_to(rem: dict, m: int) -> list:
+            tot = sum(rem.values())
+            if tot <= 0 or m <= 0:
+                return []
+            keys = list(rem); counts = _apportion([rem[kk] for kk in keys], m, rng)
+            return [(kk, int(cc)) for kk, cc in zip(keys, counts) if cc > 0]
+        q["by_class"] = {}
+        for cls, m in ((spec.positive_class, k), (spec.negative_class, b - k)):
+            t_cls = target["by_class"].get(cls, {}); d_cls = (done.get("by_class") or {}).get(cls, {})
+            q["by_class"][cls] = {"n": m, "numerical": {}, "categorical": {}}
+            for kind in ("numerical", "categorical"):
+                for c, t in t_cls.get(kind, {}).items():
+                    q["by_class"][cls][kind][c] = _scale_to(_rem(t, d_cls.get(kind, {}).get(c, {})), m)
+        for kind in ("numerical", "categorical"):
+            for c in target[kind]:
+                tot: dict = {}
+                for cls in q["by_class"]:
+                    for kk, cc in q["by_class"][cls][kind].get(c, []):
+                        tot[kk] = tot.get(kk, 0) + cc
+                q[kind][c] = [(kk, cc) for kk, cc in tot.items() if cc > 0]
+        return q
     for c, t in target["numerical"].items():
         q["numerical"][c] = _scale(_rem(t, done["numerical"].get(c, {})))
     for c, t in target["categorical"].items():
@@ -529,10 +603,22 @@ def build_cortec_prompt(spec: DatasetSpec, cohort_stats: dict, n_rows: int = 25,
                       f"write them out:",
                   f"  {spec.target_col}: exactly {quotas['positives']} rows '{spec.positive_class}' "
                   f"and {quotas['n'] - quotas['positives']} rows '{spec.negative_class}'"]
-        for col, items in quotas["numerical"].items():
-            lines.append(f"  {col}: " + ", ".join(f"{b}: {c} rows" for b, c in items))
-        for col, items in quotas["categorical"].items():
-            lines.append(f"  {col}: " + ", ".join(f"{c}: {v}" for c, v in items))
+        if quotas.get("by_class"):
+            # the counts stated per outcome: the rows of each class must carry that class's
+            # distribution, which is what the FEATURE DISTRIBUTIONS BY OUTCOME blocks describe
+            for cls, part in quotas["by_class"].items():
+                lines.append(f"  Among the {part['n']} rows with {spec.target_col}='{cls}':")
+                for col, items in part["numerical"].items():
+                    lines.append(f"    {col}: " + ", ".join(f"{b}: {c} rows" for b, c in items))
+                for col, items in part["categorical"].items():
+                    lines.append(f"    {col}: " + ", ".join(f"{c}: {v}" for c, v in items))
+            lines.append("  (within an outcome every column's counts sum to that outcome's rows; across the two outcomes they sum to "
+                         f"{quotas['n']})")
+        else:
+            for col, items in quotas["numerical"].items():
+                lines.append(f"  {col}: " + ", ".join(f"{b}: {c} rows" for b, c in items))
+            for col, items in quotas["categorical"].items():
+                lines.append(f"  {col}: " + ", ".join(f"{c}: {v}" for c, v in items))
         lines += ["", f"Column schema (in order): {', '.join(spec.column_names)}", "",
                   f"Generate exactly {n_rows} synthetic rows that satisfy EVERY count above, with "
                   f"realistic correlations between columns and with each row's "

@@ -156,6 +156,8 @@ def main():
                 from google.genai import types
                 _budget = {'low': 128, 'medium': 1024, 'high': 4096}.get(a.effort, 128)
                 gen._gemini_extra['thinking_config'] = types.ThinkingConfig(thinking_budget=_budget)
+            elif a.backend == 'ollama':
+                gen.ollama_think = a.effort          # gpt-oss: low, medium or high
             print(f"  [cost] thinking effort = {a.effort} (backend={a.backend})", flush=True)
         # Ollama is self-hosted: no per-token cost, so the dollar cap does not apply.
         gen.budget_usd = None if a.backend == "ollama" else max(a.budget_usd - spent, 0.05)

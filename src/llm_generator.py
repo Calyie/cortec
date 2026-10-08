@@ -293,20 +293,26 @@ class LLMSyntheticGenerator:
         # every model at Fable 5's $10/$50 (as this did originally) makes the guard ~8x too strict
         # for a cheap model, which aborts healthy runs; charging too little would let one overrun.
         # Report tokens, not these dollars, in the paper.
-        _PRICES = {           # (input $/Mtok, output $/Mtok)
-            "claude-fable":  (10.0, 50.0),
-            "claude-opus":   (10.0, 50.0),
-            "claude-sonnet":  (3.0, 15.0),
-            "claude-haiku":   (1.0,  5.0),
+        _PRICES = {           # (input $/Mtok, output $/Mtok), list rates read 2026-10-08:
+            # claude.com/pricing and ai.google.dev/gemini-api/docs/pricing; reasoning/thinking
+            # tokens are billed as output on every vendor. Longest prefix wins.
+            "claude-fable":  (10.0, 50.0),       # Fable 5 and 5.1
+            "claude-opus-5.5": (4.0, 20.0),
+            "claude-opus":   (5.0, 25.0),        # Opus 5
+            "claude-sonnet":  (2.0, 10.0),       # Sonnet 5 and 5.5
+            "claude-haiku-5.5": (0.5, 2.5),      # the top of its prompt-length tiers
+            "claude-haiku":   (1.0,  5.0),       # Haiku 4.5
             "gpt-5":          (1.25, 10.0),
             "gpt-4.1":        (2.0,  8.0),
             "gpt-4o":         (2.5, 10.0),
-            "gemini-3-flash": (0.3,  2.5),
-            "gemini-3.1-flash": (0.3, 2.5),
-            "gemini-3.5-flash": (0.3, 2.5),
-            "gemini-3.6-flash": (0.3, 2.5),
-            "gemini-3.7-flash": (0.3, 2.5),
-            "gemini-3":       (2.0, 12.0),
+            "gemini-3-flash": (0.3,  2.5),       # no longer on the price page; kept as last listed
+            "gemini-3.1-flash": (0.3, 2.5),      # no longer on the price page; kept as last listed
+            "gemini-3.5-flash": (1.5, 9.0),      # was wrongly carried at the 2.5 Flash rate until 2026-10-08
+            "gemini-3.6-flash": (0.75, 3.75),    # introductory rate to 2026-12-31, then (1.5, 7.5)
+            "gemini-3.7-flash": (0.75, 3.75),    # introductory rate to 2026-12-31, then (1.5, 7.5)
+            "gemini-3.8-flash": (0.75, 3.75),    # introductory rate to 2026-12-31, then (1.5, 7.5)
+            "gemini-3":       (2.0, 12.0),       # 3.1 Pro preview, prompts up to 200k tokens
+            "gpt-oss":        (0.0, 0.0),        # open weights served locally (Ollama): no per-token price
             "gemini-2.5-pro": (1.25, 10.0),
             "gemini-2.5-flash": (0.3, 2.5),
         }
@@ -610,6 +616,7 @@ class LLMSyntheticGenerator:
         n_total: int = 200,
         prompt_builder=None,
         label_prefix: str = "",
+        prior: "pd.DataFrame | None" = None,
     ) -> pd.DataFrame:
         """
         Condition B: generate n_total rows spread across cohorts, each batch
@@ -617,6 +624,14 @@ class LLMSyntheticGenerator:
 
         `prompt_builder` exists so the matched header-only control of §7.1.2 can reuse this loop
         verbatim -- same allocation, same batching, same parser -- and differ in the prompt alone.
+
+        `prior` resumes an aborted run: the rows a previous call of this loop had already
+        generated for the same release and allocation (the `partial_generated_rows.csv` a run
+        writes when it stops, with its `_source` column naming the cohort). Each cohort starts
+        from its prior rows, absorbs them into its exact-count quotas, and asks the model only for
+        what it still owes, so a run stopped by a spending cap is completed without paying for the
+        rows it already holds. The allocation and the quota targets are deterministic in the
+        release and the seed, so the resumed rows complete the same targets.
         """
         _cond = label_prefix or "CoRTeC"
         print(f"\n[Condition B] {_cond} generation — {n_total} rows across "
@@ -643,9 +658,22 @@ class LLMSyntheticGenerator:
             print(f"    {nm:34s} n={cs.get('cohort_size', 0):>6d}  share={w:>6.1%}  rows={a}")
 
         frames = []
+        if prior is not None and len(prior):
+            if "_source" not in prior.columns:
+                raise ValueError("prior rows need a `_source` column naming the cohort they were generated for")
+            print(f"  resuming from {len(prior)} previously generated rows "
+                  f"({prior['_source'].nunique()} cohorts)")
         for ci, (cs, n_rows) in enumerate(zip(cohort_stats_list, alloc)):
             if n_rows <= 0:
                 continue
+            _lbl0 = cs.get("cohort_name", f"cohort-{cs['cohort_id']}")
+            _src = f"{label_prefix}/{_lbl0}" if label_prefix else _lbl0
+            prior_c = pd.DataFrame()
+            if prior is not None and len(prior):
+                prior_c = prior[prior["_source"].astype(str) == _src].drop(
+                    columns=[c for c in ("_source", "_cohort_id") if c in prior.columns])
+                prior_c = prior_c[[c for c in prior_c.columns if c in self._cols]] if self._cols else prior_c
+                prior_c = prior_c.head(int(n_rows)).reset_index(drop=True)
             if prompt_builder is not None:
                 prompt = prompt_builder(self.spec, cs, n_rows=min(self.rows_per_call, int(n_rows)))
             elif self.spec and getattr(self, "quota", False):
@@ -653,20 +681,18 @@ class LLMSyntheticGenerator:
                 # batch asks for what the cohort still owes after the rows accepted so far, so a
                 # batch that returns more or fewer valid rows than asked cannot break the totals
                 from src.generic_pipeline import (build_cortec_prompt as _cp, cohort_quota_targets as _ct,
-                                                  remaining_quotas as _rq, emitted_counts as _ec)
+                                                  remaining_quotas as _rq, emitted_counts as _ec,
+                                                  absorb_counts as _ac)
                 _rng = np.random.default_rng(10_000 * (ci + 1) + int(getattr(self, "quota_seed", 0)))
-                _target = _ct(self.spec, cs, int(n_rows), _rng)
-                _done = {"n": 0, "positives": 0, "numerical": {}, "categorical": {}}
+                _target = _ct(self.spec, cs, int(n_rows), _rng, by_class=bool(getattr(self, "quota_by_class", True)))
+                _done = {"n": 0, "positives": 0, "numerical": {}, "categorical": {}, "by_class": {}}
 
                 def _absorb(df, _cs=cs, _done=_done):
-                    e = _ec(self.spec, _cs, df)
-                    _done["n"] += e["n"]; _done["positives"] += e["positives"]
-                    for kind in ("numerical", "categorical"):
-                        for c, cnt in e[kind].items():
-                            d = _done[kind].setdefault(c, {})
-                            for k, v in cnt.items():
-                                d[k] = d.get(k, 0) + v
+                    # per column and per outcome, so each batch asks for what each class still owes
+                    _ac(_done, _ec(self.spec, _cs, df))
                 self._quota_absorb = _absorb
+                if len(prior_c):
+                    _absorb(prior_c)        # the resumed rows count against this cohort's quotas
                 prompt = lambda b, _cs=cs, _t=_target, _d=_done: _cp(self.spec, _cs, n_rows=b, quotas=_rq(self.spec, _t, _d, b, _rng))
             elif self.spec:
                 from src.generic_pipeline import build_cortec_prompt as _cp
@@ -676,11 +702,23 @@ class LLMSyntheticGenerator:
             if not (self.spec and getattr(self, "quota", False)):
                 self._quota_absorb = None
             _lbl = cs.get("cohort_name", f"cohort-{cs['cohort_id']}")
-            df = self._generate_batched(
-                prompt,
-                n_rows=int(n_rows),
-                label=f"{label_prefix}/{_lbl}" if label_prefix else _lbl,
-            )
+            if len(prior_c):
+                # the resumed rows are part of this run's output and of its partial record, so a
+                # second stop keeps them too
+                _tagged = prior_c.copy(); _tagged["_source"] = _src
+                self._partial_frames.append(_tagged)
+            need = int(n_rows) - len(prior_c)
+            if need > 0:
+                df = self._generate_batched(
+                    prompt,
+                    n_rows=need,
+                    label=f"{label_prefix}/{_lbl}" if label_prefix else _lbl,
+                )
+            else:
+                df = pd.DataFrame(columns=prior_c.columns)
+                print(f"  [{_lbl}] complete from the resumed rows ({len(prior_c)}); no call made")
+            if len(prior_c):
+                df = pd.concat([prior_c, df], ignore_index=True)
             if len(df):
                 df = df.copy()
                 df["_cohort_id"] = cs["cohort_id"]
@@ -1016,6 +1054,10 @@ class LLMSyntheticGenerator:
                 "options": {"num_predict": self.ollama_num_predict, "temperature": 0.7,
                             "num_ctx": self.ollama_num_ctx},
             }
+            # Reasoning models served by Ollama (gpt-oss) take a thinking level; None leaves the
+            # model's default (medium for gpt-oss), which is what the open-weight arm reports
+            if getattr(self, "ollama_think", None) is not None:
+                payload["think"] = self.ollama_think
             hdrs = {"Host": self._ollama_host_override} if self._ollama_host_override else None
             # A reverse proxy in front of Ollama (e.g. `tailscale serve`) can impose its own
             # request timeout — measured at ~60 s on one GPU pod, where a 25-row call
@@ -1045,6 +1087,14 @@ class LLMSyntheticGenerator:
             d = r.json()
             msg = d.get("message", {})
             content = msg.get("content", "") or ""
+            # reasoning evidence for the open-weight arm: Ollama returns the chain of thought as
+            # text, not as a token count, so the count is the text's length over four (stated as
+            # an estimate wherever it is reported); eval_count covers thinking and answer together
+            if msg.get("thinking"):
+                self._n_calls_with_thinking_block = getattr(self, "_n_calls_with_thinking_block", 0) + 1
+                self._tok_think = getattr(self, "_tok_think", 0) + len(msg["thinking"]) // 4
+            self._tok_in += int(d.get("prompt_eval_count", 0) or 0)
+            self._tok_out += int(d.get("eval_count", 0) or 0)
             if not content.strip() and msg.get("thinking"):
                 print(f"  [ollama] empty content but {len(msg['thinking'])} chars of reasoning "
                       f"(done_reason={d.get('done_reason')}, eval_count={d.get('eval_count')}) — "
