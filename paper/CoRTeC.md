@@ -405,10 +405,13 @@ sensitivity is also `1/(|c|−1)` rather than `1/|c|`.
 
 **(v) Across levels, sequential composition.** Levels of differing granularity describe the same
 individuals, so they are not disjoint and must compose sequentially: `|L| · ε_L = ε_cond`. The reference
-implementation splits `ε_cond` across `L_viable`, the levels in which at least one cell's noised support
-reaches `n_min`; those supports are a count family it charges separately, so `L_viable` is a function
-of released counts and the split is post-processing (§H.3). A split across levels found viable from
-exact counts would not be. Splitting across declared
+implementation additionally spends a count family on every cell's support, inside `ε_total`: 0.05 of
+the available budget plus the former suppression share, half to cohort sizes and half to cell supports,
+the cell half divided across the declared levels (§J.1). It then splits `ε_cond` across `L_viable`, the
+levels in which at least one noised support reaches `n_min`; that set is a function of released counts,
+so the split is post-processing (§H.3). No reported release uses it: every table in this paper was
+produced by the research path, which splits `ε_cond` across the `|L|` declared levels as line 4 states.
+A split across levels found viable from exact counts would not be sound. Splitting across declared
 levels leaves the share of any level whose cells all fall below `n_min` unspent. The release is then quieter than the caller paid for rather than noisier than declared, which is safe for the
 guarantee and a defect against the caller (defect 11, §7.7).
 
@@ -882,14 +885,23 @@ utility rows alone will get 2.9 × 10⁻³ and should not. The rank-based Mann�
 reaches p = 0.0043 on all six, its smallest attainable value at 6 versus 5 draws. We report that attainable floor beside every rank p-value throughout, because at small group sizes it is the design
 and not the data that limits the statistic.
 
-**Are AIM and MST simply under-tuned?** They are run at smartnoise-synth defaults, at matched ε and matched discretisation (§6.3). Three pieces of evidence bear on the question, none of them a tuning sweep.
+**Are AIM and MST simply under-tuned?** They are run at smartnoise-synth defaults, at matched ε and matched discretisation (§6.3), and on Adult the answer is yes. A sweep of the two settings a practitioner would try first, fitted on the same training split under the same public bins and scored under the same protocol, raises AIM's junction-tree limit from 80 MB to 300 MB and its workload from 2-way to 3-way marginals:
 
-- First, AIM is not malfunctioning on its own terms. At adequate `n` it records the lowest error on all three of its own 3-way workloads, below CoRTeC's (§7.3).
-- Second, §8.2 supplies the missing ingredient and measures what it recovers. Giving AIM and MST a DP conditional target table, the quantity neither mechanism releases, and relabelling their output moves AIM from TSTR-LR 0.675 to 0.777 and MST from 0.690 to 0.773. That recovers most of the distance to CoRTeC without altering either synthesiser's configuration. It is the strongest available answer to the tuning objection, and it does not favour us. The gap is largely attributable to what each mechanism releases, and a practitioner who wants the conditional structure can obtain much of it by augmenting the marginal method.
-- Third, the residual is not the language model's prior. §7.1.2 and §7.1.3 show an ungrounded model within 0.06 of CoRTeC on Adult and, against a matched control, by the same margin on a dataset with no public presence.
+| condition | draws | fit | 1-way TV ↓ | 2-way TV ↓ | cond. seen ↓ | cond. held-out ↓ | TSTR-LR ↑ | TSTR-RF ↑ | TSTR-GBM ↑ |
+|---|---|---|---|---|---|---|---|---|---|
+| AIM, defaults (80 MB model, 2-way workload) | 5 | 23 min | 0.037 | 0.119 | 0.054 | 0.101 | 0.675 | 0.700 | 0.691 |
+| AIM, 300 MB model | 3 | 30 min | 0.034 | 0.107 | 0.045 | 0.029 | 0.772 | 0.867 | 0.835 |
+| AIM, 3-way workload | 3 | 13.4 h | 0.032 | 0.102 | 0.046 | 0.026 | 0.812 | 0.876 | 0.847 |
+| CoRTeC (Gemini 3.5 Flash), shipped configuration | 3 | none | 0.029 | 0.110 | 0.017 | 0.039 | 0.842 | 0.876 | 0.849 |
+| *real sample, n = 300* | *3* | | *0.043* | *0.107* | *0.062* | *0.036* | *0.830* | *0.870* | *0.840* |
 
-We claim only that the gap survives the one
-intervention we tested, and that the intervention which removes most of it is a change in what is
+The larger model trains logistic regression at 0.772 and the trees at 0.867 and 0.835; the 3-way workload at 0.812, 0.876 and 0.847. Against CoRTeC's 0.842, 0.876 and 0.849 and the real sample's 0.830, 0.870 and 0.840, the tree students no longer separate and the linear student is 0.03 short, where the defaults were 0.17 and 0.18 short. Conditional error over seen groups stays at 0.045 and 0.046 against CoRTeC's 0.017, and 2-way error falls to 0.102, below CoRTeC's 0.110. The cost is fitting time: 30 minutes for the larger model and 13.4 hours for the 3-way workload on one four-core machine, against 23 minutes at the defaults. The utility margin of §7.12 is therefore a margin over the library defaults on this dataset, and the claim this paper makes is the narrower one: a release built for a classifier reaches the real-sample floor with no fitting, and a marginal method reaches it on Adult when given a larger model or a richer workload and the hours to fit it. A third setting, both changes together, was still fitting when this version was prepared, and whether tuning has the same effect on finance and NHANES, where AIM at defaults fits in under a minute on NHANES and not at all on the full finance schema, is not measured. Two other pieces of evidence stand.
+
+- AIM is not malfunctioning on its own terms. At adequate `n` it records the lowest error on all three of its own 3-way workloads, below CoRTeC's (§7.3).
+- §8.2 supplies the missing ingredient and measures what it recovers. Giving AIM and MST a DP conditional target table, the quantity neither mechanism releases, and relabelling their output moves AIM from TSTR-LR 0.675 to 0.777 and MST from 0.690 to 0.773. That recovers most of the distance to CoRTeC without altering either synthesiser's configuration. It is the strongest available answer to the tuning objection, and it does not favour us. The gap is largely attributable to what each mechanism releases, and a practitioner who wants the conditional structure can obtain much of it by augmenting the marginal method.
+- The residual is not the language model's prior. §7.1.2 and §7.1.3 show an ungrounded model within 0.06 of CoRTeC on Adult and, against a matched control, by the same margin on a dataset with no public presence.
+
+The gap over the defaults does not survive tuning on Adult, and most of it is a change in what is
 released rather than in hyperparameters.
 
 **The generative DP families, and why their numbers need care.** All three fail on Adult at ε = 2.0,
@@ -1339,9 +1351,9 @@ private. We release a Laplace estimate and turn the noise into a one-sided confi
 > with probability at least 1 − α, simultaneously over all k released cells,
 > `|p_c − q_c| ≤ |p̂_c − q_c| + b_c · ln(k / α)`
 
-where `b_c = 1/(n_min · ε_cell)`. The sensitivity of a released cell's rate is bounded by `1/n_min`, the public floor, never by the private cell size, so the scale depends on nothing private; that a cell clears `n_min` is the uncharged suppression decision of §10, item 4. The bound is conservative by a factor `n_c/n_min` on each cell, which is the cost of using the public floor. The union bound over cells makes the guarantee simultaneous rather than per-cell. Cells partition the data, so the k rate queries compose in parallel and each may spend the full `ε_cell`. Bounding at `ε_cert` means the deployment spent `ε_release + ε_cert`.
+where `b_c = 1/(n_min · ε_cell)`. The sensitivity of a released cell's rate is bounded by `1/n_min`, the public floor, never by the private cell size, so the scale depends on nothing private; which cells enter the bound is the release's own decision, a noisy threshold on its charged counts (§4.3). The bound is conservative by a factor `n_c/n_min` on each cell, which is the cost of using the public floor. The union bound over cells makes the guarantee simultaneous rather than per-cell. Cells partition the data, so the k rate queries compose in parallel and each may spend the full `ε_cell`. Bounding at `ε_cert` means the deployment spent `ε_release + ε_cert`.
 
-Floors and a ceiling are built into the procedure. `certify_with_controls` runs three conditions: the synthetic data, a real hold-out sample (which should clear the tolerance tightly), and the same real sample with its target permuted (which must not). It refuses to report a verdict unless the ceiling clears and the floor does not.
+Floors and a ceiling are built into the procedure. `certify_with_controls` runs three conditions: the synthetic data, a real hold-out sample (which should clear the tolerance tightly), and the same real sample with its target permuted (which must not). It refuses to report a verdict unless the ceiling clears and the floor does not. The tolerance is derived from the release unless one is given: the noise term plus half the largest gap between a released cell rate and the released base rate, which sits halfway between the noise term and the permuted floor's large-sample limit and reads released quantities only. The earlier fixed 0.15 was chosen by repetition on NHANES's own data, a calibration a shipped procedure cannot repeat. No verdict is issued while any released cell holds fewer than 20 synthetic rows, because such a rate moves by a third on three rows and the bound carries no sampling term for it.
 
 | dataset | ε_cert | synthetic bound | real-sample ceiling | permuted floor | discriminating? | verdict |
 |---|---|---|---|---|---|---|
@@ -1349,7 +1361,7 @@ Floors and a ceiling are built into the procedure. `certify_with_controls` runs 
 | NHANES, same release, cohort-wise output | 1.0 | 0.332 | 0.075 (clears) | 0.219 (does not) | **yes** | **outside tolerance** |
 | Diabetes 130 (auto-configured), 13 cells | 1.0 | 0.467 | 0.362 (does not) | 0.336 (does not) | **no** | **withheld** |
 
-The two NHANES rows are the same release and the same model, generated per released cell and per cohort. The bound distinguishes them where the aggregate metrics of §F.1.1 do not. The cell-wise output that clears it is the one §7.10's coverage guard refuses. A bound and a representativeness check answer different questions.
+The two NHANES rows are the same release and the same model, generated per released cell and per cohort, read at the earlier operating point of 0.15. Under the shipped rule the tolerance derived from that release is 0.091, and both rows are outside it, the cell-wise one by 0.001 (§F.1.4). The bound distinguishes them where the aggregate metrics of §F.1.1 do not. The cell-wise output that clears it is the one §7.10's coverage guard refuses. A bound and a representativeness check answer different questions.
 
 The budget the bound is computed at must be large enough for its own control to pass, and that is measurable. At `ε_cert` = 0.5 and tolerance 0.15 the NHANES ceiling cleared in only 21 of 40 repetitions, so a verdict issued there would have held in only about half of the runs. At `ε_cert` = 1.0 the ceiling clears in 25 of 25 runs and the floor never does. Loosening the tolerance instead lets the floor through too. The table is therefore reported at `ε_cert` = 1.0.
 
@@ -1632,7 +1644,7 @@ counts (§H.8). §H.9 is the free sweep of the release parameters around the shi
 
 The evidence supports a selection rule stated by deliverable rather than by method.
 
-**If the deliverable is a model trained on the synthetic data**, CoRTeC has the largest measured advantage on this deliverable among the mechanisms we ran. On Adult it reaches parity with a real sample of the same size, and its students score 0.14–0.17 AUC above AIM's and MST's after correction. On finance the class-conditional release scores 0.070–0.091 above AIM and 0.078–0.079 above MST after correction on the schema where AIM completes (§F.3), and the shipped configuration brings all three students within 0.015 AUC of the real sample (§7.12). On NHANES the shipped configuration reads 0.752 / 0.732 / 0.711 against a matched real sample's 0.773 / 0.728 / 0.716 (§7.12). We claim only that the margin over the marginal methods survives the one tuning intervention we tested (§7.2). §8.2 shows that most of it is attributable to what is released.
+**If the deliverable is a model trained on the synthetic data**, CoRTeC has the largest measured advantage on this deliverable among the mechanisms we ran. On Adult it reaches parity with a real sample of the same size, and its students score 0.14–0.17 AUC above AIM's and MST's at library defaults after correction. On finance the class-conditional release scores 0.070–0.091 above AIM and 0.078–0.079 above MST after correction on the schema where AIM completes (§F.3), and the shipped configuration brings all three students within 0.015 AUC of the real sample (§7.12). On NHANES the shipped configuration reads 0.752 / 0.732 / 0.711 against a matched real sample's 0.773 / 0.728 / 0.716 (§7.12). On Adult that margin is over the library defaults and does not survive tuning: AIM with a larger model or a 3-way workload trains the tree students at the floor and the linear student 0.03 short, at 30 minutes and 13.4 hours of fitting (§7.2). The claim is the narrower one, that CoRTeC reaches the floor with no fitting, and §8.2 shows that most of the default margin is attributable to what is released.
 
 **If the deliverable is a marginal report, a contingency table, or a published set of
 cross-tabulations**, the answer depends on scale. At n = 300 the shipped configuration's 1-way error is within 0.005 of MST's on Adult and finance, below it on NHANES, and below AIM's on every dataset where they were compared (§7.12). At adequate `n` AIM records the lowest error on its own 3-way workloads (§7.3), and both marginal methods sample any
@@ -1752,7 +1764,7 @@ One pattern recurred often enough to name. A fix applied at one site was repeate
 
 3. **The transmission sweeps are single-seed on healthcare.** Each perturbs one relationship at three interior points, so the curve shape between endpoints rests on one measurement per model.
 
-4. **The `n_min` decisions behind the reported tables read exact counts.** Algorithm 1 now makes every such decision from a noised, charged count (lines 5′, 7 and 10), the reference implementation does the same from version 1.0.1, and the proposition of §4.3 covers it. The releases behind the tables in this paper predate that rule and compared exact counts with `n_min`, as the marginal-synthesis literature does, for the comparability reason of §4.3. The noisy threshold reproduces their gate decisions with probability 0.26 (Adult), 0.24 (finance) and 0.70 (NHANES); §J.5 lists the decisions that differ. Result 1′, the arms generated for §7.11 and the arms of §7.12 do noise and charge their cohort and cell counts. Regenerating the three shipped arms under the current rule is on the replication list beside the second-vendor draws; the inversion and transmission sweeps re-run under pure ε with no code change and are listed there too. The tool is therefore more
+4. **The `n_min` decisions behind the reported tables read exact counts.** Algorithm 1 now makes every such decision from a noised, charged count (lines 5′, 7 and 10), the reference implementation does the same, and the proposition of §4.3 covers it. The releases behind the tables in this paper predate that rule and compared exact counts with `n_min`, as the marginal-synthesis literature does, for the comparability reason of §4.3. The noisy threshold reproduces their gate decisions with probability 0.26 (Adult), 0.24 (finance) and 0.70 (NHANES); §J.5 lists the decisions that differ. Result 1′, the arms generated for §7.11 and the arms of §7.12 do noise and charge their cohort and cell counts. The replication list is item 2 above. The tool is therefore more
    conservative than this paper's tables.
 
 5. **The membership-inference result is bounded by the attacks we ran.** Four attacks, all validated
@@ -1821,7 +1833,7 @@ The defaults, reached through one call, `generate_selected(release, n_rows)`, ar
 conditional target table and relabels a marginal synthesiser's output to match it, with no model
 server in the dependency tree. Its claim is deliberately narrower than §8.2's. It corrects one axis, it reports whether the correction helped, and it tells the user to keep their budget when it did not.
 
-**Test suites**: 151 in `cortec` and 28 in `cortec-hybrid`. Every regression test is named after the defect it prevents, and each was verified
+**Test suites**: 153 in `cortec` and 28 in `cortec-hybrid`. Every regression test is named after the defect it prevents, and each was verified
 to fail against the pre-fix code. What building them changed in this paper, and what the tools
 enforce and still do not, are in Appendix J.
 
@@ -2040,7 +2052,7 @@ specifications behind each table are retained with the per-draw records (see *Wh
 | §7.4.1 NHANES transmission by mechanism family | `run_baseline_transmission.py --dataset nhanes_auto` | MST and PATE-CTGAN on the same forced relationship at the same ε; Figure 7 reads its output |
 | §F.3 AIM on the 12-column finance schema | [`src/datasets_extra.py`](https://github.com/Calyie/cortec/blob/main/src/datasets_extra.py) (`credit_aim12`) | the 12-column schema on which AIM completes; AIM's five fits are scored beside CoRTeC's five draws, MST's and PATE-CTGAN's three and the real floors, every arm on the same 12 columns, with Holm over the fourteen CoRTeC-vs-AIM and CoRTeC-vs-MST comparisons |
 | §7.1.2 matched control | [`src/generic_pipeline.py`](https://github.com/Calyie/cortec/blob/main/src/generic_pipeline.py), [`src/prompts.py`](https://github.com/Calyie/cortec/blob/main/src/prompts.py) (`build_matched_header_only_prompt`) | CoRTeC's prompt with the released arrays deleted, built by stripping CoRTeC's own output and refusing to return if any released quantity survives |
-| Tests | `cortec/tests/` and `cortec-hybrid/tests/` in the companion repository | 151 + 28, each named after the defect it prevents |
+| Tests | `cortec/tests/` and `cortec-hybrid/tests/` in the companion repository | 153 + 28, each named after the defect it prevents |
 
 ---
 
@@ -2281,33 +2293,26 @@ confidently right about a few individuals is the one that harms someone.
 
 #### F.1.4 A bounded release
 
-Stage C (§7.9) on the auto-configured NHANES release, at α = 0.05 and **ε_cert = 1.0** over 4 released
-cells, all covered, scored on the cells the release published. The first three rows are the three
-shipped-configuration draws of §7.12, one unseeded bound each; the fourth pools them. The last two rows
-are configuration C (cohort-wise on the same release, rate-based prompt, no selection, n = 600) and the
-cell-wise configuration A, which the guard refuses. Thin: cells with fewer than 20 synthetic rows, of four.
+Stage C (§7.9) on the auto-configured NHANES release under the rule the procedure now ships, at α = 0.05 and **ε_cert = 1.0** over 4 released cells, all covered, scored on the cells each release published. The first three rows are the shipped-configuration draws of §7.12, one unseeded bound each; the fourth pools them; the last two are configuration C (cohort-wise on its own release, rate-based prompt, no selection, n = 600) and the cell-wise configuration A, which the guard refuses. An earlier version of this table read every row at a fixed tolerance of 0.15 chosen by repetition on this dataset; the last column keeps that reading for comparison. The tolerance derived from the shipped release is 0.088 and from the earlier one 0.091; no verdict is issued while a released cell holds fewer than 20 synthetic rows. Thin: such cells, of four.
 
-| condition | n | thin | worst-case simultaneous bound on the conditional gap | within tolerance 0.15? | real-sample ceiling | permuted-target floor | discriminates? |
+| condition | n | thin | worst-case bound | ceiling | floor | verdict under the shipped rule | at τ = 0.15 |
 |---|---|---|---|---|---|---|---|
-| **CoRTeC synthetic, shipped configuration, draw 0** | 300 | 2 | 0.1691 | **no** | *0.0782* | *0.1871* | yes |
-| **CoRTeC synthetic, shipped configuration, draw 1** | 300 | 3 | 0.1583 | **no** | *0.0672* | *0.1897* | yes |
-| **CoRTeC synthetic, shipped configuration, draw 2** | 300 | 2 | 0.1074 | **yes** | *0.0778* | *0.1787* | yes |
-| CoRTeC synthetic, shipped configuration, three draws pooled | 900 | 0 | 0.1415 | yes | *0.1037* | *0.1348* | **no: the floor passes** |
-| CoRTeC synthetic, configuration C (cohort-wise, rate prompt) | 600 | 0 | 0.3318 | **no** | *0.0745* | *0.2194* | yes |
-| CoRTeC synthetic, configuration A (cell-wise; *refused by the guard*) | 600 | 0 | **0.0920** | **yes** | *0.0671* | *0.2076* | yes |
+| shipped configuration, draw 0 | 300 | 2 | 0.1658 | 0.0763 | 0.1828 | none: 2 thin cells | outside |
+| shipped configuration, draw 1 | 300 | 3 | 0.1645 | 0.0687 | 0.1745 | none: 3 thin cells | outside |
+| shipped configuration, draw 2 | 300 | 2 | 0.1291 | 0.0755 | 0.1788 | none: 2 thin cells | within |
+| shipped configuration, three draws pooled | 900 | 0 | 0.1287 | 0.0880 | 0.1302 | none: the ceiling fails 0.088 | within, and so is the floor |
+| configuration C (earlier; cohort-wise, rate prompt) | 600 | 0 | 0.3294 | 0.0662 | 0.2199 | outside, by 0.24 | outside |
+| configuration A (earlier; cell-wise, refused by the guard) | 600 | 0 | 0.0924 | 0.0723 | 0.2300 | outside, by 0.001 | within |
 
-The shipped configuration's result is indeterminate, and we state why rather than report the two failures or the one pass. Two draws fall outside tolerance and one inside, and in all three the worst cell is the same one, the 50–60-year band, holding 9, 9 and 14 synthetic rows. Three positives among nine rows is a rate of 0.333 against a released 0.192, and the bound carries no sampling term for the synthetic rate, so at that cell size the verdict is a property of nine rows. Pooling the draws removes every thin cell and the bound falls to 0.142, but the permuted floor falls to 0.135 and the test refuses a verdict. That refusal is informative. The floor's bound in a cell converges, as the synthetic sample grows, to the gap between the released rate and the base rate plus the noise term, 0.029 at n_min = 150 and ε_cert = 1.0. On this release that limit is 0.147 in the worst cell, the 30–40-year band, below the tolerance of 0.15, so on this release the floor passes at any large n, and the discrimination seen at n = 300 and n = 600 rests on the floor's sampling width. The released base rate is 0.138 and the four released rates lie within 0.12 of it. The tolerance is loose for such a release, and Stage C at n = 300 over four cells, two or three of them thin, has little power either way. A deployment would raise ε_cert, tighten the tolerance to what the floor's limit allows, or generate enough rows that no cell is thin, and would read the per-cell table rather than the verdict alone.
+Under the shipped rule no row in the shipped configuration receives a verdict, and we state why rather than report the two failures and the one pass the earlier operating point gave. At $n$ = 300 two or three of the four released cells hold fewer than 20 synthetic rows, and in every draw the worst cell is the same one, the 50 to 60-year band, holding 9, 9 and 14 rows: three positives among nine is a rate of 0.333 against a released 0.192, and the bound carries no sampling term for it, so a verdict there would be a property of nine rows. Pooling the draws removes every thin cell, but the derived tolerance of 0.088, halfway between the noise term of 0.029 and the floor's limit of 0.147, is one the real-sample ceiling itself fails, at 0.088, so the controls do not discriminate and no verdict is issued either. The derived tolerance is tight because the release's cell rates lie within 0.12 of its base rate of 0.138; on such a release Stage C at these sample sizes has little power, and the rule says so instead of a verdict. Both earlier-configuration arms are outside their release's derived tolerance of 0.091: configuration C by 0.24 and configuration A by 0.001, where the earlier operating point had read A as within.
 
-Configuration C fails for a different reason, and the contrast is the useful part of the table. In the 50–60-year cell, 24 of its 48 synthetic rows are positive against a private rate of 0.197, so the bound on that cell is 0.33. Cohort-wise generation under the rate-based prompt pins each cohort's marginals and shows the model the conditional table, but nothing forces the rate *inside* a fine cell to match it. The shipped configuration's exact-count batches and selection over every released cell reduce that cell's gap to between 0.08 and 0.14 over three draws. Cell-wise generation forces it directly, which is why it reduced conditional rate error 77× in §3.3 and why configuration A clears here.
-
-This is the trade-off §F.1.1 named. C is representative and trains the better model. A transmits the fine-cell rates and is not representative. A deployment that needs the bound needs
-a cell-wise release the guard passes, B on this schema, or the coverage the guard demands. §7.12's conditional error over seen groups, 0.006, is not the quantity bounded here: it is a mean over the three stratification bands, where Stage C takes a worst case over the four finest cells, so the two are not reconciled by averaging.
+Configuration C fails for a reason the contrast shows. Its worst cell is the same band, where 24 of 48 synthetic rows are positive against a private rate of 0.197: cohort-wise generation under the rate-based prompt pinned each cohort's marginals and showed the model the conditional table, but nothing forced the rate inside a fine cell to match it. The shipped configuration's exact-count batches and selection reduce that cell's gap to between 0.10 and 0.14 over three draws. §7.12's conditional error over seen groups, 0.006, is not the quantity bounded here: it is a mean over the three stratification bands, where Stage C takes a worst case over the four finest cells, so the two are not reconciled by averaging.
 
 Each run is one unseeded draw at tolerance 0.15. §H.6's 40-draw sweep on the same release, at
 ε_cert = 0.5, puts the permuted floor at 0.196 ± 0.011; the runs above, at ε_cert = 1.0, put it
 between 0.179 and 0.219 at n = 300 and 600. The floor bound varies from draw to draw and must fail for a verdict to be issued. The variation is the reason the operating point was chosen by repetition rather than from a single run.
 
-The resulting claim is auditable and quantified. *With probability at least 95%, simultaneously over all released cells, the difference between the private conditional rate and the synthetic conditional rate is no larger than the stated bound: 0.107 for the third shipped draw and 0.092 for configuration A. That is established at a Stage C cost of ε = 1.0, on top of ε = 2.0 for the release, for ε = 3.0 total per row and, on this 1-row-per-person dataset, ε = 3.0 per person.*
+Under the shipped rule no NHANES run in this paper clears the bound, so the claim the procedure is built to issue is not issued here. Where it is issued it reads: *With probability at least 95%, simultaneously over all released cells, the difference between the private conditional rate and the synthetic conditional rate is no larger than the stated bound. That is established at a Stage C cost of ε = 1.0, on top of ε = 2.0 for the release, for ε = 3.0 total per row and, on this 1-row-per-person dataset, ε = 3.0 per person.*
 
 #### F.1.5 Summary for a clinical deployment
 
@@ -2759,7 +2764,7 @@ Report the ratio *and* the cell count, alongside an unconditioned control.
 
 **A budget defect worth reporting, because it was systematic.** The conditional budget was originally split across all *declared* levels up front. A level whose cells all fall below `n_min` releases nothing, so its share was left unspent. This fired on 6 of 11 datasets. Against a declared ε = 2.0 they accounted 1.63–1.79, so roughly a tenth to a fifth of the budget went unspent and the released statistics carried correspondingly more noise. Noise scales as 1/ε, so an accounted 1.63 is a release about 23% noisier than the caller paid for. Heart Cleveland (1.63) and German credit (1.71) are the worst, which is the worst place for it. The effect concentrates on small data where noise already dominates. The fix splits across only the levels that will actually release a cell.
 
-**The privacy argument is what makes that fix sound, and it should not be made without it.** Which cells clear `n_min` is decided from the noised support counts the ledger charges (a noisy threshold, from version 1.0.1), so allocating budget from that decision is post-processing of charged queries and reveals nothing further. Version 1.0.0 charged a separate `suppression` entry while the decision still read the exact count; a deterministic function of private data is not made private by paying for it, and that entry protected nothing (defect 28, §J.3). After the fix all eleven datasets account exactly 2.0000.
+**The privacy argument is what makes that fix sound, and it should not be made without it.** Which cells clear `n_min` is decided from the noised support counts the ledger charges (a noisy threshold), so allocating budget from that decision is post-processing of charged queries and reveals nothing further. An earlier build charged a separate `suppression` entry while the decision still read the exact count; a deterministic function of private data is not made private by paying for it, and that entry protected nothing (defect 28, §J.3). After the fix all eleven datasets account exactly 2.0000.
 
 We also note why the defect survived. The reference implementation's exact-spend test uses a *declared* schema, which skips auto-configuration entirely. A test that exercises one code path says nothing about the other.
 
@@ -3526,7 +3531,7 @@ in place.
 **The prompt channel is bounded by argument, not by measurement.** The noise the fixed pipeline adds has sd 35.4 records, which across Adult's twelve released cohorts is 0.6% of the largest (6,038 records) and 10.1% of the smallest (350). The largest cohort's line would read `6073` instead of `6038`. An earlier version quoted three cohorts at 0.23–3.0%, figures that match none of the twelve. The worst case is what a reader needs, and it is ten percent. The number is context for a subpopulation description, not a quantity the model is asked to reproduce. The row count per call is set by the allocation, not by this field, and no released statistic is expressed relative to it. We therefore judge the channel immaterial, but judging is not measuring. Isolating it would require regenerating every table with noised counts, which we have not done. A reader who declines the argument should treat the affected tables as carrying that unquantified caveat. It applies to the research pipeline only. Both reference implementations noise and charge the counts, so no deployment inherits it.
 
 What the defect changes, then, is not the numbers but what those releases were entitled to claim, which
-is why it is recorded as a defect rather than a footnote. The reference implementation noises and charges both the cohort counts and the per-cell supports, and from version 1.0.1 makes every `n_min` decision from those noised counts. Version 1.0.0 charged a separate suppression entry while the decision still read the exact count, which protected nothing (defect 28). The tool is therefore more conservative than the tables in this paper, and §9 records why. An early version of the tool published exact, unnoised private counts beside correctly noised rates, and its own privacy audit reported a clean ε = 2.0 throughout, because a verifier that sums *declared* queries cannot detect an undeclared one.
+is why it is recorded as a defect rather than a footnote. The reference implementation noises and charges both the cohort counts and the per-cell supports, and makes every `n_min` decision from those noised counts. An earlier build charged a separate suppression entry while the decision still read the exact count, which protected nothing (defect 28). The tool is therefore more conservative than the tables in this paper, and §9 records why. An early version of the tool published exact, unnoised private counts beside correctly noised rates, and its own privacy audit reported a clean ε = 2.0 throughout, because a verifier that sums *declared* queries cannot detect an undeclared one.
 
 
 ### J.4 Two decisions in the hybrid settled by measurement

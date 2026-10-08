@@ -82,6 +82,29 @@ import src.datasets_auto        # noqa: F401
 # Below this many synthetic rows in a cell, q_c is too coarse to be meaningful (with 1 row it can
 # only be 0 or 1). Such cells are reported, not silently trusted.
 MIN_SYNTH_ROWS_PER_CELL = 20
+TOLERANCE_RULE = ("derived from the release: the Laplace half-width plus half the largest gap between a released cell rate and the released base rate, so the permuted floor cannot pass at any sample size; reads released quantities only")
+
+
+def derive_tolerance(released_rates, base_rate: float, *, n_min: int, epsilon: float,
+                     alpha: float) -> tuple[float, dict]:
+    """The shipped tolerance: post-processing of the release alone.
+
+    The permuted floor's bound in a cell converges, as the synthetic sample grows, to the gap
+    between that cell's rate and the base rate plus the Laplace half-width, so any tolerance at
+    or above the largest such gap plus the half-width lets the floor through at a large enough n,
+    and the test stops discriminating. The rule places the tolerance halfway between the
+    half-width alone and that limit. It reads only released quantities (the finest table's rates
+    and the size-weighted released class balance), so it costs no budget and cannot be tuned on
+    the private data, which the earlier operating point of 0.15 was.
+    """
+    rates = [float(r) for r in released_rates]
+    k = max(len(rates), 1)
+    hw = (1.0 / n_min) / epsilon * math.log(k / alpha)
+    spread = max((abs(r - base_rate) for r in rates), default=0.0)
+    tol = hw + 0.5 * spread
+    return tol, {"rule": TOLERANCE_RULE, "halfwidth": round(hw, 4), "largest_released_gap": round(spread, 4),
+                 "released_base_rate": round(float(base_rate), 4), "tolerance": round(tol, 4),
+                 "floor_limit_at_large_n": round(hw + spread, 4)}
 
 # A bare standard name in a compliance artefact is an invitation to assume the broadest reading of
 # it. Each entry says what it is claimed FOR, so "SP 800-188" cannot be read as "this performed a
@@ -295,6 +318,22 @@ def certify_with_controls(spec, train, test, synth, *, level, epsilon, alpha=0.0
     ceil_ok = res["real-sample [CEILING]"]["within_bound"]
     res["_discriminating"] = bool(floor_ok and ceil_ok)
     res["_tolerance"] = tolerance
+    # The verdict. A cell with fewer than MIN_SYNTH_ROWS_PER_CELL synthetic rows has a rate that
+    # three rows can move by a third, and the bound carries no sampling term for it, so a verdict
+    # decided by such a cell is a property of a handful of rows. None is issued while any released
+    # cell is thin; the per-cell table is still reported.
+    thin = int(res["synthetic"].get("n_cells_thin", 0) or 0)
+    if thin:
+        res["_verdict"] = None
+        res["_verdict_reason"] = (f"{thin} of {res['synthetic'].get('n_cells', 0)} released cells hold fewer than "
+                                 f"{MIN_SYNTH_ROWS_PER_CELL} synthetic rows; no verdict is issued")
+    elif not res["_discriminating"]:
+        res["_verdict"] = None
+        res["_verdict_reason"] = ("the controls did not discriminate (the real-sample ceiling failed or the "
+                                 "permuted floor cleared); no verdict is issued")
+    else:
+        res["_verdict"] = "within bound" if res["synthetic"]["within_bound"] else "outside tolerance"
+        res["_verdict_reason"] = None
     return res
 
 
@@ -306,7 +345,10 @@ def main() -> None:
     ap.add_argument("--epsilon", type=float, default=0.5,
                     help="budget for the transmission bound (eps_cert)")
     ap.add_argument("--alpha", type=float, default=0.05)
-    ap.add_argument("--tolerance", type=float, default=0.15)
+    ap.add_argument("--tolerance", default="auto",
+                    help="'auto' (the default, needs --release) derives the tolerance from the release: "
+                         "half-width plus half the largest gap between a released cell rate and the "
+                         "released base rate; or a number such as 0.15")
     ap.add_argument("--n-min", type=int, default=150)
     ap.add_argument("--seed", type=int, default=42)
     # REQUIRED, with no default. Defaulting to 1 is the silent per-person claim itself: the
@@ -350,17 +392,28 @@ def main() -> None:
         if not _tbl:
             raise SystemExit(f"{a.release} carries no conditional table at level {level}")
         released_cells = sorted(_tbl.keys())
+    if str(a.tolerance).lower() == "auto":
+        if not a.release:
+            raise SystemExit("--tolerance auto derives the tolerance from the release; pass --release, or a number")
+        _pos = spec.positive_class
+        _tot = sum(float(c["cohort_size"]) for c in _rel)
+        _base = sum(float(c["cohort_size"]) * float(c["class_balance"][_pos]) for c in _rel) / _tot
+        tolerance, tolerance_rule = derive_tolerance(_tbl.values(), _base, n_min=a.n_min, epsilon=a.epsilon,
+                                                     alpha=a.alpha)
+    else:
+        tolerance, tolerance_rule = float(a.tolerance), {"rule": "explicit", "tolerance": float(a.tolerance)}
 
     print("=" * 100)
     print(f"STAGE C — UTILITY TRANSMISSION BOUND | {spec.name} | level {level} | "
-          f"eps_cert={a.epsilon} | alpha={a.alpha} | tolerance={a.tolerance}")
+          f"eps_cert={a.epsilon} | alpha={a.alpha} | tolerance={tolerance:.4f} ({tolerance_rule['rule'][:40]})")
     print("=" * 100)
     print("This SPENDS privacy budget: the deployment total is eps_release + "
           f"{a.epsilon}, not eps_release.\n")
 
     res = certify_with_controls(spec, train, test, synth, level=level, epsilon=a.epsilon,
                                 alpha=a.alpha, n_min=a.n_min, seed=a.seed,
-                                tolerance=a.tolerance, released_cells=released_cells)
+                                tolerance=tolerance, released_cells=released_cells)
+    res["_tolerance_rule"] = tolerance_rule
     print(f"{'condition':26s} {'cells':>6s} {'cov':>5s} {'uncov':>6s} {'thin':>5s} "
           f"{'mean':>7s} {'worst':>7s} {'within bound':>13s}")
     for lab in ("synthetic", "real-sample [CEILING]", "permuted-target [FLOOR]"):
@@ -377,15 +430,14 @@ def main() -> None:
         print(f"  note: {res['synthetic']['n_cells_thin']} cell(s) have fewer than "
               f"{MIN_SYNTH_ROWS_PER_CELL} synthetic rows, so their rate is coarse.")
 
-    if not res["_discriminating"]:
-        print("\n  !! THIS TEST DID NOT DISCRIMINATE. A utility bound is only meaningful when the "
-              "real-sample ceiling clears the bound AND the permuted-target floor does NOT. Adjust "
-              "tolerance or epsilon; do not report the synthetic result from this run.")
+    if res["_verdict"] is None:
+        print(f"\n  NO VERDICT: {res['_verdict_reason']}. The per-cell table above is the report; "
+              "do not read the synthetic row as a pass or a fail.")
     else:
         v = res["synthetic"]
         print(f"\n  Test discriminates (ceiling clears the bound, floor does not).")
         print(f"  VERDICT: synthetic data {'IS' if v['within_bound'] else 'is NOT'} within bound at "
-              f"tolerance {a.tolerance} with simultaneous confidence {1 - a.alpha:.0%} "
+              f"tolerance {tolerance:.4f} with simultaneous confidence {1 - a.alpha:.0%} "
               f"over {v['n_cells_covered']} cells, at eps_cert={a.epsilon}.")
 
     # ── the formal bound report, in the form NIST SP 800-226 asks for ───────────────
@@ -457,7 +509,7 @@ def main() -> None:
         # detected because the audit checked two of its three numbers.
         res["_meta"] = {
             "dataset": a.dataset, "level": level, "epsilon_transmission_bound": a.epsilon,
-            "alpha": a.alpha, "tolerance": a.tolerance, "n_min": a.n_min, "seed": a.seed,
+            "alpha": a.alpha, "tolerance": tolerance, "tolerance_rule": tolerance_rule, "n_min": a.n_min, "seed": a.seed,
             "synthetic_files": paths, "n_synthetic_rows": int(len(synth)),
             "cells_from_release": a.release,
             "epsilon_release": a.epsilon_release,
