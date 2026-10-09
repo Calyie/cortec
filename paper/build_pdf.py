@@ -489,7 +489,15 @@ def _frac(t: str) -> str:
 
 
 def _tex_to_html(m: str) -> str:
-    t = _html.escape(m, quote=False).replace("'", "′")
+    # the text may arrive already escaped (an algorithm line is escaped before its math is found):
+    # unescape to plain characters first, so '<' never renders as a doubled entity
+    plain = m
+    while True:
+        nxt = _html.unescape(plain)
+        if nxt == plain:
+            break
+        plain = nxt
+    t = _html.escape(plain, quote=False).replace("'", "′")
     t = re.sub(r"\\(?:tilde|widetilde)\{([^}]*)\}", lambda k: k.group(1) + "\u0303", t)
     t = re.sub(r"\\(?:hat|widehat)\{([^}]*)\}", lambda k: k.group(1) + "\u0302", t)
     t = re.sub(r"\\bar\{([^}]*)\}", lambda k: k.group(1) + "\u0304", t)
@@ -510,7 +518,9 @@ def _tex_to_html(m: str) -> str:
         return re.sub(r"[A-Za-z]+(?:\u0303|\u0302|\u0304)?",
                       lambda k: k.group(0) if k.group(0).rstrip("\u0303\u0302\u0304") in _UPRIGHT
                       or len(k.group(0).rstrip("\u0303\u0302\u0304")) > 3 else f"<i>{k.group(0)}</i>", seg)
-    parts = re.split(r"(<[^>]+>)", t)
+    # tags and character entities ("&lt;" for the comparison operators) pass through untouched; an
+    # earlier version italicised the "lt" of an entity, so "<" rendered as a literal "&lt;"
+    parts = re.split(r"(<[^>]+>|&[A-Za-z]+;|&#\d+;)", t)
     out, upright = [], 0
     for p in parts:
         if p.startswith("<"):
@@ -518,6 +528,8 @@ def _tex_to_html(m: str) -> str:
                 upright += 1
             elif p == "</span>" and upright:
                 upright -= 1
+            out.append(p)
+        elif p.startswith("&"):
             out.append(p)
         else:
             out.append(p if upright else ital(p))

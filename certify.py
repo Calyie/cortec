@@ -9,8 +9,8 @@ noise into a one-sided confidence bound, giving a statement of the form
     with probability at least 1 - alpha, simultaneously over all released cells,
         |p_c - q_c|  <=  |p_hat_c - q_c| + b_c * ln(k / alpha)
 
-where `b_c = (1/n_min) / eps_cell` is the Laplace scale -- the sensitivity of a released cell's
-rate is bounded by 1/n_min, the PUBLIC floor, never by the private cell size -- and `k` is the number of cells (a union
+where `b_c = (1/n_min) / eps_cell` is the Laplace scale -- each cell's rate is taken over max(|c|, n_min),
+so its sensitivity is at most 1/n_min, the PUBLIC floor, whatever the private cell size -- and `k` is the number of cells (a union
 bound over the cells, so the guarantee is SIMULTANEOUS rather than per-cell — reporting a per-cell
 95% bound over 20 cells and calling it simultaneous would be wrong).
 
@@ -145,7 +145,7 @@ DP_CLAIM = {
     "privacy_unit": "one dataset row",
     "composition": "parallel across disjoint cells; sequential across overlapping query groups",
     "mechanism": "Laplace",
-    "sensitivity": "1/n_min per released cell rate: the PUBLIC size floor, not the private cell "
+    "sensitivity": "1/n_min per released cell rate, taken over max(|c|, n_min): the PUBLIC size floor, not the private cell "
                    "size. A scale set from the true cell size is data-dependent under add/remove "
                    "adjacency and is not pure epsilon-DP; the bound is conservative by n/n_min.",
 }
@@ -247,7 +247,10 @@ def certify(spec, real: pd.DataFrame, synth: pd.DataFrame, *, level: int,
     out = []
     for cell, idx in groups.items():
         n_c = len(idx)
-        p_true = float(ry.loc[idx].mean()) if n_c else 0.0
+        # the rate over max(|c|, n_min), as the release takes its rates: the sensitivity is then at most
+        # 1/n_min for EVERY cell, including one the noisy gate released below the floor (a cell below
+        # the floor reads at |c|/n_min of its true rate, a rare, bounded, downward bias)
+        p_true = float(ry.loc[idx].sum()) / max(n_c, n_min) if n_c else 0.0
         # Sensitivity bound is 1/n_min, NOT 1/n_c (technical report, section 4.3). Under add/remove-one adjacency the
         # cell size is private, so a scale set from n_c is data-dependent and the mechanism is not
         # pure eps-DP. For a cell released in both neighbouring datasets both sizes are >= n_min,
