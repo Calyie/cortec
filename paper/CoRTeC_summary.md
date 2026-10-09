@@ -33,7 +33,7 @@ Four consequences follow, and they are the reasons to use it.
 
 Every comparison is at ε = 2 and n = 300, against a real sample of the same size (the floor no synthetic method should be expected to exceed) and against the same data with its target permuted (the score of data that carries no usable information). Fidelity and utility are always reported together, because a method can score well on one and poorly on the other.
 
-**Table 1:** 1-way total variation (lower is better) and train-on-synthetic, test-on-real (TSTR) AUC under three students, logistic regression (LR), random forest (RF) and gradient boosting (GBM), higher is better, on the three head-to-head datasets. CoRTeC is the shipped configuration with Gemini 3.5 Flash, three draws per dataset. AIM completes on finance only on a 12-column schema, so its finance row is scored on those columns.
+**Table 1:** 1-way total variation (lower is better) and train-on-synthetic, test-on-real (TSTR) AUC under three students, logistic regression (LR), random forest (RF) and gradient boosting (GBM), higher is better, on the three head-to-head datasets. CoRTeC is the shipped configuration with Gemini 3.5 Flash, three draws per dataset, from releases gated on noised, charged counts and decoded with the exact counts stated as totals over the outcomes. AIM completes on finance only on a 12-column schema, so its finance row is scored on those columns.
 
 | dataset | condition | 1-way TV | TSTR-LR | TSTR-RF | TSTR-GBM |
 |---|---|---|---|---|---|
