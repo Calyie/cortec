@@ -5,7 +5,7 @@
 <p><b>Calister Nnona</b></p>
 <p>calisternnona@gmail.com</p>
 <p>Summary of the paper, 9 October 2026</p>
-<p>DOI: <a href="https://doi.org/10.5281/zenodo.22945316">10.5281/zenodo.22945316</a></p>
+<p>DOI: <a href="https://doi.org/10.5281/zenodo.22945315">10.5281/zenodo.22945315</a></p>
 </div>
 
 <div class="abstract">
