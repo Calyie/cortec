@@ -2111,7 +2111,7 @@ size; [`classification_report.py`](https://github.com/Calyie/cortec/blob/main/cl
 
 F1 is 0.664 against the same-size real sample's 0.672, within 0.008, and average precision 0.719 against 0.722. The CoRTeC-trained model recovers 652 of 801 positives against the real-sample model's 694, at 511 false positives against 569. MST and AIM are 0.07 and 0.19 lower on F1.
 
-The shadow-model attack on the same 900 records records accuracy 0.507, precision 0.507, recall 0.509, F1 0.508, AUC 0.511, Youden's J 0.014 and TPR 0.000 at FPR 0.1%, with confusion 505 / 495 / 491 / 509 over 1,000 members and 1,000 non-members. On the leaking control it records AUC 0.605, accuracy 0.581, Youden's J 0.161 and TPR 0.037 at FPR 0.1%. Every arm's accuracy is between 0.67 and 0.81 against 0.754 for a
+The shadow-model attack on the same 900 records records accuracy 0.513, precision 0.513, recall 0.513, F1 0.513, AUC 0.512, Youden's J 0.026 and TPR 0.004 at FPR 0.1%, with confusion 513 / 487 / 487 / 513 over 1,000 members and 1,000 non-members. On the leaking control it records AUC 0.605, accuracy 0.581, Youden's J 0.161 and TPR 0.037 at FPR 0.1%. Every arm's accuracy is between 0.67 and 0.81 against 0.754 for a
 constant majority-class predictor, which is why accuracy is excluded from the table.
 
 **The trap is milder here but still present, and DP-CTGAN shows why.** Adult has a strong signal and a base rate of 0.241, so accuracy is less degenerate than on the three regulated datasets. Yet DP-CTGAN's accuracy of 0.758 still looks respectable and is *below* the 0.759 a classifier gets by predicting the majority class for every record. (Accuracy is excluded from the table above for the

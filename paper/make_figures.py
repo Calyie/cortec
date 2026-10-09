@@ -600,7 +600,7 @@ def fig_head_to_head():
           "dpctgan": "DP-CTGAN", "pategan": "PATE-GAN"},
          {"lr": "tstr_auc_LR", "rf": "tstr_auc_RF", "gbm": "tstr_auc_GBM"}),
         # the healthcare panel is NHANES, scored beside its own baselines at n = 300
-        (("Healthcare: NHANES", "results/cortec_v2_nhanes_auto_eval.json", "CoRTeC (Gemini 3.5 Flash)",
+        (("Healthcare: NHANES", "results/cortec_v3_nhanes_auto_eval.json", "CoRTeC (Gemini 3.5 Flash)",
           "real-sample [FLOOR-n]", "shuffled-target [FLOOR]",
           {"CoRTeC (Gemini 3.5 Flash)": "CoRTeC", "AIM": "AIM", "MST": "MST", "PATE-CTGAN": "PATE-CTGAN"},
           {"lr": "tstr_LR", "rf": "tstr_RF", "gbm": "tstr_GBM"})
@@ -616,12 +616,13 @@ def fig_head_to_head():
           "dpctgan": "DP-CTGAN", "pategan": "PATE-GAN"},
          {"lr": "tstr_LR", "rf": "tstr_RF", "gbm": "tstr_GBM"}),
     ]
-    # Each panel also carries CoRTeC v2 (class-conditional release, exact-count batches, selection
-    # from a 3x pool; Gemini 3.5 Flash), read from the v2 evaluation files, beside the earlier
-    # pooled-release arms, which stay as the ablation reference.
-    EXTRA = {"Census: Adult": ("results/cortec_v2_adult_eval.json", "CoRTeC (Gemini 3.5 Flash)", "CoRTeC"),
+    # Each panel also carries the shipped configuration (class-conditional release gated on noised,
+    # charged counts, exact-count batches, selection from a 3x pool; Gemini 3.5 Flash), read from the
+    # current-release evaluation files (cortec_v3_*), beside the earlier pooled-release arms, which
+    # stay as the ablation reference.
+    EXTRA = {"Census: Adult": ("results/cortec_v3_adult_eval.json", "CoRTeC (Gemini 3.5 Flash)", "CoRTeC"),
              "Healthcare: Diabetes 130": None, "Healthcare: NHANES": None,
-             "Finance: Credit default": ("results/cortec_v2_credit_eval.json", "CoRTeC (Gemini 3.5 Flash)", "CoRTeC")}
+             "Finance: Credit default": ("results/cortec_v3_credit_eval.json", "CoRTeC (Gemini 3.5 Flash)", "CoRTeC")}
     RENAME = {"Census: Adult": "CoRTeC, earlier configuration", "Healthcare: Diabetes 130": "CoRTeC, earlier configuration",
               "Healthcare: NHANES": "CoRTeC",
               "Finance: Credit default": "CoRTeC, earlier configuration"}
@@ -964,8 +965,8 @@ def fig_classification_profile(report="results/classification_report.json",
 
 def fig_classification_profile_shipped():
     """The same profile on the shipped-configuration Adult draws (Gemini 3.5 Flash, Table 3 of the
-    arXiv paper), from results/classification_report_shipped.json."""
-    fig_classification_profile("results/classification_report_shipped.json",
+    arXiv paper), from results/classification_report_v3.json (the current release)."""
+    fig_classification_profile("results/classification_report_v3.json",
                                "fig12_classification_shipped.png")
 
 
