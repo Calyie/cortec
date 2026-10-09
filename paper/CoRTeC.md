@@ -1598,7 +1598,7 @@ selected to the release exactly as the Gemini pools were. The pool's 1-way error
 
 **An open-weight generator.** The same releases were decoded through OpenAI's open-weight gpt-oss-120b (Apache-2.0), served locally through Ollama on one 80 GB GPU at its low reasoning level, so the generator is again the only variable. The arm stands in for a model an institution hosts itself, which is the deployment the architecture allows; it is not a recommendation of open weights, and the model is unmeasured by the tool's capability gate. On NHANES the open-weight generator trains the three students at 0.685 against 0.773, 0.660 against 0.728, 0.628 against 0.716 (no student separates from the real sample after correction), and no measure separates it from the Gemini arm on the same release; its 1-way error is 0.020 against the real sample's 0.034 and the Gemini arm's 0.016. On finance the open-weight generator trains the three students at 0.677 against 0.695, 0.730 against 0.727, 0.701 against 0.717 at one draw, a point value with no test; its 1-way error is 0.060 against the real sample's 0.041 and the Gemini arm's 0.029. Generation costs no API fee; a 25-row call took one to three minutes on the shared GPU.
 
-**The counts stated per outcome.** The open-weight gap above was traced to a specification the prompt had left to the model. Both generators matched the pooled histograms of NHANES's class-conditional cohort, but neither matched the positives' class block from totals alone: inside that cohort the positives' mean 1-way distance to their released block was 0.090 under Gemini and 0.175 under gpt-oss (the negatives' 0.014 and 0.038), and selection then kept fewer positives from the open-weight pool (0.135 against the released 0.150). The exact-count block had stated the per-class apportionment summed over the two outcomes (Section 4), leaving each class's marginals to the model's reading of the class blocks. With the counts stated per outcome, the default from this release, the same releases were decoded again. Per outcome, gpt-oss: positives' distance 0.085, negatives' 0.031, students 0.716, 0.637, 0.643; Gemini: positives' distance 0.060, negatives' 0.012, students 0.733, 0.678, 0.662; GPT-5: positives' distance 0.048, negatives' 0.012, students 0.735, 0.681, 0.670 (real sample 0.773, 0.728, 0.716). Before selection the pools of every per-outcome arm are at the same distance from the class blocks (positives 0.009 to 0.011, negatives 0.002 to 0.017, over 3 generators): the class marginals are now set by the counts, not by the model's reading. With the counts per outcome no measure separates the open-weight arm from the Gemini arm on the same release after Holm correction. No measure separates the gpt-oss arm from the real sample after correction. 2-way error separates the Gemini arm from the real sample after correction. No measure separates the GPT-5 arm from the real sample after correction. No measure separates the gpt-oss arm from its own totals-only arm after correction (students LR 0.685 to 0.716, RF 0.660 to 0.637, GBM 0.628 to 0.643). No measure separates the Gemini arm from its own totals-only arm after correction (students LR 0.738 to 0.733, RF 0.679 to 0.678, GBM 0.681 to 0.662). Three draws per arm on one dataset, two for GPT-5. The per-outcome statement fixes what the specification had left open, and it fixes it for every generator alike; it does not by itself lift the open-weight students to the Gemini level (RF 0.637 against 0.678). That remaining difference is below what three draws can resolve after correction, and it is the model's, not the specification's. On finance the same GPT-5 arm at one draw, a point value with no test, trains the students at 0.697, 0.735, 0.713 against the real sample's 0.695, 0.727, 0.717, with a 1-way error of 0.028 against 0.041; the finance arms of the other generators were generated under the totals-only prompt, so no comparison between them is made.
+**The counts stated per outcome.** The open-weight gap above was traced to a specification the prompt had left to the model. Both generators matched the pooled histograms of NHANES's class-conditional cohort, but neither matched the positives' class block from totals alone: inside that cohort the positives' mean 1-way distance to their released block was 0.090 under Gemini and 0.175 under gpt-oss (the negatives' 0.014 and 0.038), and selection then kept fewer positives from the open-weight pool (0.135 against the released 0.150). The exact-count block had stated the per-class apportionment summed over the two outcomes (Section 4), leaving each class's marginals to the model's reading of the class blocks. With the counts stated per outcome, the default from this release, the same releases were decoded again. Per outcome, gpt-oss: positives' distance 0.085, negatives' 0.031, students 0.716, 0.637, 0.643; Gemini: positives' distance 0.060, negatives' 0.012, students 0.733, 0.678, 0.662; GPT-5: positives' distance 0.053, negatives' 0.012, students 0.736, 0.696, 0.682 (real sample 0.773, 0.728, 0.716). Before selection the pools of every per-outcome arm are at the same distance from the class blocks (positives 0.009 to 0.011, negatives 0.002 to 0.017, over 3 generators): the class marginals are now set by the counts, not by the model's reading. With the counts per outcome no measure separates the open-weight arm from the Gemini arm on the same release after Holm correction. No measure separates the gpt-oss arm from the real sample after correction. 2-way error separates the Gemini arm from the real sample after correction. No measure separates the GPT-5 arm from the real sample after correction. No measure separates the gpt-oss arm from its own totals-only arm after correction (students LR 0.685 to 0.716, RF 0.660 to 0.637, GBM 0.628 to 0.643). No measure separates the Gemini arm from its own totals-only arm after correction (students LR 0.738 to 0.733, RF 0.679 to 0.678, GBM 0.681 to 0.662). Three draws per arm on one dataset. The per-outcome statement fixes what the specification had left open, and it fixes it for every generator alike; it does not by itself lift the open-weight students to the Gemini level (RF 0.637 against 0.678). That remaining difference is below what three draws can resolve after correction, and it is the model's, not the specification's. On finance the same GPT-5 arm at one draw, a point value with no test, trains the students at 0.697, 0.735, 0.713 against the real sample's 0.695, 0.727, 0.717, with a 1-way error of 0.028 against 0.041; the finance arms of the other generators were generated under the totals-only prompt, so no comparison between them is made.
 
 | condition | draws | 1-way TV ↓ | 2-way TV ↓ | cond. seen ↓ | cond. held-out ↓ | TSTR-LR ↑ | TSTR-RF ↑ | TSTR-GBM ↑ |
 |---|---|---|---|---|---|---|---|---|
@@ -1607,7 +1607,7 @@ selected to the release exactly as the Gemini pools were. The pool's 1-way error
 | CoRTeC (gpt-oss-120b, low reasoning; current release) | 3 | 0.020 | 0.134 | 0.023 | 0.052 | 0.685 | 0.660 | 0.628 |
 | CoRTeC (Gemini 3.5 Flash, reasoning on; current release, counts per outcome) | 3 | 0.017 | 0.128 | 0.014 | 0.032 | 0.733 | 0.678 | 0.662 |
 | CoRTeC (gpt-oss-120b, low reasoning; current release, counts per outcome) | 3 | 0.019 | 0.137 | 0.027 | 0.028 | 0.716 | 0.637 | 0.643 |
-| CoRTeC (GPT-5, medium reasoning; current release, counts per outcome) | 2 | 0.018 | 0.109 | 0.015 | 0.030 | 0.735 | 0.681 | 0.670 |
+| CoRTeC (GPT-5, medium reasoning; current release, counts per outcome) | 3 | 0.017 | 0.107 | 0.014 | 0.032 | 0.736 | 0.696 | 0.682 |
 | CoRTeC (Gemini 3.5 Flash, reasoning on; earlier release) | 3 | 0.015 | 0.119 | 0.006 | 0.036 | 0.752 | 0.732 | 0.711 |
 | CoRTeC (GPT-5, minimal reasoning) | 3 | 0.031 | 0.116 | 0.038 | 0.063 | 0.751 | 0.710 | 0.702 |
 | CoRTeC (GPT-5, low reasoning; one draw) | 1 | 0.020 | 0.104 | 0.011 | 0.069 | 0.727 | 0.664 | 0.640 |
@@ -1805,7 +1805,7 @@ One pattern recurred often enough to name. A fix applied at one site was repeate
     two draws per arm** (§7.11). The utility gain replicates across generators on finance. The cost on held-out conditional error appears under one generator and not the other. Adult is a two-draw check. The §7.2 Adult headline arms, the ε-sweep and the generator ladder were generated
     from pooled releases and stand as reported.
 14. **The shipped configuration is measured under one generator family** (Gemini 3.5 Flash, three
-    draws per dataset, §7.12). On NHANES the same release was decoded by three generators under the per-outcome prompt (Table 34): Gemini 3.5 Flash, OpenAI's open-weight gpt-oss-120b at low reasoning, and GPT-5 at medium reasoning (two draws). No measure separates the three after Holm correction at three draws, and the point differences that remain (random forest 0.637 under gpt-oss against 0.678 under Gemini) are below what three draws resolve. The Gemini arm under that prompt reproduces the shipped NHANES row to within 0.019 on every measure. The cross-vendor check through Claude Opus 5 is one complete pool on Adult, which reproduces the Gemini result to within 0.010 on every measure. Adult and finance under a second generator, and the shipped Adult and finance tables under the per-outcome prompt, are the replications this result still needs. The configuration also costs three times the generation spend of the earlier arms.
+    draws per dataset, §7.12). On NHANES the same release was decoded by three generators under the per-outcome prompt (Table 34): Gemini 3.5 Flash, OpenAI's open-weight gpt-oss-120b at low reasoning, and GPT-5 at medium reasoning (three draws). No measure separates the three after Holm correction at three draws, and the point differences that remain (random forest 0.637 under gpt-oss against 0.678 under Gemini) are below what three draws resolve. The Gemini arm under that prompt reproduces the shipped NHANES row to within 0.019 on every measure. The cross-vendor check through Claude Opus 5 is one complete pool on Adult, which reproduces the Gemini result to within 0.010 on every measure. Adult and finance under a second generator, and the shipped Adult and finance tables under the per-outcome prompt, are the replications this result still needs. The configuration also costs three times the generation spend of the earlier arms.
 15. **Below bin resolution the output follows the release only where the release has class
     blocks.** Where a cohort has a pooled block the generator's placement inside bins is kept, because it is the only carrier of the class signal there, and it comes from the generator's prior. On NHANES the one such cohort carries the remaining linear-student gap (§7.12, §H.17). Finer public bins where cohort sizes support them would leave the generator less room. Sizing them is an auto-configuration rule we have not built, and at selection alone they cost marginal fidelity.
 16. **The evaluator's numeric bins are right-closed and the release's are left-closed** (§6.4,
@@ -2098,7 +2098,7 @@ band with reasoning verifiably not firing (§7.5, verified by the instrumentatio
 **The same profile on the shipped configuration.** Re-run on the three shipped Adult draws of
 §7.12 (Gemini 3.5 Flash, pooled to 900 records, with the real-sample reference drawn at the same
 size; [`classification_report.py`](https://github.com/Calyie/cortec/blob/main/classification_report.py), drawn as
-`paper/figures/fig12_classification_shipped.png`, the classification figure of the arXiv paper):
+`paper/figures/fig12_classification_shipped.png`, the classification figure, which the arXiv paper summarises in its membership-inference section):
 
 | trained on | precision | recall | F1 | AUC | avg. precision |
 |---|---|---|---|---|---|
@@ -2883,6 +2883,20 @@ relation (add or remove one record, unbounded DP), **privacy unit**, composition
 - The guarantee says nothing about the generator's pretraining data.
 - **The Stage C output is a utility transmission bound computed under DP. It does not certify privacy and must never be presented as a privacy audit.**
 
+#### H.6.1 The report format, as shipped
+
+
+Stage C (§7.9), shipped as [`cortec.bound`](https://github.com/Calyie/cortec-framework/blob/main/cortec/cortec/bound.py) in the framework and as [`certify.py`](https://github.com/Calyie/cortec/blob/main/certify.py) in the research repository (the script's name predates the renaming of Stage C and is kept so that links resolve), writes its result as a report a third party can read without the private data. The report is headed `UTILITY TRANSMISSION BOUND`. Its JSON:
+
+- opens with a `_what_this_is` block stating that it is not a privacy audit;
+- records a clearing result in a field named `within_bound` and never `certified`;
+- lists every released cell with its bound and its synthetic support, so that thin cells are visible;
+- states $ε_{cert}$, α, the tolerance, the privacy unit and the total ε spent by release and bound together;
+- claims alignment with NIST SP 800-226 and SP 800-188 only; and
+- carries a `_standards_not_claimed` block naming HIPAA Expert Determination, ISO/IEC 27559, ISO/IEC 20889 and GDPR Article 25 with the reason for each.
+
+The bound is unseeded, because it spends budget on a query over the private data and a seeded mechanism is deterministic. A published bound is therefore one draw. The budget $ε_{cert}$ = 1.0 was chosen by repetition rather than from a single run (Section 6.9); the tolerance is now derived from the release (Section 4.6), and the earlier fixed 0.15 is reported beside it for comparison. That calibration was a research-time step on this dataset's own data; a deployment that repeats it on private data is making an uncharged choice, and should fix $ε_{cert}$ before the run. A Monte Carlo over 200 independent noise draws checks that the empirical violation rate of (4) stays below α.
+
 ### H.7 A second regulated dataset, and a second defect the coverage rule does not cover
 
 The rule above is calibrated on one dataset's conditioning columns, so we tested it on a second of comparable sensitivity: **Diabetes 130-US**, 101,763 real hospital encounters under HIPAA. The arms were generated by a third vendor's frontier model on one shared release, 300 rows per arm. The release was tuned (`n_min = 4,000`) to put one conditioning column below the floor, giving a falsifiable prediction. `number_inpatient` at 86% coverage should be damaged. `discharge_disposition_id` at 100% should not.
@@ -3582,6 +3596,37 @@ The rule of Algorithm 1 (lines 5′, 7 and 10) and the rule the earlier releases
 | NHANES (one release) | 127 | 4 | 0.70 | 30–40 years, band 1, group 1: 163 records, released (0.86) |
 
 On Adult the decisions that differ are class-block splits: the cohort of graduates working under 40 hours holds 149 positives against a floor of 150 and is released pooled, where the noisy rule splits it about half the time (0.55); the cohort of some-college workers under 40 hours holds 154 positives and is split, where the noisy rule keeps it pooled one time in three (0.67); the cell of graduates under 40 hours who are not married holds 161 records and is released, where the noisy rule drops it 17% of the time (0.83). On finance they are four cells of 139 to 148 records that the exact rule withholds and the noisy rule releases between 17% and 41% of the time, and one class block of 140 positives. On NHANES they are the 30–40-year cell at 163 records, released, which the noisy rule drops 14% of the time, and two cells of 127 and 132 records, withheld, which it releases 5% and 9% of the time. Nothing else in the mechanism changes, so the regenerated §7.12 tables differ from the earlier build's by those decisions and by draw-to-draw variation.
+
+### J.6 Using the reference implementation
+
+The listing below shows the complete workflow in the reference implementation. Stage A is the only line that touches private data. The release is serialised with its audit trail and contains no record. Stage B may be run as often as wanted, on any endpoint, at no further privacy cost.
+
+```python
+from cortec import Schema, Band, release_statistics, Generator
+
+schema = Schema(
+    name="encounters",
+    numerical={"age": (18, 95), "length_of_stay": (1, 30)},
+    categorical={"admission_type": ["Emergency", "Elective", "Urgent"],
+                 "a1c_result": ["None", "Norm", ">7", ">8"]},
+    target="readmitted_30d", positive="YES", negative="NO",
+    bins={"age": [18, 40, 55, 70, 95], "length_of_stay": [1, 3, 6, 10, 30]},
+    stratify=[("length_of_stay", [Band("los1-2", 1, 3), Band("los3-5", 3, 6),
+                                  Band("los6+", 6, 31)])],
+    conditional=[("admission_type",), ("admission_type", "a1c_result")],
+)
+
+release = release_statistics(schema, private_df, epsilon_total=2.0, n_min=150)
+print(release.audit["epsilon_accounted"])
+release.to_json("release.json")
+
+gen = Generator(schema, backend="gemini", surface="vertex",
+                model="gemini-3.5-flash", reasoning="on")
+synthetic = gen.generate_selected(release, n_rows=5000, pool_factor=3)
+print(gen.stats.calls_with_reasoning_block, "of", gen.stats.calls, "calls reasoned")
+```
+
+The reference implementation end to end. The schema declares only what an institution knows without looking at its data: column names, public bounds and bin edges, the target, and the cohort and conditional structure. [`cortec.autoconfig.derive()`](https://github.com/Calyie/cortec-framework/blob/main/cortec/cortec/autoconfig.py) can derive the last of these instead. The call to `release_statistics` is the only line that touches private data; it prints an accounted budget of 2.0 and writes a release that contains no private record. `generate_selected` runs Stage B with the shipped defaults: exact-count batches, a 3× pool, selection to the release and the sub-bin rule. The final line reports on how many calls the model's reasoning verifiably fired.
 
 ## Appendix K — Composition: why a tighter accountant does not help, and how deep the chain goes
 
