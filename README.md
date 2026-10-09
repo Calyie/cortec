@@ -32,16 +32,21 @@ forest and gradient boosting, with the gap bounded inside ±0.027 and every p > 
 That equivalence was first claimed at one dataset and one sample size, and we measured where it
 stopped. On the finance dataset the pooled release reaches TSTR-LR 0.652 against a matched real
 sample's 0.695, a significant shortfall. With one histogram per outcome at the same ε the
-two tree students reach the real-sample floor (§7.11). Under the configuration the tools now ship all
-three students are within 0.015 AUC of the floor on both datasets, with 1-way marginal error within
-0.005 of MST's and below a real sample of the same size (§7.12). That configuration is a
-class-conditional release with a fifth of the budget on the conditional table, batches told the
-exact counts they owe, and output selected from a threefold pool of generated rows. It is a result
-at n = 300 under one generator family.
+two tree students reach the real-sample floor (§7.11). Under the configuration the tools now ship, no
+student separates from a real sample of the same size on Adult or finance at three draws each (all
+three within 0.018 AUC of the floor), one tree model is 0.049 AUC short on NHANES, and 1-way marginal
+error is within 0.005 of MST's on all three and below a real sample's (§7.12). That configuration is a
+class-conditional release gated on noised, charged counts, with a fifth of the budget on the
+conditional table, batches told the exact counts they owe, and output selected from a threefold pool
+of generated rows. The head-to-head is at n = 300 under one generator family; on NHANES the same
+release decoded by three generators under the per-outcome prompt (Gemini 3.5 Flash, the open-weight
+gpt-oss-120b and GPT-5) does not separate after correction at three draws (§7.12).
 
-Over the same Adult data, AIM and MST train models 0.14 to 0.17 AUC lower (Holm-adjusted
-p ≤ 0.0024). We report this as calibration rather than as a verdict: those methods optimise a
-different objective, and on their own 3-way workloads at adequate n AIM records the lowest error.
+Over the same Adult data, AIM and MST at library defaults train models 0.14 to 0.17 AUC lower
+(Holm-adjusted p ≤ 0.0024); with a 300 MB model or a 3-way workload, at hours of fitting against
+none, AIM's tree students reach the floor (§7.2). We report this as calibration rather than as a
+verdict: those methods optimise a different objective, and on their own 3-way workloads at adequate
+n AIM records the lowest error.
 CoRTeC pays per generated record, three times over under the shipped configuration, where the
 marginal methods pay once at fit time.
 
@@ -106,8 +111,9 @@ synthetic = gen.generate_selected(release, n_rows=5000, pool_factor=3)   # Stage
 
 The conditional hierarchy is derived from the declared schema plus one DP-noised selection step. The
 release carries one histogram block per cohort and outcome class by default, with a fifth of the
-budget on the conditional table. Generation asks each batch for the exact counts it owes and keeps,
-from a threefold pool, the rows whose cell counts match the release (technical report §3.3, §7.12).
+budget on the conditional table. Generation asks each batch for the exact counts it owes, stated per
+outcome where the release carries class blocks, and keeps, from a threefold pool, the rows whose cell
+counts match the release (technical report §3.3, §4.4, §7.12).
 `release.json` is the controlled artefact: store it, hash it, and reuse it by file. Every further
 draw is free in ε.
 
@@ -137,7 +143,8 @@ python3 paper/build_pdf.py paper/CoRTeC_arxiv.md paper/CoRTeC_arxiv.pdf      # r
 
 Every CoRTeC arm in the papers is one invocation of `run_dataset.py`, and the technical report
 records the exact arm specification behind each table. `--quota` gives every batch the exact counts
-it owes, and `--pool-factor 3` selects the output from a threefold pool; together they are the
+it owes (per outcome by default; `--no-quota-by-class` states the totals, as the §7.12 tables were
+generated), and `--pool-factor 3` selects the output from a threefold pool; together they are the
 shipped configuration of §7.12. A release already present in the output directory is reused rather
 than redrawn, so further draws cost no privacy budget. Datasets are fetched from public sources on
 first use and cached under `data/`, which is not committed.
