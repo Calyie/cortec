@@ -9,26 +9,25 @@ doi: "10.5281/zenodo.22945316"
 repository-code: "https://github.com/Calyie/cortec"
 abstract: >-
   Differentially private synthetic tabular data is worth producing only if a model trained on it
-  performs as one trained on the real records. The marginal-based mechanisms in deployment, MST
-  and AIM, were built for marginal workloads and are evaluated on them; measured instead on this
-  quantity, at library defaults and ε = 2 on UCI Adult, their output trains models 0.14 to 0.17
-  AUC below a real sample of the same size. CoRTeC spends the privacy budget once, on a release
-  built for a downstream model, and trains nothing. Within publicly defined cohorts it publishes
-  one Laplace histogram per attribute and outcome class, and a table of target rates over disjoint
-  cells, so conditional structure costs one query per level. A frozen language model then decodes
-  the release under exact per-bin counts and selection from a pool. It never sees a private
-  record, so generation is post-processing: unlimited datasets at no further privacy cost. At ε =
-  2 and n = 300, no model trained on CoRTeC's output separates from one trained on a real sample
-  of the same size on census or credit data, one tree model is 0.05 AUC short on clinical data,
-  and 1-way marginal error is within 0.005 of MST's on all three. The gap lies largely in what is
+  performs as one trained on the real records. The deployed marginal mechanisms, MST and AIM, were
+  built for marginal workloads and are evaluated on them; measured instead on this quantity, at
+  library defaults and ε = 2 on UCI Adult, their output trains models 0.14 to 0.17 AUC below a
+  same-size real sample. CoRTeC spends the privacy budget once, on a release built for a downstream
+  model, and trains nothing. Within publicly defined cohorts it publishes one Laplace histogram per
+  attribute and outcome class, and a table of target rates over disjoint cells, so conditional
+  structure costs one query per level. A frozen language model then decodes the release under exact
+  per-bin counts and selection from a pool. It never sees a private record, so generation is post-
+  processing: unlimited datasets at no further privacy cost. At ε = 2 and n = 300, no model trained
+  on CoRTeC's output separates from one trained on a real sample of the same size on census or
+  credit data, one tree model is 0.05 AUC short on clinical data, and 1-way marginal error is
+  within 0.005 of MST's on the first two and below it on the third. The gap lies largely in what is
   released: giving MST and AIM a private conditional table recovers most of it at no change to
-  either mechanism. Four membership-inference attacks validated on a positive control reach an
-  advantage of at most 0.049 against a permitted 0.762. Both criteria the field selects
-  synthesisers on are saturated: real data with its target permuted passes a 90%
-  marginal-similarity bar, and a language model given only column names passes aggregate
-  downstream utility on a public benchmark. Only conditional and subgroup measures, against a
-  real-sample floor and a no-information floor, separate a mechanism that transmits the
-  institution's structure from one that recites a prior.
+  either mechanism. Four membership-inference attacks validated on a positive control reach at most
+  0.049 advantage against a permitted 0.762. Both criteria the field selects synthesisers on are
+  saturated: real data with its target permuted passes a 90% marginal-similarity bar, and a
+  language model given only column names passes aggregate downstream utility on a public benchmark.
+  Only conditional and subgroup measures, against a real-sample and a no-information floor,
+  separate a mechanism that transmits the institution's structure from one that recites a prior.
 authors:
   - family-names: "Nnona"
     given-names: "Calister"
