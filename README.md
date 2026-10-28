@@ -19,7 +19,6 @@ through an interface the institution does not control.
 |---|---|
 | [The paper](paper/CoRTeC_arxiv.pdf) | The mechanism, its privacy analysis, and the measurements with their controls (12 pages of main text, appendices A to G) |
 | [The deployment guide](paper/CoRTeC.pdf) | The architecture, the parameters, the full prompt, a checklist, the controls mapped to standards, the failure modes with their guards, and the cost (7 pages) |
-| [The summary](paper/CoRTeC_summary.pdf) | The problem, the mechanism and the findings on two pages |
 
 ## What the paper finds
 
@@ -129,7 +128,7 @@ stored releases of every arm are deposited with the paper's Zenodo record, DOI 1
 | `tests/` | Their tests, offline |
 | `docs/` | The setup guide, the hybrid's guide, the design notes (the measurements behind the defaults) and the result format |
 | `examples/example.py` | A runnable tour of the three stages with no API key |
-| `paper/` | The paper, the deployment guide and the summary, with their sources and figures |
+| `paper/` | The paper and the deployment guide, with their sources and figures |
 | `research/` | The pipeline driver, the evaluator, the Stage C script, the membership-inference script, the dataset specifications and the frozen auto-configurations |
 | `research/controls/` | The paper's controls: the reference AIM and MST wrapper with its corrected sampler, the maximum-entropy decoder of a release alone and with the selection step, the one-shot control, the anonymisation of a release and its draws, the per-pair scorer and the three paper-protocol scorers |
 
