@@ -968,7 +968,12 @@ def release_subbin_values(spec: DatasetSpec, release: list, df: pd.DataFrame, *,
         v = pd.to_numeric(out[c], errors="coerce").values.astype(float); fin = np.isfinite(v)
         if not (scoped & fin).any():
             continue
-        is_int = bool(np.all(np.mod(v[fin], 1) == 0))
+        # Integer-valued columns: decided from the PUBLIC bins and bounds (all integral) together with the
+        # majority of the pool's values, not from every value. Deciding it from every value let a single
+        # model-written "45.0" or "37.5" turn a whole integer column into real re-draws (2026-10-23,
+        # backbone study: fractional ages, hours and capital values in the delivered draws).
+        _edges_int = bool(np.all(np.mod(edges, 1) == 0)) and bool(np.all(np.mod(np.asarray(spec.feature_bounds[c], float), 1) == 0))
+        is_int = _edges_int and bool(np.mean(np.mod(v[fin], 1) == 0) >= 0.5)
         b = np.clip(np.digitize(v, edges[1:-1]), 0, len(edges) - 2)
         lo = edges[b].copy(); hi = edges[b + 1].copy()
         if c in bands:

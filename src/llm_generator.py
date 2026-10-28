@@ -22,6 +22,7 @@ import os
 import re
 import time
 import random
+import threading
 from typing import Literal
 
 import numpy as np
@@ -307,7 +308,8 @@ class LLMSyntheticGenerator:
             "gpt-4o":         (2.5, 10.0),
             "gemini-3-flash": (0.3,  2.5),       # no longer on the price page; kept as last listed
             "gemini-3.1-flash": (0.3, 2.5),      # no longer on the price page; kept as last listed
-            "gemini-3.5-flash": (1.5, 9.0),      # was wrongly carried at the 2.5 Flash rate until 2026-10-08
+            "gemini-3.5-flash": (0.75, 3.75),    # since 2026-10-08 Google routes this id to gemini-3.6-flash and bills at its
+                                                 # introductory rate (changelog 2026-10-08; was (1.5, 9.0) as the real 3.5 Flash)
             "gemini-3.6-flash": (0.75, 3.75),    # introductory rate to 2026-12-31, then (1.5, 7.5)
             "gemini-3.7-flash": (0.75, 3.75),    # introductory rate to 2026-12-31, then (1.5, 7.5)
             "gemini-3.8-flash": (0.75, 3.75),    # introductory rate to 2026-12-31, then (1.5, 7.5)
@@ -340,6 +342,10 @@ class LLMSyntheticGenerator:
         self._last_api_error: str | None = None
         self._total_rows = 0
         self._total_rows_requested = 0   # denominator for the yield guard
+        # One lock for the call accounting: with cohorts on parallel threads the counters above are
+        # read and written from several threads, and the yield guard must only ever see rows from
+        # calls that have returned (a dispatched call has requested rows but no usable rows yet).
+        self._acct_lock = threading.Lock()
         self._n_rows_out_of_bounds = 0   # rows rejected for leaving the public domain
         # Every successfully parsed frame is kept here so that rows we have already paid for
         # survive an abort. Losing them would waste exactly the credits the guard exists to save.
@@ -663,9 +669,9 @@ class LLMSyntheticGenerator:
                 raise ValueError("prior rows need a `_source` column naming the cohort they were generated for")
             print(f"  resuming from {len(prior)} previously generated rows "
                   f"({prior['_source'].nunique()} cohorts)")
-        for ci, (cs, n_rows) in enumerate(zip(cohort_stats_list, alloc)):
-            if n_rows <= 0:
-                continue
+        def _run_cohort(ci, cs, n_rows):
+            """One cohort, start to finish: its resumed rows, its own quota closure and RNG, its own
+            sequence of calls. Identical whether it runs on the main thread or on a worker thread."""
             _lbl0 = cs.get("cohort_name", f"cohort-{cs['cohort_id']}")
             _src = f"{label_prefix}/{_lbl0}" if label_prefix else _lbl0
             prior_c = pd.DataFrame()
@@ -690,7 +696,7 @@ class LLMSyntheticGenerator:
                 def _absorb(df, _cs=cs, _done=_done):
                     # per column and per outcome, so each batch asks for what each class still owes
                     _ac(_done, _ec(self.spec, _cs, df))
-                self._quota_absorb = _absorb
+                _cohort_absorb = _absorb
                 if len(prior_c):
                     _absorb(prior_c)        # the resumed rows count against this cohort's quotas
                 prompt = lambda b, _cs=cs, _t=_target, _d=_done: _cp(self.spec, _cs, n_rows=b, quotas=_rq(self.spec, _t, _d, b, _rng))
@@ -700,7 +706,7 @@ class LLMSyntheticGenerator:
             else:
                 prompt = build_cortec_prompt(cs, n_rows=min(self.rows_per_call, int(n_rows)))
             if not (self.spec and getattr(self, "quota", False)):
-                self._quota_absorb = None
+                _cohort_absorb = None
             _lbl = cs.get("cohort_name", f"cohort-{cs['cohort_id']}")
             if len(prior_c):
                 # the resumed rows are part of this run's output and of its partial record, so a
@@ -713,6 +719,7 @@ class LLMSyntheticGenerator:
                     prompt,
                     n_rows=need,
                     label=f"{label_prefix}/{_lbl}" if label_prefix else _lbl,
+                    absorb=_cohort_absorb,
                 )
             else:
                 df = pd.DataFrame(columns=prior_c.columns)
@@ -722,7 +729,30 @@ class LLMSyntheticGenerator:
             if len(df):
                 df = df.copy()
                 df["_cohort_id"] = cs["cohort_id"]
-            frames.append(df)
+            return df
+
+        jobs = [(ci, cs, int(n_rows)) for ci, (cs, n_rows) in enumerate(zip(cohort_stats_list, alloc)) if n_rows > 0]
+        workers = int(getattr(self, "cohort_workers", 1) or 1)
+        if workers > 1 and len(jobs) > 1:
+            # cohorts are independent of one another (own quota targets, own RNG, own call sequence), so
+            # they may run on parallel threads; the frames are joined in cohort order exactly as the
+            # sequential loop would. A spend-guard abort in any thread stops the others before their
+            # next call and is re-raised here so the partial-row save handler runs as before.
+            import threading
+            from concurrent.futures import ThreadPoolExecutor
+            self._stop_event = threading.Event()
+            print(f"  cohorts run {workers} at a time on parallel threads (calls within a cohort stay sequential)", flush=True)
+            def _guarded(job):
+                try:
+                    return _run_cohort(*job)
+                except BaseException:
+                    self._stop_event.set()
+                    raise
+            with ThreadPoolExecutor(max_workers=workers) as ex:
+                frames = list(ex.map(_guarded, jobs))
+            self._stop_event = None
+        else:
+            frames = [_run_cohort(*job) for job in jobs]
 
         combined = pd.concat(frames, ignore_index=True)
         print(f"  CoRTeC total valid rows: {len(combined)}")
@@ -735,28 +765,48 @@ class LLMSyntheticGenerator:
         prompt: str,
         n_rows: int,
         label: str,
+        absorb=None,
     ) -> pd.DataFrame:
-        """Repeatedly call the LLM until we accumulate n_rows valid rows."""
+        """Repeatedly call the LLM until we accumulate n_rows valid rows.
+
+        `absorb` is the cohort's own quota-absorbing callback (exact per-batch counts). It is passed
+        explicitly so that cohorts generated on parallel threads never share one callback; when it is
+        None the instance-level `_quota_absorb` set by the single-threaded paths is used, as before.
+        """
+        if absorb is None:
+            absorb = getattr(self, "_quota_absorb", None)
         frames: list[pd.DataFrame] = []
         attempts = 0
         max_attempts = (n_rows // self.rows_per_call + 1) * self.max_retries
 
         while sum(len(f) for f in frames) < n_rows and attempts < max_attempts:
+            _stop = getattr(self, "_stop_event", None)
+            if _stop is not None and _stop.is_set():
+                break           # another cohort's thread tripped the spend guard; stop before a new call
             attempts += 1
             # what this particular call asks the model for — the yield guard scores against this,
             # never against rows_per_call (see _checkpoint)
             still_needed = n_rows - sum(len(f) for f in frames)
             b = min(self.rows_per_call, max(int(still_needed), 1))
-            self._total_rows_requested += b
             # a callable prompt is rebuilt per call (exact per-batch counts); a string is reused
-            raw_text = self._call_llm(prompt(b) if callable(prompt) else prompt)
+            _ptxt = prompt(b) if callable(prompt) else prompt
+            # Keep the prompt as sent when asked (CORTEC_PROMPT_LOG names a file): pairs with the parse-failure
+            # dump below for reading a cohort whose responses fail to parse. Off by default.
+            _plog = os.environ.get("CORTEC_PROMPT_LOG")
+            if _plog:
+                with open(_plog, "a") as _fh:
+                    _fh.write(f"\n===== [{label}] call {attempts} ({self.backend}/{self.model}) prompt =====\n{_ptxt}\n")
+            raw_text = self._call_llm(_ptxt)
             df = self._parse_csv(raw_text)
-            self._n_calls += 1
-            self._window_calls += 1
-            if df is not None and len(df) > 0:
+            with self._acct_lock:
+              # the call has returned: its requested rows now join the yield denominator
+              self._total_rows_requested += b
+              self._n_calls += 1
+              self._window_calls += 1
+              if df is not None and len(df) > 0:
                 frames.append(df)
-                if callable(prompt) and getattr(self, "_quota_absorb", None):
-                    self._quota_absorb(df)      # the next batch asks for what is still owed
+                if callable(prompt) and absorb:
+                    absorb(df)      # the next batch asks for what is still owed
                 tagged = df.copy()
                 tagged["_source"] = label
                 self._partial_frames.append(tagged)
@@ -765,7 +815,7 @@ class LLMSyntheticGenerator:
                 self._total_rows += len(df)
                 print(f"  [{label}] call {attempts}: got {len(df)} valid rows "
                       f"(total {sum(len(f) for f in frames)})")
-            else:
+              else:
                 print(f"  [{label}] call {attempts}: parse failed — retrying …")
                 # Keep the raw text when asked, so a parse failure can be read rather than guessed at
                 # (a vendor returning prose, a markdown table, a refusal or an empty body all print the
@@ -775,7 +825,7 @@ class LLMSyntheticGenerator:
                     with open(_dump, "a") as _fh:
                         _fh.write(f"\n===== [{label}] call {attempts} ({self.backend}/{self.model}) =====\n"
                                   f"{(raw_text or '<empty>')[:4000]}\n")
-            if self._window_calls >= self.CHECK_EVERY:
+              if self._window_calls >= self.CHECK_EVERY:
                 self._checkpoint()
             time.sleep(0.5)  # polite rate limiting
 

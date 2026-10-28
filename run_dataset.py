@@ -105,6 +105,7 @@ def stage_generate(spec, a, out: Path):
     # different run seeds still apportion the same cohort targets, so every model sees the same counts
     gen.quota_seed = a.seed if getattr(a, "quota_seed", None) is None else int(a.quota_seed)
     gen.quota_by_class = not bool(getattr(a, "no_quota_by_class", False))
+    gen.cohort_workers = int(getattr(a, "cohort_workers", 1) or 1)
     if getattr(a, 'effort', None):
         # Each vendor spells "think less" differently (see run_cortec_gen.py): GPT-5 at its
         # default spent 93% of its output on reasoning, 14.5x the cost per draw of minimal.
@@ -320,6 +321,8 @@ def main():
                          "default, in cohorts that carry class blocks, the counts are also stated per outcome "
                          "(the positives' rows per bin from the positive block, the negatives' from the negative "
                          "block), so the class-specific marginals are enforced, not only read")
+    ap.add_argument("--cohort-workers", type=int, default=1,
+                    help="cohorts generated on this many parallel threads (scheduling only: every cohort keeps its own sequence of calls, prompts, counts and seed; default 1 = sequential)")
     ap.add_argument("--quota", action="store_true",
                     help="cohort-wise path: give every batch exact per-column counts apportioned "
                          "from the release instead of shares to match")
