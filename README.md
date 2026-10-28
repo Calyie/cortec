@@ -128,7 +128,7 @@ stored releases of every arm are deposited with the paper's Zenodo record, DOI 1
 | `tests/` | Their tests, offline |
 | `docs/` | The setup guide, the hybrid's guide, the design notes (the measurements behind the defaults) and the result format |
 | `examples/example.py` | A runnable tour of the three stages with no API key |
-| `paper/` | The paper and the deployment guide, with their sources and figures |
+| `paper/` | The paper and the deployment guide as PDFs, with the figures |
 | `research/` | The pipeline driver, the evaluator, the Stage C script, the membership-inference script, the dataset specifications and the frozen auto-configurations |
 | `research/controls/` | The paper's controls: the reference AIM and MST wrapper with its corrected sampler, the maximum-entropy decoder of a release alone and with the selection step, the one-shot control, the anonymisation of a release and its draws, the per-pair scorer and the three paper-protocol scorers |
 
