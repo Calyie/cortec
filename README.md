@@ -18,7 +18,7 @@ through an interface the institution does not control.
 | Document | What it is |
 |---|---|
 | [The paper](paper/CoRTeC_arxiv.pdf) | The mechanism, its privacy analysis, and the measurements with their controls (12 pages of main text, appendices A to G) |
-| [The deployment guide](paper/CoRTeC.pdf) | The architecture, the parameters, the full prompt, a checklist, the controls mapped to standards, the failure modes with their guards, and the cost (7 pages) |
+| [The deployment guide](paper/CoRTeC_deployment_guide.pdf) | The architecture, the parameters, the full prompt, a checklist, the controls mapped to standards, the failure modes with their guards, and the cost (7 pages) |
 
 ## What the paper finds
 

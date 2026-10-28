@@ -33,7 +33,7 @@ the settings that matter, and what to check before moving on.
 | 10. Troubleshooting | What each refusal means and what to change |
 | 11. Output and exports | One printed layout and one exportable record for every stage |
 
-Two further documents: the [deployment guide](../paper/CoRTeC.pdf) is the operational manual for
+Two further documents: the [deployment guide](../paper/CoRTeC_deployment_guide.pdf) is the operational manual for
 a regulated deployment (the architecture, the parameters, the full prompt, the checklist, the
 controls mapped to standards, the failure modes with their guards, and the cost), and
 [`design-notes.md`](design-notes.md) records the measurements behind the defaults.
@@ -542,7 +542,7 @@ with guard():            # the same, for one block (works in notebooks too)
 ```
 
 ```
-── CoRTeC 1.2.2 · Refused · Data Validation ────────────────────────────────────────────
+── CoRTeC 1.2.3 · Refused · Data Validation ────────────────────────────────────────────
   refused by  DataValidationError
   reason
     column 'income' is missing from the data. NO privacy budget was spent.
