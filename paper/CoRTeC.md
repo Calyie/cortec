@@ -8,7 +8,7 @@
 </div>
 
 <div class="abstract">
-<p><b>Scope.</b> This guide covers what a team needs to deploy CoRTeC: the trust boundary and what crosses it, the reference implementation and its surfaces, the parameters, the prompt, a checklist, the controls mapped to standards, the failure modes the implementation guards against, and the cost. The method, its privacy analysis and the measurements are in the paper (<a href="https://github.com/Calyie/cortec/blob/main/paper/CoRTeC_arxiv.pdf">CoRTeC_arxiv.pdf</a>). The implementation, the packages <code>cortec</code> and <code>cortec_hybrid</code> at version 1.2.0 under Apache-2.0, is in the same repository, <a href="https://github.com/Calyie/cortec">Calyie/cortec</a>, with the pipeline that produced the paper's CoRTeC arms.</p>
+<p><b>Scope.</b> This guide covers what a team needs to deploy CoRTeC: the trust boundary and what crosses it, the reference implementation and its surfaces, the parameters, the prompt, a checklist, the controls mapped to standards, the failure modes the implementation guards against, and the cost. The method, its privacy analysis and the measurements are in the paper (<a href="https://github.com/Calyie/cortec/blob/main/paper/CoRTeC_arxiv.pdf">CoRTeC_arxiv.pdf</a>). The implementation, the packages <code>cortec</code> and <code>cortec_hybrid</code> at version 1.2.1 under Apache-2.0, is in the same repository, <a href="https://github.com/Calyie/cortec">Calyie/cortec</a>, with the pipeline that produced the paper's CoRTeC arms.</p>
 </div>
 
 ## 1. Architecture
