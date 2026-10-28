@@ -1,33 +1,26 @@
 cff-version: 1.2.0
-title: "CoRTeC: Cohort-Conditioned Differentially Private Synthetic Tabular Data from a Frozen Language Model"
+title: "CoRTeC: A Differentially Private Release for Synthetic Tabular Data, Decodable With or Without a Language Model"
 message: "If you use this software or the accompanying paper, please cite it."
 type: software
 license: Apache-2.0
-version: "1.1.0"
-date-released: "2026-10-09"
+version: "1.2.0"
+date-released: "2026-10-28"
 doi: "10.5281/zenodo.22945315"
 repository-code: "https://github.com/Calyie/cortec"
 abstract: >-
-  Differentially private synthetic tabular data is worth producing only if a model trained on it
-  performs as one trained on the real records. The deployed marginal mechanisms, MST and AIM, were
-  built for marginal workloads and are evaluated on them; measured instead on this quantity, at
-  library defaults and ε = 2 on UCI Adult, their output trains models 0.14 to 0.17 AUC below a
-  same-size real sample. CoRTeC spends the privacy budget once, on a release built for a downstream
-  model, and trains nothing. Within publicly defined cohorts it publishes one Laplace histogram per
-  attribute and outcome class, and a table of target rates over disjoint cells, so conditional
-  structure costs one query per level. A frozen language model then decodes the release under exact
-  per-bin counts and selection from a pool. It never sees a private record, so generation is post-
-  processing: unlimited datasets at no further privacy cost. At ε = 2 and n = 300, no model trained
-  on CoRTeC's output separates from one trained on a real sample of the same size on census or
-  credit data, one tree model is 0.05 AUC short on clinical data, and 1-way marginal error is
-  within 0.005 of MST's on the first two and below it on the third. The gap lies largely in what is
-  released: giving MST and AIM a private conditional table recovers most of it at no change to
-  either mechanism. Four membership-inference attacks validated on a positive control reach at most
-  0.049 advantage against a permitted 0.762. Both criteria the field selects synthesisers on are
-  saturated: real data with its target permuted passes a 90% marginal-similarity bar, and a
-  language model given only column names passes aggregate downstream utility on a public benchmark.
-  Only conditional and subgroup measures, against a real-sample and a no-information floor,
-  separate a mechanism that transmits the institution's structure from one that recites a prior.
+  CoRTeC spends a differential privacy budget once, on a small release of class-conditional
+  histograms and a conditional outcome table inside publicly defined cohorts, and lets Private-PGM
+  or a frozen language model decode that release, the model under exact per-bin counts and a
+  selection step that returns the generated rows to the released cells. The model never sees a private record, so every draw is
+  post-processing of the release. The paper measures what each part of the design contributes: the
+  same release decoded by a maximum-entropy model with no language model, the schema with every
+  name replaced by a neutral token, the reference implementations of AIM and MST, and three recent
+  methods under their own protocols. The release carries the fidelity and the
+  utility; the language model adds plausibility driven by the column names; the reference AIM is
+  ahead on pairwise fidelity and, for the fixed-rule release at larger sample sizes, on utility, and
+  level with or behind the auto-configured release decoded with no model; what survives every control
+  is the privacy architecture. This repository holds the Apache-2.0 reference implementation with its
+  tests, the research pipeline, the papers and the frozen auto-configurations.
 authors:
   - family-names: "Nnona"
     given-names: "Calister"

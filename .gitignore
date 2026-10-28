@@ -3,7 +3,7 @@
 *.env
 .env
 
-# Environment and caches
+# Environment, build and caches
 venv/
 .venv/
 __pycache__/
@@ -13,13 +13,12 @@ __pycache__/
 build/
 dist/
 
-# Datasets are fetched from public sources on first use and cached here, with row-count
-# validation. Regenerable, and not ours to redistribute.
-data/
+# Datasets are fetched from public sources on first use and cached here; not ours to redistribute.
+research/data/
 
 # Run output is not published. The one exception is the frozen auto-configurations, which the
 # *_auto dataset specifications load by file and must never re-derive.
-results/*
-!results/autoconfig/
-results/autoconfig/*
-!results/autoconfig/*.json
+research/results/*
+!research/results/autoconfig/
+research/results/autoconfig/*
+!research/results/autoconfig/*.json

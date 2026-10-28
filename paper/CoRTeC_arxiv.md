@@ -1,5 +1,5 @@
 <!-- math: on -->
-# CoRTeC: Cohort-Conditioned Differentially Private Synthetic Tabular Data from a Frozen Language Model
+# CoRTeC: A Differentially Private Release for Synthetic Tabular Data, Decodable With or Without a Language Model
 
 <div class="authors">
 <p><b>Calister Nnona</b></p>
@@ -8,1238 +8,657 @@
 </div>
 
 <div class="abstract">
-<p><b>Abstract.</b> Differentially private synthetic tabular data is worth producing only if a model trained on it performs as one trained on the real records. The deployed marginal mechanisms, MST and AIM, were built for marginal workloads and are evaluated on them; measured instead on this quantity, at library defaults and ε = 2 on UCI Adult, their output trains models 0.14 to 0.17 AUC below a same-size real sample. CoRTeC spends the privacy budget once, on a release built for a downstream model, and trains nothing. Within publicly defined cohorts it publishes one Laplace histogram per attribute and outcome class, and a table of target rates over disjoint cells, so conditional structure costs one query per level. A frozen language model then decodes the release under exact per-bin counts and selection from a pool. It never sees a private record, so generation is post-processing: unlimited datasets at no further privacy cost. At ε = 2 and n = 300, no model trained on CoRTeC's output separates from one trained on a real sample of the same size on census or credit data, one tree model is 0.05 AUC short on clinical data, and 1-way marginal error is within 0.005 of MST's on the first two and below it on the third. The gap lies largely in what is released: giving MST and AIM a private conditional table recovers most of it at no change to either mechanism. Four membership-inference attacks validated on a positive control reach at most 0.049 advantage against a permitted 0.762. Both criteria the field selects synthesisers on are saturated: real data with its target permuted passes a 90% marginal-similarity bar, and a language model given only column names passes aggregate downstream utility on a public benchmark. Only conditional and subgroup measures, against a real-sample and a no-information floor, separate a mechanism that transmits the institution's structure from one that recites a prior.</p>
+<p><b>Abstract.</b> Differentially private synthetic tabular data is made today by marginal mechanisms, which choose their workload on the private rows and ship a fitted model, or by language models fine-tuned or driven under the budget, which weld the model to the mechanism that spends it, so that what the model contributes cannot be measured. CoRTeC fixes the workload before the data is seen and spends the budget once, on a release built for a downstream classifier: class-conditional histograms and a conditional outcome table inside publicly defined cohorts, shipped as an auditable artefact of counts. Every decoder is post-processing: Private-PGM at no cost, or a frozen language model under exact per-bin counts and a selection step, never seeing a private record. We measure what each part contributes with four controls: the release decoded with no language model, alone and with the selection step; the schema with every name replaced by a neutral token; one-shot rows written from the column names with no release; and the reference implementations of AIM and MST, beside three recent methods under their own protocols. The release carries the fidelity and the utility: decoded with no model it matches the language-model arms, and auto-configured it is level with or ahead of the reference AIM on utility over three splits, ahead on single columns and behind on pairs at the larger size. The language model adds plausibility driven by the column names: it repairs the pairs it recognises, invents those it expects, loses its edge when the names are neutral, and without the release recites the public file. What survives every control is the privacy architecture: one release serves unlimited draws, the backbone can be replaced at no privacy cost, the strongest membership attack reaches a small fraction of the permitted advantage, and no synthetic row copies a training row.</p>
 </div>
 
 ## 1. Introduction
 
-An institution that holds sensitive tabular data usually wants three things its obligations forbid. It wants to train a model outside its own perimeter; to give a realistic sample to a partner or a vendor; and to let researchers work on the problem without working on the people. Synthetic data with a differential privacy guarantee [13, 14] is the accepted way to do all three. Whether it is worth doing depends on one question: if I train on the synthetic data instead of the real data, how much accuracy do I lose?
+An institution that holds sensitive tabular data wants to train models outside its own perimeter, hand realistic samples to partners and let researchers work on the problem without working on the people. Differentially private synthetic data [14, 15] is the accepted way to do all three. Two families of methods compete for the task. Marginal methods such as MST [27] and AIM [28] measure low-order marginals under the budget and fit a graphical model to them; a recent benchmark finds them the utility leaders on five datasets [10]. Methods built on language models fine-tune a pretrained model on the private rows under DP-SGD [1, 3, 38] or drive a model through its inference interface by privately scoring its candidates [24, 43]; Tab-PE keeps that private vote and replaces the model with variation operators [39]. The benchmark excludes the language-model family on purpose, because a model pretrained on public corpora may already know the public benchmarks it is evaluated on [10]; Swanberg et al. find that one-shot records from a strong model, treated as public data, help no more than uniform data on the marginal workloads of Adult [37].
 
-The mechanisms an institution can deploy today do not answer that question in their own papers. The marginal-based synthesisers MST [28] and AIM [29] are evaluated on marginal workload error, the error in the distributions of single columns and of small groups of columns. They attain low error on that measure, and they were built for published tables and contingency reports rather than for training models.
+Neither family fixes its workload before the data is seen. The marginal methods choose their marginals adaptively on the private rows and ship a fitted model whose structure is that choice, so a change of workload is a new run on the private rows; the fine-tuning methods put the private rows on the training hardware and spend the budget on every gradient step, so a change of model is a new training run; the inference-interface methods spend budget on every round of candidates. In none of them can the budget be spent once on counts chosen in advance and those counts decoded again, by another team, on another model, at no further cost. And in none of them can what the language model contributes beyond the private statistics be measured, because the model is welded to the mechanism that spends the budget: a fine-tuned model cannot be separated from the DP-SGD run that produced it, and a model driven through its interface spends the budget on its own rounds.
 
-The generative models trained under differential privacy [24, 38, 49] are evaluated on downstream utility, the accuracy of a model trained on the synthetic data and tested on real data. On Adult at ε = 2 they do not preserve the target's base rate.
+CoRTeC's contribution is a release built for a downstream classifier, decodable by any means. It spends the budget once, on that release: inside cohorts formed by a public rule it publishes one Laplace histogram per attribute and outcome class, a noisy class balance and cohort size, and a table of outcome rates over disjoint cells. A frozen language model then reads that release, and nothing else, and writes rows that carry exactly the per-bin counts it is asked for; a pool of such rows is raked and refined to the released cells; values below bin resolution are redrawn inside their released bins. Generation is post-processing: it spends no budget, can be repeated without limit and can run on any model, including one reached through an interface the institution does not control; and because the model is a swappable, budget-free component, the same release can be decoded by a frozen model, by a model that knows nothing of the column names, or by no model at all, which is what lets this paper measure what the model adds.
 
-The methods that do reach real-data utility fine-tune a language model on the records [5, 45]. They either carry no privacy guarantee or train on the private data under DP-SGD [1], gradient descent with clipped and noised updates. DP-SGD is expensive, and it places the private data on the training hardware. PATE [35, 36], an ensemble of teachers trained on disjoint shards of the private data whose noised votes label a public dataset, would avoid that. But it needs a public transfer set drawn from roughly the same distribution as the private data, and where privacy matters most, in a hospital's encounter records or a bank's default history, no such set exists.
+This paper measures what that design contributes, with the controls that the field's objection to language-model methods requires. The first control decodes the same release with a maximum-entropy model and no language model. The second renames every column, category and label of the schema so that the model's knowledge of Adult cannot act. The third is the reference implementation of AIM and MST on the same split and the same public bins, fitted with a stable inference oracle and a consistency check, and sampled with the corrected sampler. The fourth is the comparison with DP-2Stage [3], DP-LLMTGen [38] and Tab-PE [39] under each paper's own protocol. Two further controls complete the square over the release and the model: the decoder's own pool passed through the selection step, and one-shot rows written from the column names with no release. Every comparison reports fidelity and utility in the same table, against a real sample of the same size, a no-information floor and a train-on-real ceiling, and the central cells are replicated on three splits with three fresh releases.
 
-A practitioner therefore chooses between two options. One is a mechanism that optimises low-order marginals rather than the structure a downstream model needs. The other is a large language model asked to invent plausible records. That is fast and needs no privacy accounting, but the model knows nothing about the institution's data.
+**Findings.** The release carries the result: decoded with no language model it is level with CoRTeC on single columns at every seed on both datasets and on utility on Adult, ahead of it on NHANES, and at the real sample's floor on single columns on a third dataset (Section 6). Against the reference AIM the fixed-rule release trades pairs for the conditionals it budgets for, and the auto-configured release, decoded with no model and the selection step, is level with or ahead of AIM on utility at both sizes over three splits, ahead on single columns and behind on pairs at the larger size. The language model's contribution is label-driven plausibility: it repairs the logical pairs it recognises, invents dependences between near-independent columns, loses its edge on pairs and utility under neutral names, and with no release recites the public file into most of its output; the single-column edge that survives neutral names is the selection step's, which a model-free pool gets as well. The DP fine-tuning family and Tab-PE are behind on fidelity at the same budgets.
 
-**CoRTeC.** CoRTeC separates two things every other method does together: spending the privacy budget and producing records. First it spends the budget, once, on a statistics release. The release contains:
+What survives every control is the privacy architecture. No private row reaches the model; one release serves unlimited draws; the backbone can be replaced at no privacy cost, and a ladder of four backbones shows capability improving formatting reliability and single-column fidelity and nothing else; the strongest membership attack on any arm reaches a small fraction of the advantage the budget permits; no synthetic row in any arm is a copy of a training row; and although the served Gemini backbone reproduces the head of the Adult file verbatim when prompted with its header, no memorised row appears in any draw.
 
-- cohorts (groups of records) formed by a public stratification rule, meaning bands of one or two attributes fixed before the data is seen;
-- one differentially private histogram per attribute and per outcome class inside each cohort;
-- a private class balance (the share of each outcome) and a private cohort size; and
-- a private table of target rates over the cells of a conditional hierarchy, meaning nested subgroups defined by one, two or three attributes, each subgroup being a cell.
+**Contributions.**
 
-Then a frozen, un-finetuned language model reads that release, and nothing else, and writes records that match it. Each batch is told the exact number of rows it must produce per bin, per category and per outcome. From a pool of generated rows, the pipeline keeps the rows whose cell counts match the release. Wherever the release describes the class shape at bin resolution, the kept values are redrawn inside their released bins.
+- A control that separates the release from the model: a maximum-entropy decoder of CoRTeC's own release, which shows that the release is a competitive differentially private synthesiser by itself, level with or ahead of the reference AIM on utility once auto-configured, and gives every language-model number in the paper its reference point.
+- A schema-anonymisation control that shows which part of a language model's contribution is knowledge of the column names, in the form DP-LLMTGen's feature-name experiment used from the other side [38].
+- A comparison against the reference AIM and MST and against DP-2Stage, DP-LLMTGen and Tab-PE on one split and under their own protocols, with fidelity and utility in the same table, floors and ceiling in every table, and replication over three splits and three releases.
+- The mechanism itself, with its privacy analysis as five composition steps, the selection step (a post-processing operator that takes any decoder's pool to the released cells and accounts for most of the model-free margin), two reference implementations, and the measurements a deployment needs: membership inference validated on a positive control, distance to closest record, a memorisation test of the served backbone, and the cost per thousand rows.
 
-This design has four consequences, and they are the reasons to use it.
+A companion [deployment guide](https://github.com/Calyie/cortec/blob/main/paper/CoRTeC.pdf) carries the operational material: the reference architecture, the guardrails, the failure modes met while building the method and the test that carries each one's name.
 
-*The privacy argument is small.* The generator never sees a private record, so its work is post-processing of a differentially private release: a computation on the release alone, which adds no privacy cost. The privacy analysis therefore reduces to the release, which is a composition of counting queries.
+## 2. Related Work
 
-*Generation costs no privacy and can run anywhere.* Any number of datasets can be drawn from one release at no further privacy cost, and the model can be a tenant-isolated enterprise endpoint or an air-gapped local model with the same guarantee.
+**Marginal methods.** PrivBayes [46], MST [27], PrivMRF [7] and AIM [28] select low-order marginals under the budget and fit a graphical model with Private-PGM [26]. MST won the 2018 NIST challenge, whose entries Bowen and Snoke compare on marginal, joint and correlation measures [6]; AIM selects marginals adaptively and is the strongest of the family. The benchmark of Chen et al. [10] finds AIM and PrivMRF the utility leaders over five datasets and three budgets, with machine-learning efficacy, 3-way query error and 2-way total variation as its measures; the earlier benchmark of Tao et al. [36] reached the same ordering against the generative methods of its day. Our reference AIM and MST rows are the authors' private-pgm implementation on our public bins.
 
-*The budget goes to the structure a classifier needs, and it goes there cheaply.* A downstream model needs the conditional structure and the per-class shape of each attribute. Histograms have sensitivity 1 regardless of resolution, and disjoint cohorts and cells compose in parallel, so the release carries that structure at 6.7× more budget per statistic than the moment-based implementation this method replaced: private clustering for cohorts, a mean and a standard deviation per attribute, and basic composition across cohorts (Section 4.8).
+**Generators trained under differential privacy.** DP-GAN [44] and DP-CTGAN [32] train a generative adversarial network, CTGAN [42] in the latter case, under DP-SGD [1]; PATE-GAN [22] trains it under PATE [30, 31]; DP-TBART [8] trains an autoregressive transformer under DP-SGD and reaches the marginal methods' level on most of its datasets; DP-TLDM [47] trains a latent diffusion model the same way. The evaluations above find the adversarial and diffusion generators behind the marginal methods on tabular data, and we carry them as citations rather than as rows.
 
-*No statistician is needed.* An auto-configurator chooses the cohorts and the hierarchy from the schema and the budget.
+**Language models fine-tuned on the private rows.** GReaT [5] serialises each row as "column is value" text and fine-tunes GPT-2 with no privacy guarantee. DP-LLMTGen [38] fine-tunes Llama-2 7B in two stages, format learning on random tables and DP-SGD on the private rows with a loss that weights the value tokens, and finds that meaningful feature names help the fine-tuned model. DP-2Stage [3] fine-tunes GPT-2 the same way, with a pseudo-data stage first, and reports AIM ahead of it on Adult. In each the private rows reach the training hardware and the budget is spent on per-sample gradients over every epoch.
 
-**What we find.** We test at ε = 2, where ε is the privacy budget and smaller is stronger, and at n = 300, on three datasets: census, finance, and a national health examination survey.
+**Methods that keep the model frozen.** Private Evolution [24] and its text version [43] generate candidates from a foundation model, let the private records vote for their nearest candidates under a Gaussian mechanism, and iterate; Tab-PE [39] replaces the model with heuristic variation operators and shows that marginal methods cannot carry high-order correlations that the standard benchmarks do not test. Swanberg et al. [37] adapt Private Evolution to tabular data and also try one-shot generation from column names alone, used as public data inside a marginal mechanism; neither beats the marginal baselines on Adult, and their one-shot rows carry 1-way marginals but not pairs. Private Evolution with a foundation model in the loop is therefore the published negative result on tabular data [37]; its tabular successor, which replaces the model with variation operators [39], is run here, as is the one-shot arm, and we do not contest the earlier finding. CoRTeC differs from both in what the model is given: a differentially private release of conditional statistics, which the selection step then enforces. Two hybrids lie between the families: Swanberg et al. place language-model rows as public data inside a marginal mechanism [37], and the hybrid released with this paper relabels a marginal synthesiser's output with a differentially private conditional table (deployment guide). Table 1 states the properties.
 
-On fidelity, CoRTeC's 1-way marginal error, the error in each single column's distribution, is within 0.005 of MST's on Adult and finance, and below it on NHANES. It is below the error of a real sample of the same size, and below AIM's, on every dataset. Its 2-way error, over pairs of columns, is below both marginal methods' on every dataset.
+**Table 1:** What each method needs. The budget column says where the privacy loss is incurred.
 
-On utility, no student separates from the real-sample floor on Adult or finance at three draws each, and the powered six-draw test is Adult's, on the earlier release; on NHANES the random forest is 0.049 short (p = 0.033 before correction), gradient boosting 0.036 (p = 0.10) and logistic regression 0.035 (p = 0.32). The floor is the accuracy of a model trained on a real sample of the same size. The linear model is above it on Adult and within 0.006 of it on finance. Measured on this deliverable, models trained on AIM's and MST's output at library defaults score 0.02 to 0.18 lower in AUC, the area under the ROC curve, which is the utility measure used throughout. Of 35 comparisons against AIM and MST on Adult and finance, corrected for multiple testing with Holm's procedure, 29 favour CoRTeC, none favours a baseline, and six do not separate. AIM keeps the lowest error on its own 3-way workloads, sets of three-column marginals, at adequate sample size, which its design predicts.
+| method | model weights | private rows seen by | public or side data | budget spent on | adaptive rounds | backbone swap |
+|---|---|---|---|---|---|---|
+| CoRTeC | no; any inference interface | Stage A only; the model never sees a row | column names and value lists | one release of counts, composed once | none | at no privacy cost |
+| AIM, MST | none | the measured marginals | public domains and bins | measured marginals; AIM selects adaptively | AIM yes | not applicable |
+| DP-2Stage | GPT-2, full fine-tune | the DP-SGD trainer | pseudo data (uniform over private ranges, or a public table) | per-sample gradients, every step | yes | retrain |
+| DP-LLMTGen | Llama-2 7B, LoRA | the DP-SGD trainer | random tables from names, categories and ranges | per-sample gradients, every step | yes | retrain |
+| Tab-PE | none | the nearest-neighbour histogram, every iteration | numerical bounds; class counts | Gaussian noise on the histogram, 15 to 30 rounds | yes | not applicable |
+| one-shot records [37] | no | none by the model; the downstream mechanism | column names and types | inside the downstream mechanism | depends | at no privacy cost |
 
-Two results corrected our own framing. A private relationship forced into the data survives MST essentially perfectly (slope 0.998 on Diabetes 130, 0.946 on NHANES), so the marginal methods' utility gap is not an inability to carry conditional structure: on NHANES, the one dataset with both measurements, MST carries the forced rate and still trains the random-forest student 0.082 AUC below a real sample's. On Adult their loss is measurable instead as a 2.2 to 2.8× inflation of pairwise feature dependence relative to real data of the same size; CoRTeC inflates it by 1.24×.
+## 3. Preliminaries and Privacy Model
 
-The second result is that CoRTeC's own conditional fidelity, how closely the outcome rate within each subgroup matches the private data, is decided by whether reasoning is enabled in the generator, the model's option to think through a request before answering. That single flag changes conditional error by a factor of 3.8, and downstream AUC does not detect the change. This finding has a methodological consequence, developed in Section 6.3: both criteria the field selects synthesisers on, marginal similarity and aggregate downstream utility, are saturated. A known-useless dataset passes the first, and on a public benchmark an ungrounded language model passes the second.
+A dataset $D$ is a multiset of $n$ records over attributes $A = A_{num} \cup A_{cat}$ and a binary target $y$. Each attribute has a public domain, an interval for a numerical attribute and a finite value set for a categorical one, and public bin edges partition each numerical domain. $M_a(D)$ is the histogram of attribute $a$ over its bins; for a cell $c$ of the record space, $k_c(D)$ is the number of records in $c$ with $y = 1$. Two datasets are neighbours if one is obtained from the other by adding or removing one record.
 
-**Contributions.** In summary, this paper makes the following contributions.
+**Definition 1 (Differential privacy [14]).** *A randomised mechanism $\mathcal{M}$ is ε-differentially private if for all neighbours $D, D'$ and all sets $S$ of outputs, $\Pr[\mathcal{M}(D) \in S] \le e^{ε} \Pr[\mathcal{M}(D') \in S]$.*
 
-- A privacy-budget allocation that makes conditional structure cheap. Public stratification costs nothing; histograms replace moment queries; one histogram block per outcome class costs what one pooled block does; and parallel composition, under which statistics on non-overlapping groups each spend the full budget rather than sharing it, applies across disjoint cohorts and cells. The result is 6.7× more budget per released statistic than the moment-based implementation it replaced, at unchanged ε; Section 4.8 states the comparison, which is not against MST or AIM.
-- A decoding stage that reaches the release's own fidelity without spending budget: exact-count batches, selection from a threefold pool by raking and refinement over every released cell, and a sub-bin rule that makes values inside released bins the release's own (Sections 4.4 and 4.5).
-- A head-to-head against the deployed mechanisms that reports fidelity and utility in the same table, against a real-sample floor and a no-information floor (a real sample of the same size, and the same data with its target permuted), with Holm-corrected families of tests (Section 6.1).
-- Evidence that the two standard acceptance criteria are saturated, a concrete replacement criterion, and a matched control that separates a mechanism reading a release from one reciting its prior (Section 6.3); the controls that answer the reproducibility and contamination objections to a closed-weight generator are stated before the results (Section 5.6).
-- A transmission test, which asks whether a relationship planted in the private data reappears in the synthetic output, showing that whether a private conditional relationship survives synthesis differs between the two mechanism families we tested, MST and PATE-CTGAN, at the same guarantee (Section 6.4).
-- A utility transmission bound (Stage C): a budgeted, auditable bound on the gap between private and synthetic conditional rates, with floors and a ceiling built in and a refusal to report when it cannot discriminate (Sections 4.6 and 6.9).
-- Auto-configuration; a membership-inference evaluation, in which attacks that try to tell whether a record was in the private data are validated on a positive control of real records passed off as synthetic; a reference deployment architecture with the trust boundary located precisely; a catalogue of the measurement artefacts that produced wrong conclusions along the way; and two Apache-2.0 implementations that enforce the guarantees stated here in code (Sections 6.7, 6.10, 7 and 9, and Appendix C).
+The Laplace mechanism adds $\mathrm{Lap}(Δ/ε)$ noise to a function of L1 sensitivity $Δ$ and is ε-differentially private [14]. A histogram over any number of bins and a counting query both have $Δ = 1$. Mechanisms run on the same data compose sequentially, with budgets adding [15]; mechanisms run on disjoint parts of the data defined by a data-independent rule compose in parallel, at the largest of their budgets [29]; and any computation on the output of a private mechanism that does not read $D$ again is post-processing and adds nothing [15]. Definition 1 also bounds any membership adversary: no test for whether a record is in $D$ can have true-positive rate exceeding false-positive rate by more than $(e^{ε} - 1)/(e^{ε} + 1)$, which is 0.762 at ε = 2.
 
-A companion [technical report](https://github.com/Calyie/cortec/blob/main/paper/CoRTeC.pdf) contains every intermediate experiment, the per-dataset walkthroughs and the full defect catalogue. This paper reports the final mechanism and the evidence for it.
+**Threat model.** The adversary is computationally unbounded and sees everything that crosses the trust boundary: the release $R$, every synthetic dataset drawn from it, and the model's inputs and outputs. The institution's extract, the schema declaration and the release engine run inside its perimeter and are the only code that reads $D$. The generator, the selection step and every downstream use read $R$ and their own output only. Whoever operates the model, including a hostile endpoint, learns nothing that $R$ does not reveal, and $R$ is ε-differentially private.
 
-## 2. Background
+**Privacy model.** The guarantee is pure ε (δ = 0), central, under add/remove adjacency, and protects one row. On data with one row per person it protects a person; on encounter-level data the per-person guarantee weakens by the maximum number of rows one person contributes, and the reference implementation requires that maximum to be declared. Two quantities are treated as public, as in every marginal method: the attribute list with its domains and bins, and the stratification rule that forms the cohorts. Cohort sizes, class balances and cell supports are private counts and are released with noise, not assumed. The model's pretraining corpus is outside the guarantee: if a private record was in it, it was compromised before CoRTeC ran; we follow prior work in treating a public pretrained model as public [37, 40] and measure the one consequence that matters, whether anything memorised reaches a draw (Section 6).
 
-### 2.1 Data and histograms
+## 4. The Mechanism
 
-**Definition 1 (Dataset).** *A dataset $D$ is a multiset of $n$ records over a schema with attributes $A = A_{num} \cup A_{cat}$ and a binary target $y$. Each attribute $a$ has a public domain, an interval $[lo_a, hi_a]$ if numerical and a finite value set if categorical, and public bin edges $E_a$ partition each numerical domain into intervals.*
-
-**Definition 2 (Histogram and rate).** *$M_a(D)$ is the histogram of attribute $a$ over $E_a$, or over its value set if $a$ is categorical: a vector of counts, one per bin. For a cell $c$ of the record space, $k_c(D)$ is the number of records in $c$ with $y = 1$, and $\rho_c(D) = k_c(D) / |c|$ is the target rate in $c$.*
-
-A partition $\Pi$ of the record space induced by a rule over public domains assigns every record to one part, $\Pi(x)$, as a function of $x$ alone. Two properties of the schema are assumed public throughout, as in every marginal-based synthesiser: the attribute list and each attribute's domain bounds. No quantity derived from private values is used to choose bins, bands or cells. The one exception is the auto-configurator's column ranking, which is charged to the budget (Section 4.3).
-
-### 2.2 Differential privacy
-
-Two datasets $D, D'$ are neighbours if one is obtained from the other by adding or removing one record.
-
-**Definition 3 (Differential privacy [13]).** *A randomised mechanism $\mathcal{M}$ satisfies ε-differential privacy if for all neighbouring $D, D'$ and all sets $S$ of outputs,*
-
-$$ \Pr[\mathcal{M}(D) \in S] \le e^{ε} \cdot \Pr[\mathcal{M}(D') \in S]. $$ (1)
-
-**Proposition 1 (Laplace mechanism [13]).** *Let $f$ be a function of $D$ with L1 sensitivity $Δ = \max_{D, D'} \| f(D) − f(D') \|_1$. Then $f(D) + \mathrm{Lap}(Δ/ε)$, with the noise drawn independently per coordinate, satisfies ε-differential privacy.*
-
-A histogram over any number of bins has $Δ = 1$, because one record moves exactly one count by one. A counting query has $Δ = 1$ for the same reason. The mechanism is built on this fact: an entire distributional shape costs the same budget as a single count. The total error of a histogram still grows with its bin count, because every bin carries its own noise; what the sensitivity bound fixes is the budget, not the error.
-
-**Proposition 2 (Sequential composition [14]).** *If $\mathcal{M}_1, …, \mathcal{M}_k$ satisfy $ε_1, …, ε_k$-differential privacy and are run on the same data, their joint output satisfies $(Σ_i ε_i)$-differential privacy.*
-
-**Proposition 3 (Parallel composition [30]).** *If $D_1, …, D_k$ are disjoint subsets of $D$ defined by a data-independent rule and each $\mathcal{M}_i$ satisfies ε-differential privacy on $D_i$, the joint output satisfies ε-differential privacy.*
-
-**Proposition 4 (Post-processing [14]).** *If $\mathcal{M}$ satisfies ε-differential privacy and $g$ is any function, possibly randomised, that does not read $D$, then $g \circ \mathcal{M}$ satisfies ε-differential privacy.*
-
-Definition 3 also bounds any membership adversary. No test that decides whether a record is in $D$ can have a true-positive rate exceeding its false-positive rate, which is its advantage, by more than
-
-$$ \frac{e^{ε} − 1}{e^{ε} + 1}, $$ (2)
-
-which is 0.762 at ε = 2. We use this bound as the reference for the measured advantages of Section 6.10.
-
-### 2.3 Related work
-
-**Marginal and graphical-model methods.** PrivBayes [52], MST [28], PrivMRF [7] and AIM [29] select low-order marginals under differential privacy and fit a graphical model with Private-PGM [27]. MST won the 2018 NIST differential privacy synthetic data challenge [37]. AIM is workload-adaptive and is the strongest of these.
-
-Both MST and AIM are evaluated on marginal workload error. MST uses the NIST score at ε ∈ {0.3, 1, 8}; AIM uses normalised L1 workload error over all-3-way, target and skewed workloads. Neither paper reports a downstream predictive-utility experiment. We state this as a scope observation rather than a criticism: these mechanisms target a different objective and attain it, and Section 6.1 shows them doing so.
-
-The benchmark of Tao et al. [44], which does include a classification task, found the marginal methods ahead of the generative ones, and our Tables 3 to 5 reproduce that result for the baselines they share. A later benchmark by Chen et al. [10] reaches the same conclusion with a machine-learning utility score. It excludes language-model-based methods on the ground that their pretraining corpora would bias the evaluation, an objection Section 6.3 is designed to answer.
-
-**Generative models trained under differential privacy.** DP-GAN [49], PATE-GAN [24], and DP-CTGAN and PATE-CTGAN [38] apply DP-SGD or PATE [35, 36] to a generative model, the last two over the CTGAN architecture [50]. Rosenblatt et al. [38] evaluate downstream utility with train-on-synthetic, test-on-real (TSTR) against train-on-real. We adopt their protocol.
-
-**Language models for tabular data.** GReaT [5] fine-tunes a language model to emit rows and achieves high fidelity with no privacy guarantee, since the model memorises records. DP-LLMTGen [45] adds DP-SGD fine-tuning, which is private but expensive and still trains on the private data. DP-2Stage [3] reduces the cost of that fine-tuning by first training on public pseudo-data, but still trains on the private records. Curated LLM [39] uses a language model to augment small tabular datasets without a privacy guarantee, and conditions on the private data directly rather than on a release.
-
-**Private synthesis through model APIs.** The closest line of work to ours also keeps the foundation model frozen and reaches it only through an inference API. Private Evolution [26, 48] generates candidate records from the model, privately votes on which candidates lie nearest to the private records, and iterates; it spends privacy budget on every round of votes. Swanberg et al. [43] adapt it to tabular data with a workload-based distance and find that API access to a strong model does not by itself improve on the marginal baselines. Tran et al. [46] extend it with evolutionary operators and private scoring. Their one-shot variants treat the model's schema-only output as public data and spend the budget reweighting it to privately measured marginals, which is the nearest analogue to our selection step. The difference is that our release, not a later measurement, is what the model decodes, and the selection reads only that release.
-
-CoRTeC differs in where the budget goes and how often it is spent. It spends the budget once, on a statistics release that names the conditional structure a downstream model needs, and then treats the model as a decoder of that release under exact counts and selection. The model is therefore never in the privacy loop; any number of datasets can be drawn from one release; and the privacy analysis is a composition argument over counting queries rather than over rounds of private selection. Table 1 summarises the positioning.
-
-**Table 1:** Positioning. Every prior method except Private Evolution lets the generator see private data, and privacy depends on the mechanism that touches it: the training, or Private Evolution's votes. CoRTeC trains nothing: it releases private statistics once and lets a frozen model decode them, so the privacy argument is a post-processing argument over the release. The trade-off is explicit. Any structure the released statistics do not imply comes from the model's prior, which is the failure mode Section 6.4 is designed to detect.
-
-| method family | generator sees raw data? | where noise enters | utility in its own paper? | conditional structure |
-|---|---|---|---|---|
-| PrivBayes, MST, AIM, PrivMRF | yes (to fit) | selected marginals | no | only what the chosen marginals imply |
-| DP-GAN, DP-CTGAN | yes (DP-SGD) | gradients | partially | learned, degraded by clipping and noise |
-| PATE-GAN, PATE-CTGAN | yes (PATE on the discriminator) | teacher votes | yes | learned |
-| GReaT | yes (fine-tuning) | none; not private | yes | learned, memorised |
-| DP-LLMTGen, DP-2Stage | yes (DP-SGD fine-tuning) | gradients | yes | learned |
-| Private Evolution (API-only) | no (private votes over candidates) | each round's nearest-neighbour votes | yes | whatever the votes select; budget spent per round |
-| **CoRTeC (this work)** | **no** | released statistics only | yes | released explicitly: a private conditional table and one histogram block per outcome class |
-
-## 3. Problem Setting and Threat Model
-
-**The task.** Given a private dataset $D$ with a binary target, a public schema and a budget $ε_{total}$, produce a synthetic dataset $\hat{D}$ of any requested size such that:
-
-- (i) the whole procedure is $ε_{total}$-differentially private with respect to $D$; and
-- (ii) a model trained on $\hat{D}$ performs, on real held-out data (records no mechanism saw), as a model trained on a real sample of the same size would.
-
-We measure (ii) directly, as TSTR under three student models, the classifiers trained on the synthetic data, against a matched real sample. We always measure fidelity beside it, because a method can score well on one and poorly on the other.
-
-**The trust boundary.** Figure 1 shows where it lies. Everything to the left of the boundary runs inside the institution's regulated zone and touches private records: the extract, the schema declaration and the release engine. The only object that crosses the boundary is the release $R$, a set of noisy counts. The generator, the selection step, the evaluation and every downstream use run to the right of the boundary, and read $R$ and their own output only.
-
-Whoever operates the generator, including a hostile endpoint, learns nothing that $R$ does not already reveal, and $R$ is $ε_{total}$-differentially private. This is what lets the model be a vendor-hosted endpoint: the privacy argument holds against a hostile endpoint by construction, because the request carries only $R$. What does not hold against a hostile endpoint is the compliance argument, which rests on tenant isolation, private networking, data residency and a business associate agreement. Section 7 states those requirements.
-
-**The adversary.** For the guarantee, the adversary is unrestricted: Definition 3 bounds any function of the release and of everything derived from it. For the empirical evaluation of Section 6.10, the adversary sees $\hat{D}$ and a candidate record and must decide whether the record was in $D$. That measurement tests the implementation, not the mechanism, and cannot improve on the bound (2).
-
-**The privacy unit.** ε protects a row. On data with one row per person, $ε_{person} = ε_{row}$, which is the case for Adult, the credit dataset, NHANES and every other dataset we use except one. On encounter-level data with repeated individuals, group privacy weakens the per-person guarantee by the maximum number of rows one person contributes. Diabetes 130 has a mean of 1.42 rows per patient and a maximum of 40, so at $ε_{row} = 2$ its worst-case per-person guarantee is 80, outside any range normally considered meaningful. This is equally true of MST or AIM run on the same data at the same row-level ε. Every figure we report from that dataset is a row-level figure.
-
-The mitigation is a pre-processing step taken before the release, and its accounting is exact. Capping each person's contribution to their first $C$ rows discards data, and the estimand becomes the retained rows rather than every encounter. On Diabetes 130 at a matched $ε_{person} = 2$ it is 6.3× more accurate than aggregating to one row per person (conditional error 0.0123 against 0.0780). The reference implementations require the schema to declare the maximum rows per person, and refuse a declared unit whose $ε_{person}$ is vacuous unless the caller acknowledges it in the audit trail.
-
-**What the guarantee does not cover.** The frozen model's pretraining corpus is not part of it. If a private record was in that corpus, it was compromised before CoRTeC ran. Language models are known to reproduce training data even under benign prompting [2]. What CoRTeC guarantees is that the generator learns nothing about $D$ from CoRTeC; it cannot guarantee what the generator already knew. Section 6.3 measures the one consequence that would inflate our results, a prior that happens to be right about a public benchmark. Section 6.10 attacks the artefact the method publishes, which is where a memorised record would have to surface to cause harm.
-## 4. The CoRTeC Mechanism
-
-### 4.1 Overview
+CoRTeC has three stages (Figure 1). Stage A is the only code that reads $D$; it produces the release $R$. Stage B decodes $R$ with a frozen language model and a selection step, reading $R$ and its own output only. Stage C, optional and separately budgeted, bounds how far the synthetic conditional rates lie from the private ones.
 
 ![Figure 1](figures/fig01_pipeline.png){: .wide}
 
-**Figure 1:** CoRTeC. The privacy budget is spent once, in Stage A. Everything to the right of the dashed line, the generator and every post-processing step, sees only released statistics, so it contributes nothing to the privacy cost and may be repeated without limit.
+**Figure 1:** The privacy budget is spent once, in Stage A. Everything to the right of the dashed line reads only released statistics and may be repeated without limit.
 
-The mechanism has three stages.
-
-Stage A (Algorithm 1) is the only code that reads $D$. It partitions the record space into cohorts by a public rule. Inside each cohort of at least $n_{min}$ records it releases a noisy cohort size, a noisy class balance, and one noisy histogram per attribute and per outcome class. It then releases, for each level of a nested conditional hierarchy, a noisy positive count and a noisy size for every cell of at least $n_{min}$ records. The output is the release $R$.
-
-Stage B reads $R$ and nothing else. It:
-
-- allocates rows to cohorts by released size;
-- apportions exact per-bin counts from the released histograms;
-- asks a frozen language model for batches of rows that carry exactly the counts still owed (Algorithm 3);
-- generates a pool $k$ times larger than the requested size and keeps the $m$ rows whose cell counts best match $R$ (Algorithm 4); and
-- redraws each kept value uniformly inside its released bin wherever the release describes the class shape at that resolution.
-
-Stage C (Algorithm 5) is optional and spends a separately declared budget. It releases a Laplace estimate of each cell's private target rate and turns it into a simultaneous bound on how far the synthetic data's rates lie from the private ones. A deployment can then attach a quantified utility claim to a release package without exposing the private data.
-
-An auto-configurator (Algorithm 2) derives the cohort rule and the conditional hierarchy from the schema, the budget and the requested size, and charges the one step that reads private data.
-
-### 4.2 Stage A: the release
+### 4.1 Stage A: the release
 
 ```algorithm
 Algorithm 1: CoRTeC-Release
-Input: private $D$; public schema (domains, bin edges $E$, stratification rule $\Pi$, conditional levels $L_0 \subset L_1 \subset … \subset L_k$); budget $ε_{total}$; conditional share $α$; count share $γ$; suppression floor $n_{min}$
+Input: private $D$; public schema (domains, bin edges, stratification rule $\Pi$, conditional levels $L_0 \subset \dots \subset L_k$); budget $ε_{total}$; conditional share $α$; count share $γ$; suppression floor $n_{min}$
 Output: release $R$
-(1) $ε_{count} \leftarrow γ \cdot ε_{total}$;  $ε_{rest} \leftarrow ε_{total} − ε_{count}$;  $ε_{marg} \leftarrow (1 − α) \cdot ε_{rest}$;  $ε_{cond} \leftarrow α \cdot ε_{rest}$
-(2) $q \leftarrow |A_{num}| + |A_{cat}| + 1$  (queries per cohort; sequential within a cohort)
-(3) $ε_q \leftarrow ε_{marg} / q$  (cohorts are disjoint: parallel across $\Pi$)
-(4) $ε_L \leftarrow ε_{cond} / |L|$  (levels overlap: sequential across levels)
-(5) For each cohort $P$ the public rule $\Pi$ can form, holding records or not:
-(6)     $\tilde{n}_P \leftarrow |P| + \mathrm{Lap}(1/ε_{count})$; if $\tilde{n}_P < n_{min}$, continue (the cohort is not released); release $\tilde{n}_P$
-(7)     Release the two-bin count histogram of $y$ on $P$, each count $+ \mathrm{Lap}(1/ε_q)$
-(8)     If both noised class counts of line 7 are at least $n_{min}$:  (class-conditional blocks; a noisy threshold)
-(9)         For $c \in \{0, 1\}$ and $a \in A$: release $\tilde{M}_a(P, c) \leftarrow M_a(P \cap \{y = c\}) + \mathrm{Lap}(1/ε_q)$
-(10)        $\tilde{M}_a(P) \leftarrow$ mixture of $\tilde{M}_a(P, c)$ under the released class balance
-(11)    Else: for $a \in A$, release $\tilde{M}_a(P) \leftarrow M_a(P) + \mathrm{Lap}(1/ε_q)$  (pooled block)
-(12) For each level $\ell \in L$ and each cell $c$ of $\ell$'s public domain, holding records or not:
-(13)    $\tilde{k}_c \leftarrow k_c(D) + \mathrm{Lap}(2/ε_L)$ and $\tilde{n}_c \leftarrow |c| + \mathrm{Lap}(2/ε_L)$; if $\tilde{n}_c < n_{min}$, continue (the cell is not released)
-(14)    $\tilde{ρ}_c \leftarrow \mathrm{clip}(\tilde{k}_c / \max(\tilde{n}_c, n_{min}), 0, 1)$  (post-processing of two counts)
-(15) Return $R$: every released quantity, with its ε, sensitivity and composition rule
+(1) $ε_{count} \leftarrow γ ε_{total}$;  $ε_{marg} \leftarrow (1 - α)(ε_{total} - ε_{count})$;  $ε_{cond} \leftarrow α (ε_{total} - ε_{count})$
+(2) $q \leftarrow |A| + 1$ queries per cohort;  $ε_q \leftarrow ε_{marg} / q$;  $ε_L \leftarrow ε_{cond} / |L|$
+(3) For each cohort $P$ the rule $\Pi$ can form, holding records or not:
+(4)     $\tilde{n}_P \leftarrow |P| + \mathrm{Lap}(1/ε_{count})$; if $\tilde{n}_P < n_{min}$ continue; release $\tilde{n}_P$
+(5)     release the two-bin histogram of $y$ on $P$, each count $+ \mathrm{Lap}(1/ε_q)$
+(6)     if both noised class counts are at least $n_{min}$: for $c \in \{0, 1\}$ and $a \in A$ release $M_a(P \cap \{y = c\}) + \mathrm{Lap}(1/ε_q)$
+(7)     else: for $a \in A$ release $M_a(P) + \mathrm{Lap}(1/ε_q)$  (pooled block)
+(8) For each level $\ell \in L$ and each cell $c$ of its public domain, holding records or not:
+(9)     $\tilde{k}_c \leftarrow k_c(D) + \mathrm{Lap}(2/ε_L)$;  $\tilde{n}_c \leftarrow |c| + \mathrm{Lap}(2/ε_L)$;  if $\tilde{n}_c < n_{min}$ continue
+(10)    release $\tilde{ρ}_c \leftarrow \mathrm{clip}(\tilde{k}_c / \max(\tilde{n}_c, n_{min}), 0, 1)$
+(11) Return $R$ with every released quantity, its ε, sensitivity and composition rule
 ```
 
-Five decisions in Algorithm 1 make the method work, and each rests on a sensitivity argument.
+Four decisions make the release cheap. Cohorts come from a rule over public domains, so forming them costs nothing, and the cohorts are disjoint, so their queries compose in parallel. Histograms replace moments: a histogram has sensitivity 1 at any resolution, so an entire distributional shape costs what one count costs. One histogram block per outcome class costs what a pooled block costs, because the two class blocks are disjoint; the pooled histogram is their mixture under the released class balance, which is post-processing, and a cohort whose minority class falls below $n_{min}$ keeps the pooled block. The conditional table is released over the cells of a partition, so each level receives the full $ε_L$ however many cells it holds; a cell's rate is the ratio of two counts noised at a public scale, which keeps the mechanism pure ε, where noising the rate directly at a scale set by the private cell size would not. Every $n_{min}$ decision compares a noised, charged count with the public floor, so which cohorts and cells appear in $R$ is a function of released quantities. An auto-configurator derives $\Pi$ and $L$ from the schema, the budget and the requested size, and charges the one step that reads $D$, a noised contingency table per candidate column (Appendix D).
 
-**Public stratification (line 5).** Cohorts come from a rule fixed over public domains, so $\Pi(x)$ is a deterministic function of $x$'s own record, and forming cohorts consumes no budget. This replaces private clustering, which spends budget and, in our measurements, produced degenerate cohorts of 3 and 8 records.
+### 4.2 Stage B: exact counts, selection and the sub-bin rule
 
-**Histograms, not moments (lines 9 and 11).** A histogram has L1 sensitivity 1 regardless of its bin count, since one individual moves exactly one bin. An entire distributional shape therefore costs the same budget as a single count, and moments are recovered from the released histogram for free. Under the moment formulation, by contrast, the standard-deviation query has sensitivity $(hi − lo)/(2\sqrt{n})$, and at realistic budgets that produced released values larger than the attribute's entire range: at a cohort size of 20, a released standard deviation of 693.80 against a true value near 13.
-
-**Class-conditional histograms (lines 8 to 10).** A pooled cohort histogram says what the cohort looks like, and nothing about how any feature relates to the target outside the conditional hierarchy. The generator fills that in from its prior, and on the finance dataset the filled-in columns measurably degraded the downstream model (Section 6.2). Partitioning each cohort by the target, and releasing one histogram block per (cohort, class), gives the generator the class-conditional marginals a classifier needs, for every column. The two class blocks are disjoint, so they compose in parallel, and each spends the same $ε_q$ per column that the pooled block did. The pooled histogram is their mixture under the released class balance, which is post-processing. Where a class falls below $n_{min}$, the cohort keeps the pooled block.
-
-**A conditional table over a disjoint partition (lines 12 to 14).** Because the cells of one level partition $D$, they satisfy parallel composition: each receives the full $ε_L$, however many cells the level contains. A cell's rate is the ratio of two counts, each carrying $\mathrm{Lap}(2/ε_L)$. Its noise is therefore of order $2/(|c| \cdot ε_L)$, and its accuracy is governed by cell support, not by the number of cells. Conditional structure is therefore cheap to release, and that observation is the basis of the method.
-
-We do not noise the rate directly as a bounded mean. That mechanism's scale, $1/(|c| \cdot ε_L)$, depends on $|c|$, which is itself private under add/remove adjacency. Two Laplace densities with different scales have an unbounded likelihood ratio in one tail, so the mechanism is not pure ε-differentially private. Two counts of sensitivity 1 at a public scale are.
-
-**The published cohort size (line 6).** The generator allocates rows to cohorts in proportion to size, so the size must be released. It is a private count, noised at $\mathrm{Lap}(1/ε_{count})$, taken off the top of $ε_{total}$ before the split (Algorithm 1, line 1) and clamped at $n_{min}$. A cohort is released only when it holds at least $n_{min}$ records, so any lower published value is impossible under the release's own rule. Without the clamp, at ε = 0.3 on NHANES the youngest age band's noised size clipped to zero, and the band vanished from the output while every per-row check passed.
-
-**The conditional share.** With one histogram block per outcome class, the release already carries most of what a classifier needs. The conditional table's share $α$ can then fall from a half to a fifth without measurable loss. The histograms receive that budget, and the release's own 1-way error against the training data falls from 0.029 to 0.020 on Adult and from 0.017 to 0.013 on finance. $α = 0.2$ is the shipped default; $γ$ is 0.02 in the research pipeline and 0.05 in the reference implementation (Table 29).
-
-### 4.3 Auto-configuration
-
-Every early result in this project depended on a hand-chosen configuration: which columns the conditional table conditions on, how many levels it carries, and how cohorts are formed. Choosing those columns after inspecting the private data is an uncharged, data-dependent decision, and it means the method cannot be deployed without a statistician. Algorithm 2 derives the whole configuration from the declared schema, the target, the budget and the number of records requested.
+Stage B allocates rows to cohorts in proportion to released size, apportions exact per-bin, per-category and per-class counts from the released histograms, and asks the frozen model for batches of 25 rows that carry the counts the cohort still owes. The prompt (Appendix D) carries the release and the counts and never a record; it states the counts per outcome class, and it instructs the model to follow the released statistics even where they contradict its expectations. Rows that parse, lie inside their domains and carry declared categories enter a pool $k$ times larger than the requested size, with $k$ = 3 on Adult and bank and 2 on NHANES. Generation is per cohort, not per released cell: a cell-wise variant emitted nothing for the population the released cells did not name and dropped whole subgroups while every aggregate check passed, a disparate impact of the kind Ganev et al. document for differentially private synthesis [17], and the reference implementation refuses that path below a coverage floor (deployment guide).
 
 ```algorithm
-Algorithm 2: CoRTeC-Autoconfigure
-Input: private $D$ of size $n$; public schema; target $y$; $ε_{total}$; requested size $m$; noise-floor multiple $M$
-Output: stratification rule $\Pi$, conditional levels $L$, budgets $ε_{sel}$ and $ε_{release}$
-(1) $m_{cand} \leftarrow$ number of candidate columns; $L \leftarrow$ median level count of the candidates; $|Y| \leftarrow$ number of target classes
-(2) $f \leftarrow \mathrm{clip}(M \cdot m_{cand} \cdot L \cdot |Y| / n,\; 0.05,\; 0.30)$;  $ε_{sel} \leftarrow f \cdot ε_{total}$;  $ε_{release} \leftarrow ε_{total} − ε_{sel}$
-(3) For each candidate column $a$:  (the only step that reads $D$)
-(4)     $\tilde{T}_a \leftarrow$ contingency table of bands($a$) × $y$ on $D$, each cell $+ \mathrm{Lap}(m_{cand}/ε_{sel})$
-(5)     $score_a \leftarrow$ mutual information of $\tilde{T}_a$  (post-processing)
-(6)     Coarsen $a$ into at most four bands by its noisy positive rate, read from $\tilde{T}_a$
-(7) Rank the candidates by score; choose the stratification column and the conditioning columns
-(8) Add conditioning columns while every cell still expects at least 8 records under $m$, preferring the depth closest to 20 records per cell, divided by the cohort count
-(9) Return $\Pi$, $L$, $ε_{sel}$, $ε_{release}$
-```
-
-Column ranking is the only private step, and it is charged. Each candidate is scored from one noised contingency table of its bands against the target. A record occupies exactly one cell, so the table's L1 sensitivity is 1 however many cells it has. The tables are not disjoint across candidates, since every record appears in all of them, so they compose sequentially at $ε_{sel}/m_{cand}$ each. Everything after the noised counts, namely the mutual-information computation, the coarsening and the ranking, is post-processing. A greedy conditional-MI selector was tried and reverted for a cardinality bias (technical report, H.10).
-
-Richness needs no private input at all. A conditional table's usable resolution is set by how many records land in each cell; cell counts are a function of public cardinalities, and the number of records requested is a public choice.
-
-The selection budget is adaptive because selection is meaningful only while a column's expected cell count exceeds the Laplace noise on it. Writing $f$ for the share of $ε_{total}$ spent on selection, and requiring the expected count per cell to exceed the noise scale by a factor $M$,
-
-$$ \frac{n}{L \cdot |Y|} \ge M \cdot \frac{m_{cand}}{f} \quad ⇔ \quad f \ge \frac{M \cdot m_{cand} \cdot L \cdot |Y|}{n}, $$ (3)
-
-which is line 2 after clipping the share to [0.05, 0.30]. $M = 1$ is the shipped value, and every quantity in (3) except $n$ comes from the declared schema. Small datasets therefore spend more on selection, which is correct: a smaller release needs less budget to describe. Under a fixed 5% share, three of six datasets it had never seen declined to configure at all (Section 6.7).
-
-### 4.4 Stage B: generation with exact counts
-
-```algorithm
-Algorithm 3: CoRTeC-Generate
-Input: release $R$; requested size $m$; pool factor $k$; batch size $B$; frozen model $G$
-Output: pool $\hat{D}$ of about $k \cdot m$ rows
-(1) For each cohort $P$ in $R$:  $m_P \leftarrow k \cdot m \cdot \tilde{n}_P / Σ_{P'} \tilde{n}_{P'}$  (rows by released size)
-(2)     $T_P \leftarrow \mathrm{Apportion}(m_P;$ released class balance, $\tilde{M}_a(P, c)$ for all $a, c)$  (exact per-bin, per-category and per-class counts)
-(3)     While rows are still owed to $P$:
-(4)         $b \leftarrow \min(B, \text{rows owed})$
-(5)         $\text{owed} \leftarrow \mathrm{Apportion}(b;\; T_P − \text{counts of the rows already accepted for } P)$
-(6)         $\text{rows} \leftarrow G(\mathrm{prompt}(R, P, b, \text{owed}))$  (the prompt carries $R$ and the counts, never $D$)
-(7)         Accept the rows that parse, lie inside their domains and carry declared categories; append them to $\hat{D}$
-(8) Return $\hat{D}$
-```
-
-Asked to reproduce a histogram stated as shares, a frozen model reproduces it approximately, and the rows it emits carry that approximation plus the sampling noise of any batch. Asked instead for exact counts, it can satisfy them. A 25-row batch told the number of rows it must produce per bin and per category reproduces every count line exactly on the frontier models we measured; the same batch given shares matches about two thirds of them.
-
-The counts are apportioned from the released histograms for the cohort as a whole (line 2), so they carry no more information than the release does. Each batch asks for the counts the cohort still owes after the rows already accepted (line 5), so a batch that returns more or fewer valid rows than asked cannot leave the cohort's totals short. The batch size is 25 and the pool factor is 3 by default.
-
-In a cohort that carries class blocks the apportionment in line 2 is per class, and the prompt states the counts per class: among the batch's positives, the rows per bin and per category from the positive block; among its negatives, the same from the negative block. The prompts behind the tables of Section 6.1 stated those counts as totals over the two classes, with only the number of positives stated separately, which left each class's marginals to the generator's reading of the class blocks; the open-weight comparison (Table 34) found that one generator followed them and another did not. From this release the per-class statement is the default, and `--no-quota-by-class` restores the earlier one.
-
-The prompt (Appendix A) is versioned and hash-locked in the reference implementation, because two of its elements are essential and their removal is not visible in the output. The first is the conditional target table, which is the only channel through which the conditional structure reaches the generator. The second is the instruction to follow the released statistics even where they contradict the model's expectations; without it, a model reconciles the release against its prior and emits the prior. Section 6.3 measures the first.
-
-### 4.5 Selection, and values below bin resolution
-
-```algorithm
-Algorithm 4: CoRTeC-Select
+Algorithm 2: CoRTeC-Select
 Input: release $R$; pool $\hat{D}$; requested size $m$
-Output: synthetic dataset $\hat{D}^*$ of exactly $m$ rows
-(1) Require that every cohort $P$ holds at least $1.1\cdot m \cdot \tilde{n}_P / Σ \tilde{n}$ rows of $\hat{D}$  (coverage guard)
-(2) $w \leftarrow$ inclusion weights from iterative proportional fitting of $\hat{D}$ to every released cell: cohort sizes, class balances, one histogram per cohort, class and attribute; a category the release suppressed receives weight 0
-(3) $\hat{D}^* \leftarrow$ a systematic sample of $m$ rows of $\hat{D}$ under $w$  (rake)
-(4) Repeat: swap a row of $\hat{D}^*$ for a row of $\hat{D} \setminus \hat{D}^*$ whenever the swap lowers the weighted L1 distance between the cell counts of $\hat{D}^*$ and those of $R$, until no swap improves it  (refine)
-(5) For each cohort $P$ with class-conditional blocks, each $a \in A_{num}$ and each row of $\hat{D}^*$ in $P$: redraw the value uniformly inside its released bin intersected with its stratification band; integer attributes draw integers  (sub-bin rule)
+Output: synthetic dataset $\hat{D}^*$ of $m$ rows
+(1) Require that every cohort $P$ holds at least $1.1 m \tilde{n}_P / Σ \tilde{n}$ pool rows (coverage guard)
+(2) $w \leftarrow$ inclusion weights by iterative proportional fitting [12] of $\hat{D}$ to every released cell: cohort sizes, class balances and every histogram; a suppressed category receives weight 0
+(3) $\hat{D}^* \leftarrow$ a systematic sample of $m$ rows under $w$  (rake)
+(4) Swap a row of $\hat{D}^*$ for a pool row whenever the swap lowers the weighted L1 distance between the cell counts of $\hat{D}^*$ and $R$, until no swap improves it  (refine)
+(5) In every cohort with class blocks, redraw each numerical value uniformly inside its released bin intersected with its stratification band; integer columns draw integers  (sub-bin rule)
 (6) Return $\hat{D}^*$
 ```
 
-**Selection from a pool (lines 2 to 4).** The inclusion weights come from iterative proportional fitting, the raking procedure of Deming and Stephan [11], applied to the generated pool against every released cell. Exact-count batches match the release closely but not exactly, and any $m$ rows drawn at random from a faithful pool carry the sampling error every $m$-record sample carries. Generation is free in ε, so the pipeline asks for $k$ times the rows it needs and keeps the $m$ whose cell counts match the release.
+Exact counts make the pool match the release closely; selection removes the sampling error that any $m$ rows drawn from a faithful pool carry; the sub-bin rule makes the structure below bin resolution the release's rather than the model's, since a released histogram fixes bin counts and nothing finer. Each step reads $R$, the generated rows and independent randomness, and nothing else. Whether a numerical column is integer-valued is decided from the public bin edges and bounds together with the majority of the pool's values; a version that decided it from every value let one model-written "45.0" turn a whole column into real-valued redraws, and every draw in this paper is scored after that correction (Appendix D).
 
-The pooled marginals are weighted above the per-cell counts. A cohort whose release carries only a pooled block is constrained at cohort level, not per class, because imposing a pooled histogram on each class would erase the feature-to-target structure the release spent budget on. The cost of selection is $k$ times the generation spend.
+**The maximum-entropy decoder.** To measure what the language model contributes, the same release is decoded with no model: the maximum-entropy distribution consistent with every released cell, fitted by Private-PGM [26] to exactly the numbers in $R$ and sampled at the same $n$. It spends no budget, because it reads $R$ only, and it is the control every language-model row in Section 6 is read against. Seen from the marginal methods' side, the release is a fixed workload, class-conditional 1-way marginals inside cohorts and the conditional cells, chosen before the data is seen, and the decoder is that workload fitted by the estimator AIM itself uses; what separates CoRTeC's release from AIM is the workload, not the inference engine. AIM's adaptive selection gives the pairs (Section 6); the fixed workload gives the conditionals the deployment names, an artefact a reader can inspect cell by cell, and a release that takes seconds.
 
-**The coverage guard (line 1).** Selection can only choose among rows that exist. A pool that reached its spend cap before every cohort was complete produced a draw whose two lowest-education cohorts held 63% of the rows against a released share of 40%. Every per-row check passed; the draw simply carried the pool's imbalance. Both implementations now require every cohort to be covered by at least 1.1× the rows it owes before selecting, and the tool refuses a pool that is not.
+**Stage C.** For each released cell the private data has a positive rate $p_c$ and the synthetic data a public rate $q_c$. Stage C releases a Laplace estimate of $p_c$ over the public floor at a declared budget $ε_{cert}$, turns it into a simultaneous bound on $|p_c - q_c|$ over all cells, and refuses a verdict unless a real hold-out sample clears the tolerance and a permuted one fails it, and unless every cell holds at least 20 synthetic rows. The bound speaks to utility only (Appendix E.5).
 
-**Values below bin resolution (line 5).** A released histogram fixes how many rows fall in each public bin and nothing finer, so where a value lies inside its bin is never released information. In a cohort that carries class-conditional blocks, the class shape is the release's at bin resolution, and whatever the generator does below it comes from its prior. On NHANES that prior separated the outcome classes about twice as far as the data does inside each bin: a BMI gap of 6.2 between diabetic and non-diabetic rows against 3.1 in the training data, and a positive diastolic effect the data does not have. A bin-level selection cannot see this. A tree student that splits on thresholds is indifferent to it; a linear student that fits a slope is not.
+### 4.3 Privacy analysis
 
-In those cohorts every numeric value is therefore redrawn uniformly inside its released bin, intersected with the row's stratification band so that no row changes cohort. Every bin count under the release's bins is unchanged by construction. In a cohort with only a pooled block, the generator's placement is the only carrier of the class signal, and it is kept; on the two pooled arms we measured, replacing it cost the tree students up to 0.03 AUC. The rule reads the release and the rows, has no parameter, and is post-processing.
+**Theorem 1.** *Algorithms 1 and 2 together with the generation step are $ε_{total}$-differentially private; with auto-configuration the total is $ε_{sel} + ε_{release} = ε_{total}$; Stage C adds $ε_{cert}$.*
 
-### 4.6 Stage C: the utility transmission bound
-
-Sections 6.3 and 6.4 measure, with access to the private data, whether the released conditional structure reaches the output. A deployment needs that measurement as a budgeted artefact a third party can inspect without that access. For each released cell $c$, the private data has a true positive rate $p_c$ and the synthetic data a rate $q_c$. $q_c$ is a function of the synthetic output alone, so it is public and free; $p_c$ is private. Stage C releases a Laplace estimate $\hat{p}_c$ at a declared budget $ε_{cert}$ and turns its noise into a one-sided confidence bound.
-
-```algorithm
-Algorithm 5: CoRTeC-Bound
-Input: private $D$; synthetic $\hat{D}^*$; the released cells $c_1, …, c_k$ of the finest level with their released rates $\tilde{ρ}_c$ and base rate $\bar{ρ}$; suppression floor $n_{min}$; budget $ε_{cert}$; confidence $(1 − α)$; minimum synthetic rows per cell $m_{min}$; optionally a tolerance $τ$
-Output: a simultaneous bound $B_c$ per cell, a verdict, or a refusal
-(1) For each cell $c$: $q_c \leftarrow$ positive rate of $\hat{D}^*$ in $c$  (public)
-(2) For each cell $c$: $\hat{p}_c \leftarrow k_c(D) / \max(|c|, n_{min}) + \mathrm{Lap}(1/(n_{min} \cdot ε_{cert}))$  (the rate over the public floor, as Algorithm 1 releases its rates; cells are disjoint: parallel across cells)
-(3) For each cell $c$: $B_c \leftarrow |\hat{p}_c − q_c| + \ln(k/α) / (n_{min} \cdot ε_{cert})$
-(3′) If no $τ$ was given: $τ \leftarrow \ln(k/α) / (n_{min} \cdot ε_{cert}) + \frac{1}{2} \max_c |\tilde{ρ}_c − \bar{ρ}|$  (released quantities only: post-processing)
-(4) Repeat lines 1 and 3, against the same $\hat{p}_c$ released once at line 2, for a real hold-out sample in place of $\hat{D}^*$ (the ceiling) and for the same sample with its target permuted (the floor)
-(5) If the ceiling's largest $B_c$ exceeds $τ$ or the floor's does not: Return "this test did not discriminate", no verdict
-(6) If any released cell holds fewer than $m_{min}$ rows of $\hat{D}^*$: Return "insufficient synthetic support", no verdict, and every $B_c$
-(7) Return within bound if $\max_c B_c \le τ$, else outside tolerance; report every $B_c$
-```
-
-With probability at least $(1 − α)$, simultaneously over all $k$ released cells,
-
-$$ |p_c − q_c| \le |\hat{p}_c − q_c| + b_c \cdot \ln(k/α), \qquad b_c = \frac{1}{n_{min} \cdot ε_{cell}}, $$ (4)
-
-where $ε_{cell} = ε_{cert}$ because the cells partition the data. The rate is taken over $\max(|c|, n_{min})$ (line 2), as Algorithm 1 takes its released rates, so its sensitivity is at most $1/n_{min}$ for every cell whatever its true size, including a cell that the noisy gate of Algorithm 1 released below the floor, and the scale depends on nothing private. Such a cell reads at $|c|/n_{min}$ of its true rate, a downward bias that is rare and bounded; none of the cells behind Table 23 is below the floor. The bound is conservative by a factor $n_c / n_{min}$ on each cell, which is the cost of using the public floor. The union bound over cells makes the guarantee simultaneous rather than per cell. The $k$ rate queries compose in parallel, so a deployment that bounds at $ε_{cert}$ has spent $ε_{release} + ε_{cert}$ in total.
-
-The reference implementation reports both ([`cortec.bound`](https://github.com/Calyie/cortec-framework/blob/main/cortec/cortec/bound.py) in the framework, and [`certify.py`](https://github.com/Calyie/cortec/blob/main/certify.py) in the research repository, which produced the results below). Lines 4 and 5 are the floor-and-ceiling discipline of Section 5.3 applied to the bound itself: a real sample must clear the tolerance and a permuted one must not, or the procedure issues no verdict. The tolerance is derived from the release unless one is given. The permuted floor's bound in a cell converges, as the synthetic sample grows, to the gap between that cell's rate and the base rate plus the noise term, so any tolerance at or above the largest such gap plus the noise term lets the floor through at a large enough $n$; line 3′ places it halfway between the noise term and that limit, from released quantities only. A fixed tolerance chosen by repetition on the private data, which an earlier version of this procedure used, is a calibration the procedure cannot ship. Line 6 withholds the verdict while any released cell holds fewer than $m_{min}$ = 20 synthetic rows: such a rate moves by a third on three rows, and (4) carries no sampling term for it.
-
-The bound speaks to utility only. It says how much conditional structure survived generation, and nothing about re-identification risk. Section 7 keeps it out of the compliance mapping for that reason.
-
-### 4.7 Privacy analysis
-
-**Theorem 1 (Privacy of CoRTeC).** *Algorithms 1, 3 and 4 together satisfy $ε_{total}$-differential privacy. Algorithm 2 followed by them satisfies $(ε_{sel} + ε_{release})$-differential privacy, which equals $ε_{total}$.*
-
-*Proof.* Consider neighbouring $D, D'$ differing in one record $x$.
-
-(i) *Stratification is free.* $\Pi$ is a function of public attribute domains only, so $\Pi(x)$ is computed from $x$'s own attributes without reference to any other record. The partition structure is data-independent, and releasing it costs nothing.
-
-(ii) *Within a cohort, sequential composition.* Fix a cohort $P$. Each released histogram is a counting query of L1 sensitivity 1. $x$ contributes to exactly one bin of one attribute, so removing it changes that histogram's L1 norm by 1 and every other histogram not at all. By Proposition 1 the Laplace mechanism at scale $1/ε_q$ gives $ε_q$-differential privacy per query. Under the pooled block (line 11) the $q$ queries on $P$ compose sequentially (Proposition 2) to $q \cdot ε_q = ε_{marg}$. Under the class-conditional blocks (line 9), $P$ is partitioned by $y$, so $x$ lies in exactly one of $P \cap \{y=0\}$ and $P \cap \{y=1\}$. It is touched by the class-balance query of line 7 and by the $q − 1$ histograms of its own block, and by nothing in the other block. That is a chain of $q$ queries and the same $q \cdot ε_q$. The two blocks are disjoint and compose in parallel (Proposition 3). The pooled histogram of line 10 is a function of released quantities only.
-
-(iii) *Across cohorts, parallel composition.* The cohorts are disjoint and defined by a public rule. Record $x$ lies in exactly one, so it can influence only that cohort's queries; the others are identical on $D$ and $D'$. By Proposition 3 the cost across cohorts is $ε_{marg}$, independent of $|\Pi|$.
-
-(iv) *Within a conditional level, parallel composition.* The cells of level $\ell$ partition $D$, so the same argument applies, and level $\ell$ costs $ε_L$ however many cells it contains. Within a cell $c$ we release two counting queries, the positive count $k_c$ and the cell size $|c|$. Each has L1 sensitivity exactly 1 under add/remove adjacency, and each is noised at $\mathrm{Lap}(2/ε_L)$, a scale that depends on nothing private. They touch the same records, so they compose sequentially to $ε_L$ per cell. The published rate $\tilde{ρ}_c = \tilde{k}_c / \max(\tilde{n}_c, n_{min})$ is a function of two released quantities and the public floor, so it is post-processing (Proposition 4), as is clipping to $[0, 1]$.
-
-(v) *Across levels, sequential composition.* Levels of differing granularity describe the same individuals, so they are not disjoint and compose sequentially: $|L| \cdot ε_L = ε_{cond}$. The reference implementation additionally spends a count family on every cell's support, inside $ε_{total}$: the count share of Table 29, half to cohort sizes and half to cell supports, the cell half divided across the declared levels. It then splits $ε_{cond}$ across the levels in which at least one noised support reaches $n_{min}$; that set is a function of released counts, so the split is post-processing. No reported release uses it: every table in this paper was produced by the research path, which splits $ε_{cond}$ across the $|L|$ declared levels as line 4 states. A split across levels found viable from exact counts would not be sound.
-
-(vi) *The published cohort size.* $|P|$ is a counting query of sensitivity 1, noised at $\mathrm{Lap}(1/ε_{count})$. Cohorts are disjoint, so the cost across $\Pi$ is $ε_{count}$ by parallel composition. It composes sequentially with the $q$ queries on the same cohort. Every $n_{min}$ decision in Algorithm 1 compares a noised count with the public floor (lines 6, 8 and 13), and every cohort and cell of the public domains is queried whether or not it holds a record, so which groups appear in $R$ is a function of released quantities and public constants alone, and is post-processing by Proposition 4.
-
-(vii) *Stage B is post-processing.* The row allocation (Algorithm 3, line 1) reads released sizes. The per-bin counts a batch is asked for (line 2) are apportioned from released histograms. The counts still owed (line 5) are a difference of released targets and generated rows. The prompt carries $R$ and those counts. The model $G$ is frozen and reads only the prompt. The acceptance rule of line 7 reads public domains. The inclusion weights, the rake, the refinement and the sub-bin redraw of Algorithm 4 read $R$, the generated rows and independent randomness. By Proposition 4 none of these increases the privacy loss, at any pool factor $k$ and for arbitrarily many draws.
-
-Summing the dependent components, $ε_{count} + ε_{marg} + ε_{cond} = ε_{total}$. Stage C, when run, adds $ε_{cert}$: its $k$ Laplace queries are counting-rate queries over $\max(|c|, n_{min})$, of sensitivity at most $1/n_{min}$ on disjoint cells whatever their true sizes, at a public scale, so by Proposition 3 they cost $ε_{cert}$ together. The bound $B_c$ and the verdict are functions of the released $\hat{p}_c$, the synthetic output and public quantities. The discrimination check of line 4 reads a real hold-out sample that the release did not use; it is uncharged, and it decides whether a verdict is issued, not what the bound is. Under auto-configuration the $m_{cand}$ contingency tables of Algorithm 2 are counting queries of L1 sensitivity 1 on the same records and compose sequentially to $ε_{sel}$; everything downstream of their noised counts is post-processing. The release that follows spends $ε_{release}$, so the total is $ε_{sel} + ε_{release} = ε_{total}$. $\square$
-
-**What the theorem does not cover, and what the reported tables carry.** The theorem covers the $n_{min}$ decisions as Algorithm 1 makes them. The releases behind the CoRTeC rows of Tables 3 to 6 were produced under that rule: every cohort, class block and cell was released only when its charged, noised count reached $n_{min}$, and each release file records the gate it was made under. The releases behind the earlier-configuration arms of Section 5.5, the second-vendor arms at minimal reasoning, the equivalence test and the ε sweep were produced before it, by comparing the exact count with $n_{min}$: a data-dependent decision outside the accounted budget, which is the practice of the marginal-synthesis literature and of the MST and AIM reference implementations, whose rows therefore carry the gate outside their ε; a recent audit of those implementations finds their empirical privacy close to the stated guarantee [18]. The current CoRTeC rows are the more conservative side of that comparison. We measured how far the two rules differ on the earlier releases, which spend the same budget and draw the same noise under either rule. The noisy threshold reproduces every gate decision of the earlier Adult release with probability 0.26, of the earlier finance release with probability 0.24, and of the earlier NHANES release with probability 0.70 (technical report, J.5). Where the rules differ, the difference is a cohort whose minority class holds 149 records against a floor of 150 and is released pooled rather than split, or a finance cell of 139 to 148 records that the exact rule withholds and the noisy one releases about one time in four. The regenerated Tables 3 to 6 therefore differ from the earlier build's by those decisions and by draw-to-draw variation; the arms still on earlier releases are on the replication list of Section 10. The hold-out sample behind the discrimination check of Algorithm 5 is read uncharged, and the record count $n$ that Algorithm 2 reads to set the selection share is treated as public.
-
-The earlier-configuration arms of Section 5.5 were released by an earlier rate mechanism that noised each conditional cell's rate at a scale set from the true cell size, which step (iv) above rejects. Per conditional level that mechanism is $(ε_L, δ)$-differentially private rather than pure $ε_L$, with δ computed exactly at 1.5 × 10⁻⁷ for the $n_{min}$ = 150 floor every reported release used. That pipeline also published per-cohort counts exact for most of the project; rebuilding every affected draw under noised counts moved no metric by more than 0.0005 (technical report, J.3). Every release path now implements that mechanism; the inversion test and the Adult sweep were re-run on GPT-5 under it (Sections 6.3 and 6.4), and the remaining earlier-configuration arms are on the replication list of Section 10.
-
-The floating-point attack of Mironov [31] on the Laplace mechanism applies to every implementation in the comparison, including ours. It is declared as an open gap in the release's own audit block.
-
-### 4.8 What the allocation achieves
-
-The 6.7× figure is measured against this project's own first implementation, not against MST or AIM, which release different statistics: private clustering for cohorts, a mean and a standard-deviation query per attribute, and basic composition across cohorts. Against that baseline the same $ε_{total}$ yields an ε per released statistic of 0.0667 against 0.0100, a 6.7× improvement. In accounting terms it is the gain from parallel composition over disjoint cohorts and cells and from one histogram query in place of two moment queries. The realised per-query budget on the 15-column Adult schema at $α = 0.5$ is 0.0653, because the cohort-size query of line 6 takes its 2% first; on the same footing the improvement is 6.5×.
-
-The budget is verified by instrumentation rather than by re-deriving a model of it. A test patches the Laplace mechanism inside the release path and tallies what is actually spent, asserting exactly $ε_{total}$ on three auto-configured schemas and at three budgets.
-
-A tighter accountant would not help. Advanced composition [15] and concentrated differential privacy [6] loosen the bound by 16 to 31% at the chain lengths this method reaches, and only cross over past 27 queries. Those chain lengths are 15 marginal queries per cohort on the Adult schema, or 18 once its three conditional levels are counted. No Algorithm 1 release in this paper carries a conditional hierarchy deeper than 3 levels, or deeper than 2 at the shipped $n_{min}$; the hybrid tables of Section 8.2 are budgeted separately and are named by the number of factors in their finest cell.
+The proof (Appendix A) is five steps of composition. (i) Stratification reads public domains only and is free. (ii) Within a cohort, the class-balance query and the $|A|$ histograms of one record's own class block are a chain of $q$ Laplace queries of sensitivity 1, composing sequentially to $ε_{marg}$; the two class blocks are disjoint and compose in parallel. (iii) Across cohorts, the queries compose in parallel, because a record lies in exactly one cohort. (iv) Within a conditional level, the cells partition $D$ and compose in parallel; a cell's two counts compose sequentially to $ε_L$, and the published rate is post-processing of two released counts and the public floor. (v) Across levels, which describe the same individuals, the budgets add to $ε_{cond}$; the cohort sizes cost $ε_{count}$ in parallel across cohorts. Generation, selection and the sub-bin rule read $R$, the generated rows and randomness, so by post-processing they add nothing at any pool factor and for any number of draws. Summing, $ε_{count} + ε_{marg} + ε_{cond} = ε_{total}$.
 
 ## 5. Experimental Setup
 
-### 5.1 Datasets
+**Table 2:** Datasets. Every split is seed 42; the replication seeds 43 and 44 draw a fresh split and a fresh release each.
 
-**Table 2:** Datasets. The three in bold carry the head-to-head of Section 6.1.
+| dataset | records | train / test | numerical / categorical | target, positive rate | role |
+|---|---|---|---|---|---|
+| UCI Adult [13, 23] | 32,561 | 26,048 / 6,513 | 6 / 8 | income over 50K, 24.1 % | every comparison, the controls, the ladder, the replication |
+| NHANES 2017-2018 [9] | 3,749 adults | 2,999 / 750 | 5 / 4 | HbA1c at or above 6.5 %, 14.2 % | auto-configured clinical dataset, the replication |
+| bank marketing [25] | 45,211 | 36,168 / 9,043 | 5 / 8 | term deposit, 11.7 % | third dataset, one split |
 
-| dataset | domain | records | attributes | positive rate | rows per person | role |
-|---|---|---|---|---|---|---|
-| **NHANES 2017–2018** [9] | healthcare (examination and laboratory) | 3,749 | 10 | 14.2% | 1 | primary clinical dataset |
-| **UCI Adult** [12, 25] | census | 32,561 | 15 | 24.1% | 1 | comparability anchor; AIM's own primary dataset |
-| **Default of credit card clients** [51] | finance | 30,000 | 15 | 22.1% | 1 | second regulated domain |
-| Diabetes 130-US hospitals [42] | healthcare (administrative) | 101,763 | 19 | 11.2% | mean 1.42, max 40 | ε sweep at scale; transmission; membership inference |
-| renal registry (constructed) | synthetic clinical | 20,000 | 10 | 14.9% | 1 | contamination control (Section 6.3) |
-| six untouched benchmarks | 3 health, 3 finance | 303–45,211 | 8–20 | 6.0–53.1% | 1 | auto-configuration generalisation (Section 6.7) |
+**Baselines.** The reference AIM and MST are the authors' private-pgm implementation (mbi 1.1) fitted on the training split under the same public bins CoRTeC declares, at the same ε, with the message-passing oracle set to its stable variant, whose empirical privacy Ganev et al. audit as close to the stated guarantee [16], and a consistency check between the fitted marginals and the noisy measurements, because the library's default oracle produced empty or near-uniform fits on two of our three splits; every reported fit passed the check at its first attempt, and the seed-42 fits under the default oracle reproduce to the third decimal (Appendix D). Their sampler is the corrected one (Appendix D). An earlier version of this work (Zenodo record 23258254) compared against the smartnoise-synth implementations of AIM and MST at their library defaults, which carry the sampler defect of Appendix D and whose students score 0.15 to 0.17 AUC below the reference implementation's on Adult at $n$ = 300; every AIM and MST number here is the authors' private-pgm. DP-2Stage runs the authors' code (GPT-2, DP-SGD, δ = 10⁻⁵) on our split. The DP fine-tuning rows apply DP-LLMTGen's two-stage LoRA [20] procedure and loss to Qwen3-14B, Qwen2.5-7B and Llama-2 7B on our split (δ = 10⁻⁵), so that the same backbone appears under two privacy architectures. Tab-PE runs the authors' code with a 1,000-row population (600 on NHANES), δ = 1/(n ln n); its own evaluator, TabICL [19], scores the Tab-PE protocol rows. The maximum-entropy decoder is defined in Section 4.2. Two controls complete a two-by-two over the release and the model: the release with no model (the decoder, alone and with the selection step of Algorithm 2 applied to its pool), the release with a model (CoRTeC), the model with no release (one-shot rows from the column names alone, the baseline Swanberg et al. use [37]) and, for neither, the permuted-target floor.
 
-NHANES 2017–2018 is the primary clinical dataset: a national health examination survey of physical measurements and laboratory assays, obtainable with no application. We join the demographic, glycohaemoglobin, body-measures and blood-pressure files on the respondent identifier and restrict to adults aged 18 to 80. The target is HbA1c ≥ 6.5%, the American Diabetes Association's diagnostic threshold [4], which makes this an undiagnosed-diabetes screening task on laboratory values rather than on billing codes. Bin edges are public clinical knowledge (WHO BMI categories, ACC/AHA blood-pressure stages), not quantiles of the file.
+**CoRTeC configuration.** One set of flags, fixed before the campaign: ε = 2 with α = 0.2, γ = 0.02 and $n_{min}$ = 150; batches of 25 rows; the counts stated per outcome class; a pool factor of 3 (2 on NHANES); selection with the sub-bin rule; cohorts and conditional levels from the auto-configurator for NHANES and bank and the schema's own rule for Adult. The auto-configurator is the shipped default and was used on NHANES and bank; Adult was the one dataset still on a hand-written rule, so after the campaign the default was run there too, which closes an inconsistency rather than opening a search: the released implementation's Stage A derives the cohorts and the hierarchy on each split, charging the selection to the same budget, at the implementation's count share of 0.05 plus the gate charge against the campaign's 0.02 (the designs are in Appendix D). That release is decoded with no model and the selection step only, and it is labelled "auto-configured, no model, with selection" wherever it appears. The backbones are Qwen3-8B, Qwen3-14B and Qwen3-32B (4-bit AWQ), served locally through vLLM, and Gemini 3.6 Flash through Google's interface, which has served the Gemini 3.5 Flash identifier since 8 October 2026. The Qwen3-14B arm is the primary arm; a Qwen2.5-7B arm appears where a protocol was run on it only (Table 4, Appendix E.6).
 
-Adult is the head-to-head anchor, the only schema on which every mechanism we compare completes. The credit dataset is the second regulated domain. Diabetes 130 is hospital administrative data at scale, with 81,410 training records; it carries the ε sweep on a large dataset, the transmission sweep and part of the membership-inference evaluation. It is encounter-level, so every figure from it holds under a row-level guarantee (Section 3).
+**Why ε = 2.** The recent papers report ε = 1 as their headline (DP-2Stage, Tab-PE) with ε = 0.5 and 8 in appendices (DP-LLMTGen, DP-2Stage), and the benchmark uses 0.2, 1 and 5. We keep ε = 2 as the headline for the comparison of architectures on one split, for a reason that follows from the release: at the shipped split each count of a conditional cell is noised at scale 10.2, so a cell at the suppression floor of 150 records carries its rate to within about 0.1, and at ε = 1 and 0.5 that becomes about 0.2 and 0.4, where the conditional table stops being informative near the floor and the comparison would measure the noise rather than the architectures. Every method also appears at a budget its own paper uses: the reference AIM, MST and the CoRTeC release at ε = 0.5 and 1 under the DP-LLMTGen protocol and at ε = 1 under the DP-2Stage and Tab-PE protocols (Table 4 and Appendix E.6), and the release's own decoder at ε = 0.5 and 1 on our protocol (Appendix E.6). At ε = 1 the release and its decoder are level with DP-LLMTGen and Tab-PE on their own utility measures, ahead of DP-2Stage, and behind the reference AIM on fidelity, so the headline budget does not hide a worse trade-off at the budgets those papers prefer.
 
-Each dataset is split once into a training set, which every mechanism sees, and a held-out test set, which only the evaluator sees. There are 26,048 training rows on Adult, 24,000 on finance and 2,999 on NHANES.
+**Metrics.** Fidelity: 1-way and 2-way total variation between the synthetic table and the full private training table, over the public bins; conditional total variation of $P(y \mid \text{group})$ over the cohort bands the release describes ("seen") and over group families sharing no column with the conditioning ("held-out"). Utility: train-on-synthetic, test-on-real AUC [32] under logistic regression, a random forest and gradient boosting, on the real test split. Definitions are in Appendix B. Each paper protocol in Table 3 uses that paper's own metrics and split.
 
-### 5.2 Baselines
-
-We compare against the three families an institution would realistically choose between: the marginal methods MST and AIM; the DP-SGD generative model DP-CTGAN; and the PATE generative models PATE-CTGAN and PATE-GAN. All run through smartnoise-synth [34] at matched ε. Numerical columns are pre-binned using the same public bounds CoRTeC assumes, so no method gains an advantage from a different discretisation. All run at library defaults at ε = 2 on the training split and are sampled at the same $n$ as CoRTeC.
-
-An unconditioned "header-only" prompt, the same frozen model given nothing but the column names, appears as a control and not as a competitor. It carries no privacy guarantee. Its role is to establish that CoRTeC's output depends on the released statistics rather than on the model's prior. Two forms appear. The header-only control gives the model only the column names; it is the control behind the aggregate-utility numbers of Section 6.3. The matched header-only control is CoRTeC's own prompt with the released blocks removed and nothing else changed (Appendix A); it is the control behind the inversion test and the registry diagnostic of Section 6.3.
-
-### 5.3 Metrics, and the floor-and-ceiling discipline
-
-We report:
-
-- marginal fidelity: 1-way and 2-way total variation, meaning half the summed absolute difference between two histograms, the latter over all column pairs;
-- conditional fidelity: error in $P(\text{target} \mid \text{group})$ over the cohort bands of the stratification rule ("seen": the groups every release describes, and not the conditional cells, which Stage C scores) and over strictly held-out group families sharing no column with the conditioning ("held-out");
-- AIM's own 3-way workload error where stated; and
-- utility: TSTR AUC under logistic regression, random forest and gradient boosting, each trained on the synthetic data and tested on the real held-out split.
-
-Fidelity and utility appear in the same table for every condition, because a method can score well on one and poorly on the other, and both marginal baselines do.
-
-Two references accompany every table. The *real-sample floor* is a genuine draw of $n$ real training records. No synthetic method can be expected to exceed it at that $n$, and it is the only sensible target. The *permuted-target floor* is real data with the target column permuted. It has identical marginals and zero predictive content, and is therefore the score of data that carries no usable information. Any metric that fails to separate these two has no power, and we check that before drawing conclusions (Section 6.3). The *train-on-real ceiling* trains the students on the entire training set.
-
-Evaluating against explicit reference points rather than a bare threshold is the discipline DPBench argues for [19], and it caught the founding defect of this project. Our original primary metric scored the real-data ceiling and the unconditioned baseline identically, so there was nothing for any method to improve, and a verdict had been drawn from it before the floors were checked (Section 9). The real-sample floor is drawn afresh for each table at that table's $n$ and draw count, so its value varies across tables by design. Comparisons are made at matched $n$.
-
-Every metric is computed by one implementation that bins numerical columns with the public bin edges every method is fed. One convention is declared. The evaluator's intervals are right-closed, while the release, the selection step and the baselines' discretisation are left-closed, so an integer that lies exactly on an edge counts in different bins under the two. The effect is small and falls on every method. On the earlier Adult release, 1-way error under the release's convention is 0.020 for CoRTeC, 0.015 for MST, 0.030 for AIM and 0.043 for a real sample, against 0.029, 0.024, 0.037 and 0.043 under the evaluator's. Every synthetic-output number in this paper is the evaluator's; a release's own distance from the training data (Section 6.1, Table 9) is stated under the release's convention. The ordering of methods is the same under either.
-
-### 5.4 Statistics
-
-Point estimates are means over draws. Differences between conditions are tested with Welch's t-test on the per-draw values and corrected with Holm's procedure [20] over each family of tests, a family being the seven metrics of one baseline on one dataset. Adjusted p-values are Holm's step-down values. Where a rank test is reported, its smallest attainable p-value at the draw counts in hand is reported beside it: at small group sizes it is the design, not the data, that limits the statistic. Confidence intervals on the headline equivalence test are bootstrap intervals over draws (10,000 resamples).
-
-All CoRTeC draws within a condition come from one release and one generator, so they replicate the generation step. Releases are redrawn only for the transmission sweeps. Draws from different generators are never pooled, because the generator is itself a variable under study (Section 6.6).
-
-### 5.5 The configuration reported
-
-Unless a table says otherwise, every CoRTeC row is the shipped configuration:
-
-- the class-conditional release of Algorithm 1 at ε = 2 with $α = 0.2$ and $n_{min} = 150$;
-- exact-count batches of 25 rows;
-- a 3× pool (2× on NHANES) selected to the release with the sub-bin rule;
-- Gemini 3.5 Flash with reasoning enabled, reached through the public developer API; the earlier build's draws ran through Vertex AI, and on an earlier configuration the two surfaces reproduce the same release's output to within 0.009 on every measure (technical report, Appendix H.12); and
-- $n = 300$ and three draws per dataset.
-
-Adult and finance use hand-tuned cohort and conditional hierarchies. NHANES uses the auto-configured release of Algorithm 2: three age cohorts and two conditional levels over age, diastolic blood pressure and race/ethnicity.
-
-Several results were produced on the earlier configuration the method was developed on, and each is labelled where it appears. They are:
-
-- the powered six-draw equivalence test of Section 6.1;
-- the 3-way workload table (technical report, Section 7.3);
-- the saturation and inversion controls of Section 6.3;
-- the transmission sweeps and the over-coupling decomposition of Section 6.4;
-- the Diabetes 130 budget sweep of Section 6.5;
-- the generator ladder of Section 6.6;
-- the cohort-wise and cell-wise comparison of Section 6.8;
-- the configuration C and configuration A rows of Table 23 (Section 6.9); and
-- the membership-inference evaluation of Section 6.10, except the attacks on the shipped-configuration draws (Appendix C.3).
-
-That configuration differed from the shipped one in four ways. It released pooled rather than class-conditional histograms. It stated the release to the generator as shares rather than exact counts. It kept every returned row rather than selecting from a pool. And, in the six-draw Adult arm, it showed the generator only the four most common values of each categorical attribute. Every one of those differences is conservative for CoRTeC in a fidelity or utility comparison; Section 6.10 states which draws its attacks read. The conclusions those sections draw concern the variable each isolates, not the configuration.
-
-
-### 5.6 What the controls rule out before the results
-
-Every real dataset in Table 2 is a public benchmark, and the generators we deploy are closed-weight models whose pretraining corpus we cannot audit. Two objections follow, and the experiments that answer them are stated here, before the results, because a reader who holds either objection will otherwise read every table through it. The first is recitation: that the model reproduces records or marginals it has seen. The second is that the mechanism is a property of one vendor's model.
-
-Three controls answer the first. A constructed renal registry with no public presence (Section 6.3) keeps CoRTeC's margin over an ungrounded model unchanged, 0.054 against 0.057 on Adult, a ratio of 0.95, so the margin does not depend on the model having seen the data. An inversion test (Section 6.3) plants a relationship that contradicts the model's prior, advanced degrees paired with low income, and the output follows the private release, emitting the high-income label for 0.000 of advanced-degree holders where the same model without the release emits it for 0.931; on a second vendor under the current release rule the same test gives 0.000 against 1.000. A matched control gives the model CoRTeC's own prompt with the released arrays deleted, so that the release, and not the prompt's wording, is what the control lacks. The membership-inference attacks of Section 6.10, validated on a positive control, find no private record in the output. What these controls do not rule out is recall of a public benchmark's marginal distributions, and Section 10 says so.
-
-The open-weight control answers the second. The transmission sweep of Section 6.4 was repeated on nine self-hosted open-weight models spanning six families; every family at or above 20B parameters transmits the planted relationship with a mean error of 0.10 or less (Appendix E). Those models are scientific controls on the mechanism and not a deployment proposal, for the reason Section 6.6 gives: on full-dataset generation their output is close to that of an unconditioned prompt.
+**Floors, ceiling and repetition.** Every table carries three references at the same $n$: a real sample of $n$ training rows (no synthetic method can be expected to beat it), the same rows with the target permuted (a no-information floor), and students trained on a real sample of 4,000 training rows (the ceiling; the whole split on NHANES, which holds 2,999). Any metric that fails to separate the first two has no power, and we checked that before reading any table; evaluating against explicit reference points rather than a bare threshold is the discipline DPBench argues for [18]. Every cell is the mean over three draws with the sample standard deviation; the central cells are replicated on seeds 43 and 44 with fresh splits and releases, and paired differences across seeds are reported with their sign count and a paired t-test. Single-split and single-draw cells are labelled as such and are read as signals.
 
 ## 6. Results
 
-### 6.1 Head-to-head: fidelity at the release's own level, utility at the floor
+**Table 3:** Adult at ε = 2 on the seed-42 split, three draws per arm. Fidelity and utility in one table; lower is better on the first four columns, higher on the last three. The membership column is the strongest advantage of four attacks on 3,000 candidates (Appendix F); the permitted advantage is 0.762. The Gemini arm was run at $n$ = 300 only. The decoder-with-selection row is the same release decoded with no model and then passed through Algorithm 2 on a pool of three times $n$, as every CoRTeC arm is; the one-shot row is the same Gemini backbone writing rows from the column names alone, with no release and no private data, of which about 70 % are verbatim copies of the public file's first 25 rows (Appendix F.3). The auto-configured row is the release the auto-configurator derives on Adult (Section 5), decoded with no model and the selection step; its conditional cells are not comparable (n/a): the evaluator's seen bands are the fixed rule's cohorts, which that release does not condition on, and two of the three held-out families are columns it conditions on (Appendix E.2 gives the clean family).
 
-**The bound first.** No output decoded from a release can be expected to be closer to the private data than the release itself. At ε = 2 with a fifth of the budget on the conditional table, the release's 1-way total variation against the training data is 0.020 on Adult and 0.013 on finance under the public bins. A 300-record real sample records 0.043 and 0.041 on the same measure. The release therefore carries less marginal error than a sample of the size we generate.
-
-**Adult.** Table 3 reports three draws from one release beside the baselines at five draws each. CoRTeC's 1-way error, 0.026, is below the real sample's 0.043 and within 0.002 of MST's 0.024; that difference does not survive correction (adjusted p = 0.16), so no comparison in this section leaves a baseline's error significantly lower. Its 2-way error, 0.106, equals the real sample's 0.107 within noise and is below AIM's 0.119 and MST's 0.144. Conditional error over seen groups, 0.017, is a quarter of the real sample's, because the class-conditional blocks are estimated from all 26,048 training records and a 300-record sample is not. Over held-out groups it is 0.040 against the sample's 0.036. The three students train at 0.839, 0.875 and 0.844 against the sample's 0.830, 0.870 and 0.840. The difference from AIM and MST on every student is 0.15 to 0.18 AUC.
-
-**Table 3:** Adult at ε = 2, $n$ = 300. The CoRTeC rows are three draws from one release gated under Algorithm 1 (noised, charged counts), decoded with the exact counts stated as totals over the outcomes (Section 4.4).
-
-| condition | draws | 1-way TV ↓ | 2-way TV ↓ | cond. seen ↓ | cond. held-out ↓ | TSTR-LR ↑ | TSTR-RF ↑ | TSTR-GBM ↑ |
+| condition, $n$ = 300 | 1-way TV | 2-way TV | cond. seen | cond. held-out | TSTR-LR | TSTR-RF | TSTR-GBM | MIA adv. |
 |---|---|---|---|---|---|---|---|---|
-| *train on all 26,048 real rows (ceiling)* | *1* | *0.011* | *0.028* | *0.020* | *0.008* | *0.860* | *0.907* | *0.914* |
-| *real sample, n = 300 (floor)* | *3* | *0.043* | *0.107* | *0.062* | *0.036* | *0.830* | *0.870* | *0.840* |
-| **CoRTeC** (Gemini 3.5 Flash) | **3** | **0.026** | **0.106** | **0.017** | **0.040** | **0.839** | **0.875** | **0.844** |
-| CoRTeC (Claude Opus 5) | 1 | 0.030 | 0.110 | 0.013 | 0.042 | 0.838 | 0.870 | 0.825 |
-| MST | 5 | 0.024 | 0.144 | 0.169 | 0.050 | 0.690 | 0.728 | 0.681 |
-| AIM | 5 | 0.037 | 0.119 | 0.054 | 0.101 | 0.675 | 0.700 | 0.691 |
-| *permuted target (no-information floor)* | *3* | *0.041* | *0.110* | *0.152* | *0.102* | *0.423* | *0.485* | *0.482* |
+| *real sample of 4,000 rows (utility ceiling)* | *0.011* | *0.028* | *0.020* | *0.008* | *0.860* | *0.907* | *0.914* | |
+| *real sample (floor)* | *0.043* | *0.107* | *0.062* | *0.036* | *0.830* | *0.870* | *0.840* | |
+| *permuted target (no information)* | *0.041* | *0.110* | *0.152* | *0.102* | *0.423* | *0.485* | *0.482* | |
+| CoRTeC, Qwen3-14B | 0.046 | 0.139 | 0.027 | 0.048 | 0.807 | 0.862 | 0.833 | 0.022 |
+| CoRTeC, Gemini 3.6 Flash | 0.027 | 0.110 | 0.013 | 0.042 | 0.805 | 0.863 | 0.838 | 0.022 |
+| maximum-entropy decoder of the release | 0.058 | 0.146 | 0.082 | 0.049 | 0.818 | 0.856 | 0.847 | 0.025 |
+| maximum-entropy decoder with the selection step | 0.033 | 0.118 | 0.014 | 0.048 | 0.824 | 0.866 | 0.862 | 0.024 |
+| auto-configured release, no model, with selection | 0.019 | 0.108 | n/a | n/a | 0.826 | 0.873 | 0.860 | 0.025 |
+| reference AIM | 0.056 | 0.122 | 0.055 | 0.047 | 0.845 | 0.869 | 0.845 | 0.024 |
+| reference MST | 0.048 | 0.121 | 0.140 | 0.043 | 0.733 | 0.802 | 0.748 | 0.032 |
+| DP-2Stage, GPT-2 | 0.280 | 0.465 | 0.147 | 0.141 | 0.598 | 0.607 | 0.601 | 0.021 |
+| DP fine-tuned Qwen3-14B | 0.106 | 0.190 | 0.087 | 0.071 | 0.809 | 0.832 | 0.815 | 0.024 |
+| Tab-PE | 0.203 | 0.366 | 0.134 | 0.049 | 0.812 | 0.856 | 0.839 | not run |
+| one-shot from the column names, Gemini 3.6 Flash (no release) | 0.148 | 0.307 | 0.214 | 0.136 | 0.795 | 0.850 | 0.831 | 0.012 |
+| **condition, $n$ = 1,000** | | | | | | | | |
+| *real sample (floor)* | *0.026* | *0.061* | *0.031* | *0.019* | *0.855* | *0.892* | *0.883* | |
+| *permuted target (no information)* | *0.025* | *0.069* | *0.146* | *0.095* | *0.511* | *0.508* | *0.513* | |
+| CoRTeC, Qwen3-14B | 0.036 | 0.108 | 0.022 | 0.031 | 0.827 | 0.860 | 0.859 | |
+| maximum-entropy decoder of the release | 0.041 | 0.106 | 0.034 | 0.045 | 0.826 | 0.870 | 0.863 | |
+| maximum-entropy decoder with the selection step | 0.027 | 0.089 | 0.008 | 0.037 | 0.836 | 0.873 | 0.874 | |
+| auto-configured release, no model, with selection | 0.016 | 0.081 | n/a | n/a | 0.841 | 0.884 | 0.884 | |
+| reference AIM | 0.029 | 0.072 | 0.028 | 0.030 | 0.854 | 0.888 | 0.883 | |
+| reference MST | 0.031 | 0.083 | 0.132 | 0.044 | 0.788 | 0.818 | 0.804 | |
+| DP-2Stage, GPT-2 | 0.277 | 0.454 | 0.138 | 0.133 | 0.527 | 0.485 | 0.484 | |
+| DP fine-tuned Qwen3-14B | 0.100 | 0.172 | 0.050 | 0.054 | 0.809 | 0.845 | 0.836 | |
+| Tab-PE | 0.196 | 0.350 | 0.101 | 0.031 | 0.819 | 0.854 | 0.843 | |
+| one-shot from the column names, Gemini 3.6 Flash (no release) | 0.146 | 0.305 | 0.191 | 0.137 | 0.807 | 0.860 | 0.844 | |
 
-**Finance.** Table 4 reports three draws from one release beside MST and PATE-CTGAN on the full 15-column schema, and beside AIM on the reduced 12-column schema. That schema is the only one AIM completes on within three hours; its fit on the full schema exceeded three hours on every attempt, and the cause is localised to the six high-cardinality amount columns. CoRTeC, MST and the floors are re-scored on those 12 columns for that comparison.
+**Table 4:** The three papers' own protocols on Adult, ε = 1, one split. The published rows are the papers'; our rows are scored by our implementation of each paper's metric set. Under the DP-LLMTGen protocol the distance columns are on our scorer's scale, which reads the training set itself at 0.009 against the paper's 0.004, so only the utility columns are comparable across the two sources; under the Tab-PE protocol the embedding-space precision and recall are implementation-dependent and are left to Appendix E. Rows marked three seeds are means over the three Tab-PE splits.
 
-The finance result has the same shape as the Adult result. 1-way error, 0.029, is within 0.001 of MST's 0.028 (the two do not separate) and below the real sample's. 2-way error, 0.123, is below MST's 0.230 and above the sample's 0.099; on the 12-column schema it is 0.108 against AIM's 0.136. Conditional error is below the sample's on seen and held-out groups. No student separates from the real-sample floor: the trees train at 0.721 and 0.699 against 0.727 and 0.717 (p = 0.50 and 0.16) and logistic regression at 0.689 against 0.695 (p = 0.26), where the earlier release had left it 0.015 short. On the 12-column schema CoRTeC's 1-way error is lower than AIM's by a factor of 2.2, and its students are higher on every one. It does not separate from MST on 1-way error, the measure MST is built for.
+| protocol and method | fidelity (paper's measure) | utility (paper's measure) |
+|---|---|---|
+| **DP-LLMTGen protocol** (1-way, 2-way TVD against the test split; XGBoost ACC, AUC) | | |
+| DP-LLMTGen, Llama-2 7B (published) | 0.038, 0.068 | 0.831, 0.879 |
+| RAP++ (published) | 0.054, 0.099 | 0.803, 0.807 |
+| CoRTeC, Qwen2.5-7B (ours) | 0.060, 0.121 | 0.831, 0.881 |
+| maximum-entropy decoder (ours) | 0.034, 0.089 | 0.818, 0.888 |
+| reference AIM (ours) | 0.018, 0.046 | 0.850, 0.902 |
+| reference MST (ours) | 0.018, 0.061 | 0.813, 0.836 |
+| DP fine-tuned Llama-2 7B, our run of the procedure | 0.103, 0.177 | 0.795, 0.841 |
+| **DP-2Stage protocol** (their split and metric suite; Pair, HIST, CorAcc in %; F1, AUC in %) | | |
+| real data (published) | 97.5, 99.1, 97.3 | 69.9, 91.7 |
+| AIM (published) | 77.1, 88.4, 86.4 | 59.6, 86.8 |
+| DP-2Stage-O (published) | 72.3, 88.5, 55.4 | 30.4, 61.6 |
+| DP-2Stage-O, our run of their code | 63.0, 84.7, 56.4 | 26.2, 59.9 |
+| CoRTeC, Qwen2.5-7B (ours) | 70.8, 84.6, 63.6 | 61.8, 87.1 |
+| maximum-entropy decoder (ours) | 74.3, 87.6, 69.8 | 62.8, 87.1 |
+| reference AIM (ours) | 93.1, 97.2, 83.1 | 62.9, 87.7 |
+| reference MST (ours) | 92.6, 97.2, 74.2 | 51.5, 84.0 |
+| **Tab-PE protocol** (1-WD, 2-WD against the private table; TabICL accuracy, macro F1) | | |
+| real data (published UB) | 0.014, 0.027 | 84.41, 75.68 |
+| AIM (published) | 0.017, 0.034 | 83.36, 76.10 |
+| Tab-PE (published) | 0.049, 0.086 | 82.22, 73.66 |
+| Tab-PE, our run of their code, three seeds | 0.044, 0.093 | 82.19, 72.96 |
+| CoRTeC, Qwen3-14B, three seeds | 0.040, 0.100 | 81.44, 74.46 |
+| CoRTeC, Qwen3-32B, three seeds | 0.039, 0.101 | 81.42, 74.98 |
+| CoRTeC, Qwen2.5-7B, three seeds | 0.088, 0.176 | 81.75, 74.10 |
+| maximum-entropy decoder, three seeds | 0.045, 0.109 | 81.97, 76.55 |
+| reference AIM, three seeds | 0.022, 0.061 | 81.69, 70.84 |
+| reference MST, three seeds | 0.023, 0.062 | 80.86, 64.68 |
 
-**Table 4:** Finance at ε = 2, $n$ = 300. AIM completes only on the 12-column schema, so that block re-scores every arm on those columns. The CoRTeC rows are three draws from one release gated under Algorithm 1 (noised, charged counts), decoded with the exact counts stated as totals over the outcomes (Section 4.4).
+**RQ1. Does the release carry the result? Yes: decoded with no language model, the release matches CoRTeC on single columns and on utility at every seed.** On Adult at $n$ = 1,000 the maximum-entropy decoder reads 0.041 on single columns, 0.106 on pairs and 0.826, 0.870 and 0.863 on the three students, against CoRTeC's 0.036, 0.108 and 0.827, 0.860, 0.859 (Table 3); over seeds 42, 43 and 44 the paired differences are within 0.005 on every fidelity measure and within 0.005 AUC on every student, with no consistent sign (Table 6). At $n$ = 300 the decoder's seen-conditional error is worse (0.073 against 0.035 over seeds, 0 of 3 seeds in the decoder's favour, p = 0.04) and its gradient-boosting student better by 0.012 (3 of 3, p = 0.01). On NHANES the decoder is ahead of CoRTeC on pairs at every seed (0.117 against 0.161 at $n$ = 300, 0.087 against 0.151 at $n$ = 1,000) and on every student at $n$ = 1,000 (0.769, 0.745, 0.722 against 0.732, 0.686, 0.669; 3 of 3 seeds each, p = 0.06 to 0.10). On bank marketing, one split, the decoder is at the real sample's floor on single columns (0.026 and 0.013 at the two sizes against 0.025 and 0.014) and level with the reference AIM on pairs and utility (Appendix E). Under the three paper protocols the decoder is within 0.01 of CoRTeC on every utility measure and ahead of the Qwen2.5-7B arm on every fidelity measure (Table 4). The release is a competitive differentially private synthesiser on its own, and it is the reference point for everything the model adds. Passing the decoder's own pool through the selection step of Algorithm 2, as every CoRTeC arm is, closes the one gap, and replicates: over the three splits the decoder with selection reads 0.035, 0.120 and 0.017 at $n$ = 300 and 0.027, 0.090 and 0.007 at $n$ = 1,000 (0 of 3 seeds in the plain decoder's favour on every fidelity measure, p ≤ 0.03 except the held-out conditional at $n$ = 300, p = 0.20), below a real sample on single columns at $n$ = 300 (0.035 against 0.044) and near it at $n$ = 1,000 (0.027 against 0.024), below it on the seen conditionals at both sizes (0.017 and 0.007 against 0.066 and 0.035), with students within 0.014 of the reference AIM's, behind on the forest at both sizes and on the linear student at $n$ = 1,000 (0 of 3, p = 0.01, 0.06 and 0.02) and ahead on gradient boosting at $n$ = 300 (3 of 3, p = 0.01; Table 6, Appendix E.2). The release the auto-configurator derives on Adult, decoded the same way, goes further and replicates: over the three splits it is ahead of the reference AIM on single columns (0.020 against 0.052 at $n$ = 300 and 0.016 against 0.031 at $n$ = 1,000; 0 of 3 seeds in AIM's favour, p ≤ 0.01) and on pairs at $n$ = 300 (0.109 against 0.120, 0 of 3, p = 0.05), level with or ahead of it on the students (within 0.007 AUC at $n$ = 1,000 with no consistent sign; the gradient-boosting student ahead by 0.020 at $n$ = 300, 3 of 3, p = 0.03), and behind it on pairs at $n$ = 1,000 (0.082 against 0.074, 3 of 3, p < 0.01; Table 6, Appendix E.2). Its conditional cells are not compared, because the evaluator's seen bands are the fixed rule's cohorts and two of the three held-out families are columns that release conditions on; over the one clean family it is ahead of AIM at both sizes (Appendix E.2). The attribution is in the same table: of its single-column margin over the plain decoder, 0.038 at $n$ = 300 and 0.025 at $n$ = 1,000, the selection step accounts for 0.023 and 0.014 and the auto-configured workload for 0.015 and 0.011, each step at 0 of 3 seeds against (p ≤ 0.03); on the students each step adds 0.003 to 0.009, significant only for the selection step on the forest at $n$ = 1,000 (p = 0.01; the linear student p = 0.05).
 
-| condition | draws | 1-way TV ↓ | 2-way TV ↓ | cond. seen ↓ | cond. held-out ↓ | TSTR-LR ↑ | TSTR-RF ↑ | TSTR-GBM ↑ |
+**RQ2. What does the language model add? Plausibility driven by the column names.** The aggregate effect of the model over the decoder is neutral on Adult, negative on NHANES pairs at every seed (p ≤ 0.02 at both sizes) and negative on bank at both sizes (single columns 0.040 against 0.026, pairs 0.112 against 0.066 at $n$ = 300). Its one consistent gain over the plain decoder is on the conditionals the release names: on Adult the seen-conditional error is lower at 3 of 3 seeds at $n$ = 300 (0.035 against 0.073, p = 0.04) and lower by 0.005 at $n$ = 1,000, a difference that does not replicate (1 of 3 seeds, p = 0.38). That gain is the selection step's and not the model's: the decoder's own pool passed through Algorithm 2 reads 0.017 at $n$ = 300 and 0.007 at $n$ = 1,000 over three seeds (0 of 3 in the plain decoder's favour, p ≤ 0.01; Table 6), below both. Without the release, the same Gemini backbone writing rows from the column names alone reads 0.148 on single columns, 0.307 on pairs and 0.214 on the seen conditionals, worse than the permuted floor on the conditionals, and about 70 % of its rows are verbatim copies of the public file's first 25 rows (Appendix F.3); its students still reach 0.795, 0.850 and 0.831, within 0.025 AUC of the CoRTeC arms and the decoder on every student. That is Swanberg et al.'s finding [37] in its strongest form: on a public benchmark the utility columns separate the arms weakly and the fidelity columns carry the comparison; with the release, the same backbone copies none of those rows into any draw. Per pair, the model's error against the private table is below the decoder's on the pairs it recognises as logical, education with education number, marital status with relationship, relationship with sex on Adult, days since contact with the previous outcome on bank, and above it on pairs it believes related and the data does not: education with contact, contact with the previous outcome, marital status with education, loan with contact on bank (Appendix E.3). The model repairs what it knows and invents what it expects.
+
+**RQ3. Does the edge survive neutral names? No for pairs and utility; yes for single columns, and that part is the selection step.** The anonymised schema renames every column, category and label to neutral tokens, maps the release and the prompt accordingly and de-anonymises the draws before scoring, so the model sees the same numbers with no meaning attached (Appendix C). Table 5 gives the result on Adult at $n$ = 300. On Gemini 3.6 Flash the pair error rises from 0.110 to 0.148, the decoder's level (0.146), and the students fall from 0.805, 0.863, 0.838 to 0.745, 0.840, 0.798, below the decoder's 0.818, 0.856, 0.847; the single-column error stays at 0.030 against the decoder's 0.058, which is the rake matching the released marginals and not the names. On Qwen3-14B every measure is worse without names (single columns 0.065, pairs 0.168, students 0.811, 0.846, 0.817), and on Qwen3-32B the same at two draws. DP-LLMTGen found that meaningful names help a fine-tuned model [38]; this is the same mechanism read from the other side, in a design where the model is frozen and the names are the only channel its knowledge has. The decoder-with-selection row of Table 3 says the same directly: the selection step on a model-free pool reaches 0.033 on single columns and 0.014 on the seen conditionals, within 0.006 of the Gemini arm's 0.027 and 0.013, with no names in play.
+
+**Table 5:** The anonymised-schema control, Adult, ε = 2, $n$ = 300, the same releases under neutral names. Two draws for the 32B arm; the others three.
+
+| backbone | names | 1-way TV | 2-way TV | cond. seen | cond. held-out | TSTR-LR | TSTR-RF | TSTR-GBM |
 |---|---|---|---|---|---|---|---|---|
-| *train on all 24,000 real rows (ceiling)* | *1* | *0.009* | *0.024* | *0.013* | *0.008* | *0.699* | *0.748* | *0.747* |
-| *real sample, n = 300 (floor)* | *3* | *0.041* | *0.099* | *0.059* | *0.045* | *0.695* | *0.727* | *0.717* |
-| **CoRTeC** (Gemini 3.5 Flash) | **3** | **0.029** | **0.123** | **0.016** | **0.028** | **0.689** | **0.721** | **0.699** |
-| MST | 3 | 0.028 | 0.230 | 0.090 | 0.150 | 0.580 | 0.610 | 0.604 |
-| PATE-CTGAN | 3 | 0.209 | 0.397 | 0.192 | 0.138 | 0.548 | 0.501 | 0.515 |
-| *permuted target (no-information floor)* | *3* | *0.040* | *0.100* | *0.137* | *0.059* | *0.514* | *0.482* | *0.481* |
-| **12-column schema:** CoRTeC | 3 | 0.024 | 0.108 | 0.016 | 0.028 | 0.683 | 0.723 | 0.707 |
-| 12-column schema: AIM | 5 | 0.054 | 0.136 | 0.083 | 0.036 | 0.578 | 0.652 | 0.623 |
-| 12-column schema: MST | 3 | 0.023 | 0.216 | 0.090 | 0.150 | 0.591 | 0.644 | 0.636 |
-| *12-column schema: real sample, n = 300* | *3* | *0.038* | *0.090* | *0.059* | *0.045* | *0.682* | *0.722* | *0.709* |
+| Gemini 3.6 Flash | real | 0.027 | 0.110 | 0.013 | 0.042 | 0.805 | 0.863 | 0.838 |
+| Gemini 3.6 Flash | neutral | 0.030 | 0.148 | 0.014 | 0.044 | 0.745 | 0.840 | 0.798 |
+| Qwen3-14B | real | 0.046 | 0.139 | 0.027 | 0.048 | 0.807 | 0.862 | 0.833 |
+| Qwen3-14B | neutral | 0.065 | 0.168 | 0.044 | 0.054 | 0.811 | 0.846 | 0.817 |
+| Qwen3-32B (AWQ) | real | 0.049 | 0.138 | 0.031 | 0.046 | 0.815 | 0.864 | 0.840 |
+| Qwen3-32B (AWQ) | neutral, 2 draws | 0.060 | 0.159 | 0.067 | 0.052 | 0.785 | 0.858 | 0.822 |
+| *maximum-entropy decoder* | *none* | *0.058* | *0.146* | *0.082* | *0.049* | *0.818* | *0.856* | *0.847* |
+| *real sample* | | *0.043* | *0.107* | *0.062* | *0.036* | *0.830* | *0.870* | *0.840* |
 
-**NHANES, auto-configured.** Table 5 is the turn-key case: a release the auto-configurator derived with no hand-tuned hierarchy, generated cohort-wise from a 2× pool, beside MST, AIM and PATE-CTGAN fitted on NHANES at the same ε and binning. NHANES is also the one clinical dataset on which AIM completes (58 s to fit), so it carries the healthcare panel of Figure 3.
+**RQ4. Does the reading replicate, and where is the reference AIM ahead? It replicates at three seeds and on a third dataset; AIM is ahead on pairs everywhere and on utility at Adult $n$ = 1,000 against the fixed-rule release, and level with or behind the auto-configured release on utility.** Table 6 summarises the three seeds. Three seeds give a paired test little power, so a difference is read as replicated when its sign holds at every seed, with the p-value reported beside it; where p lies between 0.06 and 0.10 below, the sign count and not the test carries the reading. On Adult the reference AIM's pair error is below CoRTeC's at every seed and both sizes (0.120 against 0.146 at $n$ = 300, 0.074 against 0.112 at $n$ = 1,000; p = 0.03 and below 0.01) and its students are above CoRTeC's at $n$ = 1,000 at every seed (0.847, 0.882, 0.876 against 0.829, 0.863, 0.860; p = 0.07 to 0.08 at three pairs); at $n$ = 300 only the random forest separates, by 0.006 (0 of 3 seeds in CoRTeC's favour, p = 0.02). Against the auto-configured release, decoded with no model and the selection step, the utility gap closes at both sizes (p = 0.28 to 0.86; the gradient-boosting student is ahead of AIM's at $n$ = 300 at 3 of 3 seeds, p = 0.03; Appendix E.2) and AIM keeps pairs at $n$ = 1,000 only. The single-column margin comes from cohort granularity: the fixed rule forms twelve cohorts of 380 to 6,041 records over education and hours, the auto-configurator three cohorts of 4,434 to 13,345 over age, and a Laplace histogram carries the same absolute noise whatever the count, so the larger cohorts hold every histogram at a smaller relative error although the per-query budget is smaller under the auto-configurator (0.089 against 0.105). Cohort granularity gives named conditionals at a cost in marginal precision. On NHANES AIM is ahead of CoRTeC on pairs at every seed (0.103 against 0.161; 0.071 against 0.151), ahead of it on every student at $n$ = 300 (0 of 3 seeds in CoRTeC's favour, p = 0.12 to 0.18) and level with it at $n$ = 1,000 (p = 0.73 to 0.96), and trades places with the decoder on utility (ahead at $n$ = 300, behind at $n$ = 1,000, with no paired difference below p = 0.06). CoRTeC is level with AIM on single columns at $n$ = 300 (0.054 against 0.052) and behind by 0.009 at $n$ = 1,000, and ahead of it on the seen conditionals on Adult at both sizes (0.035 against 0.061 at $n$ = 300, p < 0.01). This is the ordering the benchmark reports for AIM across five datasets [10], and we read it as expected. The DP fine-tuning rows are behind on every fidelity measure at the same budget, and on NHANES the fine-tuned Qwen3-14B is near the no-information floor on utility (0.575, 0.544 and 0.527 against the floor's 0.493, 0.514 and 0.515; Appendix E); Tab-PE is far from the private table on pairs under our measure while reaching the decoder's utility, which is the behaviour its authors describe on low-order datasets [39]. DP-2Stage is behind on both axes, as its own paper reports against AIM [3].
 
-The release's 1-way error against the training data is 0.009, and the selected draws' 1-way error against the release is 0.003 (both under the release's convention). The marginal result therefore carries over to a release nobody tuned: 1-way error 0.016 against the sample's 0.034, conditional error over seen groups 0.013 against 0.015, held-out 0.036 against 0.036.
+**Table 6:** Replication over seeds 42, 43 and 44: means over seeds of the per-seed means (three draws each), Adult and NHANES. The full table with every seed, the sample standard deviations across seeds and every paired test is Appendix E.2.
 
-Two things do not carry over, and both are stated. 2-way error is 0.120 against the sample's 0.081 (Welch p = 0.004): with three cohorts and a four-cell table the release names little pairwise structure, and what the selection does not constrain the generator supplies. And every student trains below the floor: logistic regression at 0.738 against 0.773 (p = 0.32), the random forest at 0.679 against 0.728 (p = 0.033) and gradient boosting at 0.681 against 0.716 (p = 0.099). The random forest is the one student on any of the three datasets that separates from a real sample at three draws before correction; on the earlier release of the same configuration it did not (0.732 against 0.728). The linear gap is not in the release, since the release decoded with no model at all trains logistic regression at 0.767. The gap lies in the youngest cohort, whose diabetic class does not clear $n_{min}$; that cohort therefore keeps a pooled block and the generator's values below bin resolution (Section 4.5). CoRTeC's error is lower than all three baselines' on every measure except conditional error over seen groups, where MST's 0.004 and AIM's 0.009 are below CoRTeC's 0.013 and neither difference survives correction (adjusted p = 0.20 and 0.42).
-
-**Table 5:** NHANES at ε = 2, $n$ = 300, under a release nobody tuned. The CoRTeC rows are three draws from one release gated under Algorithm 1 (noised, charged counts), decoded with the exact counts stated as totals over the outcomes (Section 4.4).
-
-| condition | draws | 1-way TV ↓ | 2-way TV ↓ | cond. seen ↓ | cond. held-out ↓ | TSTR-LR ↑ | TSTR-RF ↑ | TSTR-GBM ↑ |
-|---|---|---|---|---|---|---|---|---|
-| *train on all 2,999 real rows (ceiling)* | *1* | | | | | *0.797* | *0.763* | *0.747* |
-| *real sample, n = 300 (floor)* | *3* | *0.034* | *0.081* | *0.015* | *0.036* | *0.773* | *0.728* | *0.716* |
-| **CoRTeC** (Gemini 3.5 Flash, auto-configured) | **3** | **0.016** | **0.120** | 0.013 | **0.036** | **0.738** | **0.679** | **0.681** |
-| MST | 3 | 0.024 | 0.175 | **0.004** | 0.128 | 0.687 | 0.646 | 0.664 |
-| AIM | 3 | 0.024 | 0.142 | 0.009 | 0.073 | 0.596 | 0.650 | 0.650 |
-| PATE-CTGAN | 3 | 0.095 | 0.187 | 0.149 | 0.150 | 0.598 | 0.552 | 0.539 |
-| *permuted target (no-information floor)* | *3* | *0.043* | *0.093* | *0.047* | *0.060* | *0.493* | *0.514* | *0.515* |
-
-![Figure 3](figures/fig03_head_to_head.png)
-
-**Figure 3:** The central comparison on three datasets. Points are means over draws, bars are 95% bootstrap confidence intervals, and the shaded band spans the no-information floor to a real sample of the same size.
-
-**The family statistics.** Table 6 gives the Welch tests on the per-draw values, Holm-corrected over each seven-metric family of one baseline on one dataset, in the direction that favours CoRTeC. On Adult and finance, 29 of the 35 comparisons survive correction in CoRTeC's favour and none separates in a baseline's favour. The six that do not separate are: - the 1-way comparisons against MST on Adult and on finance (both schemas), where the two methods are within 0.002; - conditional error over seen groups against MST on finance, on both schemas; and - held-out conditional error against AIM on the 12-column schema.
-
-On NHANES, 6 of the 21 comparisons survive at three draws against three. Five of them are fidelity measures and one is the gradient-boosting student against PATE-CTGAN (+0.141, adjusted p = 0.0008); against MST and AIM no student separates after correction. The other utility differences on NHANES are consistent in direction and do not survive at three draws. The utility ordering there is therefore a corrected result on one student and a signal on the other two.
-
-**Table 6:** Holm-corrected families. Cells are the difference CoRTeC − baseline with the adjusted p in brackets. Negative error differences and positive AUC differences favour CoRTeC.
-
-| family | 1-way | 2-way | cond. seen | cond. held-out | TSTR-LR | TSTR-RF | TSTR-GBM |
+| dataset, $n$ | condition | 1-way TV | 2-way TV | cond. seen | TSTR-LR | TSTR-RF | TSTR-GBM |
 |---|---|---|---|---|---|---|---|
-| Adult, against AIM | −0.011 (0.0007) | −0.013 (0.0011) | −0.036 (0.0002) | −0.061 (0.0013) | +0.164 (<0.0001) | +0.176 (0.0014) | +0.152 (0.012) |
-| Adult, against MST | +0.002 (0.16) | −0.038 (<0.0001) | −0.152 (0.0011) | −0.010 (0.012) | +0.150 (0.0001) | +0.147 (0.0003) | +0.163 (0.0079) |
-| finance, against MST | +0.000 (0.69) | −0.107 (0.0015) | −0.073 (0.065) | −0.122 (0.0007) | +0.109 (0.0007) | +0.112 (0.0023) | +0.095 (0.049) |
-| finance, 12 columns, against AIM | −0.030 (0.0006) | −0.028 (0.0071) | −0.066 (0.0021) | −0.008 (0.49) | +0.104 (0.017) | +0.071 (0.016) | +0.084 (0.01) |
-| finance, 12 columns, against MST | +0.002 (0.49) | −0.108 (0.0021) | −0.073 (0.098) | −0.122 (0.0013) | +0.092 (0.0005) | +0.080 (0.016) | +0.071 (0.03) |
-| NHANES, against MST | −0.008 (0.12) | −0.055 (0.024) | +0.009 (0.2) | −0.092 (0.039) | +0.050 (0.42) | +0.033 (0.1) | +0.017 (0.42) |
-| NHANES, against AIM | −0.008 (0.42) | −0.022 (0.2) | +0.004 (0.42) | −0.037 (0.0081) | +0.141 (0.19) | +0.029 (0.2) | +0.030 (0.42) |
-| NHANES, against PATE-CTGAN | −0.079 (0.025) | −0.067 (0.0095) | −0.136 (0.1) | −0.114 (0.1) | +0.140 (0.42) | +0.127 (0.38) | +0.141 (0.0008) |
-
-**The powered equivalence test.** The claim that a model trained on CoRTeC's output performs as one trained on a real sample of the same size was first tested with adequate power on Adult. The generator was Claude Fable 5, with six draws against five real samples, on the earlier release design; the prompt showed only the four most common values of each categorical attribute, the weaker of the two prompts we ran. The differences were +0.007, −0.003 and +0.012 AUC on the three students. The 95% confidence intervals on the difference were [−0.007, +0.021], [−0.015, +0.010] and [−0.000, +0.027], and every p > 0.18.
-
-A non-significant difference is not by itself evidence of equivalence. What makes this one an equivalence result is that the intervals exclude any advantage or deficit larger than about 0.027 AUC. The same arm regenerated from a fresh release under the two-count rate mechanism of Algorithm 1 reproduces it (0.848, 0.871 and 0.852 against 0.834, 0.872 and 0.843; the one student that moves, moves in CoRTeC's favour, p = 0.050). Tables 3 to 5 remake the result under the shipped configuration and a second generator family on three datasets, at three draws each.
-
-**A second vendor.** The Adult release was also generated through Claude Opus 5, one complete threefold pool of 900 rows selected exactly as the Gemini pools were. The pool's 1-way error against the released histograms is 0.007, lower than the Gemini pools' 0.009 to 0.011. The selected draw reproduces the result (Table 3): each measure is within 0.024 of the Gemini means, and the three students match the real-sample floor. One draw is a check rather than a replication, and we present it as one.
-
-**The generative families.** All three fail on Adult at ε = 2 by not preserving the target's base rate, in opposite directions: DP-CTGAN collapses towards the negative class (two of three draws contain no positive record, so TSTR is undefined), while PATE-GAN and PATE-CTGAN emit 45 to 60% positives against a real 24.1% (TSTR-LR 0.562 and 0.608). These are library defaults, and the failure is invisible in a marginal-fidelity summary unless the base rate is inspected (technical report, Section 7.2).
-
-**AIM's own workloads.** On the metric AIM is built for, 3-way workload error at a sample size adequate for it ($n$ = 1,950), AIM records the lowest error on all three workloads, CoRTeC the second lowest, and MST and PATE-CTGAN follow (technical report, Section 7.3). The advantage is structural: AIM's adaptive selection optimises exactly that workload under the budget, and we did not set out to match it.
-
-**Are AIM and MST under-tuned?** They run at smartnoise-synth defaults, at matched ε and matched discretisation, and on Adult the answer is yes. A sweep of the two settings a practitioner would try first, fitted on the same training split under the same public bins and scored under the same protocol, raises AIM's junction-tree limit from 80 MB to 300 MB and its workload from 2-way to 3-way marginals (Table 35, Appendix G). The larger model trains logistic regression at 0.772 and the trees at 0.867 and 0.835; the 3-way workload at 0.812, 0.876 and 0.847. Against CoRTeC's 0.839, 0.875 and 0.844 and the real sample's 0.830, 0.870 and 0.840, the tree students no longer separate and the linear student is 0.03 short, where the defaults were 0.15 to 0.18 short. Conditional error over seen groups stays at 0.045 and 0.046 against CoRTeC's 0.017; held-out conditional error falls to 0.029 and 0.026, below CoRTeC's 0.040; and 2-way error falls to 0.102, below CoRTeC's 0.106. The cost is fitting time: 30 minutes for the larger model and 13.4 hours for the 3-way workload, against 23 minutes at the defaults. The utility margin of Table 3 is therefore a margin over the library defaults on this dataset, and the claim this paper makes is the narrower one: a release built for a classifier reaches the real-sample floor with no fitting, and a marginal method reaches it on Adult when given a larger model or a richer workload and the hours to fit it. Two other pieces of evidence stand. Section 8.2 shows that giving AIM and MST a DP conditional table moves AIM from 0.675 to 0.777 and MST from 0.690 to 0.773 without any change of configuration, so most of the default margin is in what is released; and the residual is not the language model's prior (Section 6.3). Whether tuning has the same effect on finance and NHANES, where AIM at defaults fits in under a minute on NHANES and not at all on the full finance schema, we have not measured, and a third setting, both changes together, was still fitting when this version was prepared.
-
-### 6.2 What the release carries, and what each step of Stage B contributes
-
-**The release alone, decoded with no model.** The clearest way to see what a release carries is to decode it by independent sampling, with no language model and no prior. A cohort is drawn by its released size, the outcome from the released class balance, and every other column from that outcome's histogram block. Under a pooled release, the columns come from the cohort's single block and the outcome from the conditional table. Table 8 does this five times for each release design on finance and on Adult.
-
-Decoded this way, the class-conditional release trains better models than the pooled one on every student and both datasets. The gain is 0.02 to 0.04 AUC on finance (Welch p = 0.089, 0.048, 0.013 for LR, RF, GBM) and 0.05 to 0.06 on Adult (p ≤ 0.005 on all three). The class-conditional release is within 0.011 AUC of the real-sample floor on every finance student and within 0.019 on every Adult student. Held-out conditional error falls by 31 to 39%. The pooled release, decoded the same way, gives the same utility as our earliest generated finance arm did: the information a classifier needs was not in the release the generator was given. The naive decode is not a competitor to the generator, since its 2-way error is 1.6× the real sample's. It is a lower bound on the information the release contains.
-
-**Table 8:** Each release design decoded by independent sampling, with no model (five decodes each).
-
-| release, decoded naively | 1-way TV ↓ | 2-way TV ↓ | cond. seen ↓ | cond. held-out ↓ | TSTR-LR ↑ | TSTR-RF ↑ | TSTR-GBM ↑ |
-|---|---|---|---|---|---|---|---|
-| **finance**, pooled | 0.053 | 0.157 | 0.053 | 0.042 | 0.666 | 0.701 | 0.664 |
-| **finance**, class-conditional | 0.054 | 0.161 | 0.061 | **0.029** | **0.687** | **0.733** | **0.706** |
-| *finance, real sample n = 300* | *0.041* | *0.099* | *0.059* | *0.045* | *0.695* | *0.727* | *0.717* |
-| **Adult**, pooled | 0.052 | 0.144 | 0.069 | 0.094 | 0.752 | 0.814 | 0.792 |
-| **Adult**, class-conditional | 0.058 | 0.150 | 0.070 | **0.057** | **0.811** | **0.861** | **0.842** |
-| *Adult, real sample n = 300* | *0.043* | *0.107* | *0.062* | *0.036* | *0.830* | *0.870* | *0.840* |
-
-The same generator on both releases confirms it. With one finance release of each kind, Gemini 3.5 Flash, the same prompts and three draws per release, the class-conditional release raises every student: +0.029, +0.050 and +0.042 AUC (Welch p = 0.007, 0.017, 0.029; Hedges' g, a standardised effect size, of 2.4 to 4.0). The four fidelity measures stay within draw-to-draw spread (p ≥ 0.20). The pooled arm under Gemini reproduces the pooled arm under Claude Fable 5 to within 0.012 AUC on every student (0.651, 0.662, 0.662 against 0.652, 0.673, 0.664), which is direct confirmation that the ceiling was the release's, not the generator's.
-
-Under Claude Fable 5 on the same release design the tree students again reach the floor (0.723 and 0.716 against 0.727 and 0.717), but held-out conditional error rises from 0.048 to 0.057 (p = 0.007), a cost the Gemini arm does not show. The per-outcome blocks give that generator more to honour per cohort, and the cost appears on the conditional families the release does not name. We report it as a cost of the design under one generator rather than as noise.
-
-**Exact counts and selection.** The two Stage B steps were separated on the Adult release by scoring the same generated rows before and after selection (Table 9). Exact counts act on the pool: the three generated pools (879, 900 and 900 rows) match the released histograms to 0.009 to 0.011, below the release's own distance from the truth, whereas the plain share-based prompt's rows have an error of 0.052 against theirs. But any 300 rows drawn at random from a faithful pool carry the sampling error every 300-record sample carries, and a random 300 rows from that pool have a 1-way error of 0.050, close to the real sample's 0.043.
-
-Selection removes that sampling error. 1-way error falls from 0.050 to 0.029, 2-way error equals the real sample's, conditional error falls by almost three quarters, and the three students move up by 0.009 to 0.027 AUC. The two steps are a pair. Counts without selection give a pool the selection can trust; selection without counts chooses from rows that were never asked to match, which produced no gain that survived a significance test on the earlier arms.
-
-**Table 9:** Exact counts and selection, separated on one Adult release with three pools. The selected row is re-selected from the same three pools at a fixed seed, which is why its 1-way error coincides with the earlier build's Table 3 row while the students differ slightly; Table 9 is on the earlier release.
-
-| condition | 1-way TV ↓ | 2-way TV ↓ | cond. seen ↓ | cond. held-out ↓ | TSTR-LR ↑ | TSTR-RF ↑ | TSTR-GBM ↑ |
-|---|---|---|---|---|---|---|---|
-| exact-count batches, a random 300 of each pool | 0.050 | 0.131 | 0.057 | 0.052 | 0.826 | 0.851 | 0.821 |
-| the same pools, the 300 rows selected to the release | **0.029** | **0.109** | **0.015** | **0.037** | 0.835 | 0.872 | 0.848 |
-| *real sample, n = 300* | *0.043* | *0.107* | *0.062* | *0.036* | *0.830* | *0.870* | *0.840* |
-| *the release itself against the training data (release convention)* | *0.020* | | | | | | |
-
-**The sub-bin rule.** Table 10 applies the rule to the current-release and pooled arms, with the values the generator produced beside the values the rule produces. It does what it was built for on the arm that needed it, and nothing on the arms that did not. On the class-conditional arms of Adult and finance the students move by at most 0.010 AUC, in both directions, inside draw-to-draw spread. Two alternatives, a redraw in every cohort and a per-block mean calibration, were measured and rejected (technical report, H.17).
-
-**Table 10:** The sub-bin rule on the current-release and pooled arms: the generator's values, then the release's. The earlier-release arms are in the technical report, H.17.
-
-| arm | draws, n | TSTR-LR | TSTR-RF | TSTR-GBM | 1-way TV | real sample LR / RF / GBM |
-|---|---|---|---|---|---|---|
-| NHANES, shipped configuration, current release | 3, 300 | **0.711 to 0.738** | 0.665 to 0.679 | 0.663 to 0.681 | 0.017 to 0.016 | 0.773 / 0.728 / 0.716 |
-| Adult, shipped configuration (Gemini), current release | 3, 300 | 0.837 to 0.839 | 0.872 to 0.875 | 0.851 to 0.844 | 0.023 to 0.026 | 0.830 / 0.870 / 0.840 |
-| Adult, shipped configuration (Opus 5) | 1, 300 | 0.840 to 0.838 | 0.872 to 0.870 | 0.833 to 0.825 | 0.027 to 0.030 | 0.830 / 0.870 / 0.840 |
-| finance, shipped configuration (Gemini), current release | 3, 300 | 0.685 to 0.689 | 0.715 to 0.721 | 0.700 to 0.699 | 0.026 to 0.029 | 0.695 / 0.727 / 0.717 |
-| NHANES, pooled release | 1, 600 | 0.763 to 0.763 | 0.744 to 0.744 | 0.733 to 0.733 | 0.025 to 0.025 | 0.778 / 0.735 / 0.725 |
-| Diabetes 130, pooled release | 1, 300 | 0.555 to 0.555 | 0.570 to 0.570 | 0.566 to 0.566 | 0.053 to 0.053 | 0.557 / 0.556 / 0.543 |
-
-### 6.3 Both standard acceptance criteria are saturated
-
-**Marginal fidelity.** A common statement of the fidelity goal is that synthetic data should be "at least 90% statistically similar" to the private data, operationalised as 1 − TV. Table 11 tests whether that criterion can tell good data from useless data, using the permuted-target control on Adult. The permuted control has no usable feature-to-target relationship (TSTR 0.458, near chance) and yet records 95.7% 1-way similarity, passing a 90% bar, because permuting one column of fifteen leaves every marginal intact. Tightening the bar far enough to exclude the useless case also excludes a genuine sample: on 2-way similarity the pair is 0.106 and 0.112, so a 90% two-way bar rejects both, including real data drawn from the private distribution itself. A criterion that fails real data is not a usable acceptance test.
-
-**Table 11:** A marginal criterion cannot separate good data from useless data (Adult, $n$ = 300; earlier configuration).
-
-| metric | real sample (known good) | permuted target (known bad) | separates? |
-|---|---|---|---|
-| 1-way TV | 0.042 | 0.043 | no; saturated |
-| 2-way TV | 0.106 | 0.112 | no; saturated |
-| conditional TV (seen) | 0.063 | 0.155 | yes |
-| conditional TV (held-out) | 0.036 | 0.102 | yes |
-| TSTR-LR | 0.834 | 0.458 | yes |
-
-We therefore propose that any fidelity criterion for private synthesis carry a conditional term. A concrete instance, calibrated on Adult at $n$ = 300 and offered as an illustration rather than as a standard, that real data and CoRTeC pass, while AIM, MST, PATE-CTGAN, DP-CTGAN, PATE-GAN and the permuted floor all fail, is: 1-way TV ≤ 0.06, 2-way TV ≤ 0.135, and mean conditional TV ≤ 0.07. The separating work is done by the conditional term. AIM fails it at 0.077, MST at 0.110 and the permuted floor at 0.129, while CoRTeC, the one method that passes, is at 0.029. The marginal thresholds exclude the deep generative baselines, which miss by an order of magnitude, and MST, whose 2-way error of 0.144 is above the bar. The 2-way threshold depends on how pairs are counted: it was 0.12 under a 20-pair sample and is 0.135 over all 105 pairs, for the same data. The conditional term's scale did not move, which is one more reason to let it carry the criterion.
-
-**Aggregate utility.** It does not follow that aggregate utility is safe. The header-only control gives the same frozen model nothing but the column names. On Adult it reaches TSTR-LR 0.824, against a real 300-record sample's 0.834, while AIM reaches 0.675 and MST 0.690. On that dataset, then, an ungrounded language model with no access to the private data at all comes within 0.010 of a real sample and exceeds AIM and MST by 0.13 to 0.15 on the metric the field uses to argue for downstream usefulness. That is a result about the metric and about the datasets: on public benchmarks a pretrained model already encodes most of the aggregate structure, so aggregate utility cannot distinguish a method that reads the private release from one that recites a prior.
-
-**Making the prior wrong.** We can separate the two by inverting a relationship the prior knows. In the inversion condition the released statistics state that advanced-degree holders (`education_num` ≥ 14) earn over 50K at a rate of 0.2%, against a real-world rate of 61.9%. The control is matched: it takes CoRTeC's own prompt and strips exactly the released blocks (class balance, histograms, categorical proportions, conditional table, cohort size), leaving every other line byte-identical, and it runs through the same generation routine, so row allocation, batching, parsing and repair are shared by construction.
-
-With one release, Claude Fable 5 and $n$ = 300 per condition, CoRTeC emits the high-income label for 0.000 of advanced-degree holders, tracking the release. The matched control emits it for 0.931, more extreme than the real-world prior (Table 12). Since every other element of the two conditions is identical, the separation is attributable to the released statistics alone. The control is told to match a table and to ignore world knowledge; it has no table, and answers from its prior. We report one draw per arm because the measure spans the full [0, 1] range: draw-to-draw variation on conditional quantities in this paper is 0.004 and release-to-release variation is 0.037, more than an order of magnitude below the effect.
-
-**Table 12:** The inversion test. The two conditions are identical but for the released arrays. The Claude Fable 5 rows are the earlier configuration; the GPT-5 rows are the current release rule.
-
-| matched condition | emits the high-income label for advanced degrees |
-|---|---|
-| **CoRTeC** | **0.000**, tracking the release |
-| matched header-only control | **0.931**, more extreme than the real-world prior |
-| CoRTeC, GPT-5 at low reasoning, release under the current rule | **0.000**, tracking the release |
-| CoRTeC, GPT-5 at minimal reasoning, same release | 0.276 |
-| matched header-only control, GPT-5 at minimal reasoning, same release | **1.000** |
-| *real data, uninverted* | *0.619* |
-
-**On a second vendor, under the current release rule.** The test was repeated on GPT-5 with one fresh inverted release made under the $n_{min}$ rule of Algorithm 1, so the release carries pure ε = 2, and the same three conditions. With reasoning at GPT-5's low level CoRTeC emits the high-income label for 0.000 of 24 advanced-degree holders, and every education band is within 0.07 of its released rate (0.119, 0.217 and 0.490 against released 0.129, 0.206 and 0.416). The matched control emits it for 1.000 of 52. At minimal reasoning CoRTeC emits it for 0.276 of 29, and over-emits the positive class in every band, by 0.13 to 0.26, while keeping graduates lowest: the inverted ordering transmits and the magnitudes do not, which is the reasoning effect of Section 6.6 on the hardest case. The minimal-reasoning control also returned only the CSV header, with no rows, on 4 of 22 calls; the generator's parse guard caught each one, and the raw text is now kept whenever it does.
-
-Evaluated on a held-out test set carrying the same inverted relationship, the model trained on header-only output is wrong for 72% of the inverted subgroup. Its aggregate AUC still exceeds CoRTeC's (0.730 against 0.670), because the subgroup is 7.9% of rows and the aggregate is dominated by the 92% where the prior is correct.
-
-On the uninverted release the same matched control separates too, at two independent replications of the whole pipeline. CoRTeC's TSTR-LR is 0.057 higher than the control's (0.849 against 0.792) against a pooled draw-to-draw spread of 0.001, and its conditional error is 3.7× lower (0.043 against 0.160). The control reaches 0.845 TSTR-GBM where a real 300-row sample reaches 0.840: an ungrounded model exceeds real data of the same size on that student. That is the saturation this section exists to demonstrate, and it survives the prompts being matched.
-
-**A contamination control on data with no public presence.** Every dataset above is a public benchmark the frozen generator has very likely seen in pretraining. So we constructed a dataset with no public presence: a renal-replacement-therapy registry of 20,000 records whose joint distribution is defined by a generative process in our own code. It has a plausible clinical schema and one deliberately counter-intuitive driver: mode of transport to dialysis outranks every clinical variable as a predictor of hospitalisation. The auto-configurator, given only the schema, independently selected `patient_age` and `transport_mode`.
-
-We generated CoRTeC and the matched header-only control from the same schema (Gemini 3.5 Flash, $n$ = 1,000, two draws each). CoRTeC records 1-way TV 0.080 and TSTR-LR 0.685, against the control's 0.541 and 0.630 and a real sample's 0.019 and 0.693. Header-only could not reproduce the schema at all: it invented 33 levels across the four categorical columns, and 99.2% of its categorical values are absent from the real data.
-
-The diagnostic this control specifies is whether the CoRTeC-to-header-only gap changes on data with no public presence. Against the matched control it does not: 0.057 on Adult and 0.054 here, a ratio of 0.95. CoRTeC's margin over an ungrounded model does not shrink when the prior is removed. What the prior supplied on Adult is visible in the control's fidelity (1-way error 0.102 on Adult against 0.541 here), not in CoRTeC's margin. CoRTeC's own marginal error here, 1-way TV 0.080 against a real sample's 0.019, is above the real sample's where on the three head-to-head datasets it is below; that arm is the earlier configuration at $n$ = 1,000, without exact counts or selection, and we have not run the shipped configuration on the registry.
-
-This also answers the objection that the architecture leans on the model's prior and would be a liability on idiosyncratic enterprise data. The prior supplies fluency in the schema, plausible values and correct types, and CoRTeC relies on that fluency; the release supplies the structure. When the prior is weak, only the release can supply it. A constructed dataset is not a real private extract, and an institutional extract remains the experiment we have not run.
-
-### 6.4 Transmission: which mechanisms carry a private relationship
-
-A generator built on a language model invites one specific doubt no aggregate metric can settle: perhaps its output is good because the model's prior about census or clinical data happens to be right, not because it read the released statistics. We test it directly.
-
-**Definition 4 (Transmission of a private relationship).** *Fix a group $g$ and a schedule of target rates $r_1, …, r_T$. For each $r_t$, construct $D^{(t)}$ by resampling $y$ within $g$ at rate $r_t$, run the mechanism on $D^{(t)}$, and let $\hat{g}^{(t)}$ be the realised rate of $y = 1$ within $g$ in the synthetic output. Transmission is the pair*
-
-$$ β = \text{slope of } \hat{g}^{(t)} \text{ on } r_t, \qquad \mathrm{MAE} = \frac{1}{T} Σ_t |\hat{g}^{(t)} − r_t|, $$ (5)
-
-*where $r_t$ is the rate the mechanism was given: the released rate for a mechanism that reads a release, and the realised rate in the forced data for one fitted directly.*
-
-$β = 1$ with $\mathrm{MAE} = 0$ is faithful transmission; $β = 0$ means the output is independent of the private data. Both must be reported, since a generator exact at the endpoints and wrong in between records $β ≈ 1$ with a large MAE.
-
-Table 13 shows that CoRTeC transmits, across three domains, with Stage A re-released from the modified data at every point. On NHANES the released rates were 0.008 / 0.469 / 0.970 and CoRTeC produced 0.0% / 44.6% / 100.0% over 60 to 65 rows per point. The unconditioned control is the comparison that matters in the table: it emits the same number at every target, 98.5% on hospital data against a true rate of 21.4%. CoRTeC's output therefore tracks the released statistics rather than the model's prior. No amount of downstream AUC reveals this, because AUC is rank-based and the direction is right, which is a concrete reason a readmission probability or a default rate must be validated on a conditional measure.
-
-**Table 13:** Transmission of a forced relationship through CoRTeC. The unconditioned control emits the same number at every target. Every row but the GPT-5 one is the earlier configuration.
-
-| domain | relationship forced | slope | MAE | unconditioned control | true rate |
-|---|---|---|---|---|---|
-| census (Adult) | education to income | 1.063 [0.973, 1.168]; 3 seeds, 14 points | 0.055 | 88.3% | 61.9% |
-| census (Adult), GPT-5 at minimal reasoning, releases under the current rule | education to income | 0.992; 1 seed, 5 points | 0.104 | not run | 61.9% |
-| healthcare (Diabetes 130) | prior admissions to 30-day readmission | 0.995 | 0.009 | 98.5% | 21.4% |
-| finance (credit) | repayment status to default | 0.962 / 1.010; 2 seeds | 0.019 / 0.023 | 100.0% | 69.6% |
-| **healthcare (NHANES)**, auto-configured | race/ethnicity to diabetes | **1.041** | **0.020** | 63.9% | 15.4% |
-
-A one-seed repeat of the Adult sweep on GPT-5 at minimal reasoning, with every release made under the current rule, records slope 0.992 and MAE 0.104 (Table 13): the direction transmits and the interior magnitudes are pulled towards the prior, which is why Definition 4 reports both numbers; with reasoning on, the inversion test above transmits exactly.
-
-**The same test on the deployed mechanisms.** We ran the identical protocol on the baselines: force the rate in the private data, fit at ε = 2 on the modified data, sample, and measure. The group is defined by public bin membership, so every mechanism can represent it. Table 14 and Figure 7 give the result, and it is not the separation we expected.
-
-MST transmits this relationship as accurately as CoRTeC does, and the reason is structural. The manipulated quantity is a two-way marginal; MST selects and privately measures two-way marginals, and forcing the rate to an extreme makes that marginal more salient to its selection step. PATE-CTGAN does not transmit it at all. Its raw output spans only 0.079 across a target range of 1.0, the same qualitative behaviour as an unconditioned generator, reached by a different route: DP-SGD and PATE inject noise into the training signal, and at ε = 2 on a 19-attribute schema the conditional structure does not survive it.
-
-**Table 14:** Transmission by mechanism family, on identical private data at identical ε = 2 (earlier configuration).
-
-| method | family | slope | MAE | output at 0% / 50% / 100% |
-|---|---|---|---|---|
-| MST (Diabetes 130) | marginal / graphical | 0.998 | 0.001 | 0.002 / 0.506 / 1.000 |
-| CoRTeC (Diabetes 130, Claude Fable 5) | released statistics + frozen model | 0.995 | 0.009 | 0.000 / 0.520 / 0.986 |
-| PATE-CTGAN (Diabetes 130) | PATE-trained generative | 0.054 | 0.376 | 0.348 / 0.324 / 0.402 |
-| MST (NHANES) | marginal / graphical | 0.946 | 0.021 | 0.054 / 0.500 / 1.000 |
-| CoRTeC (NHANES, Gemini 3.5 Flash) | released statistics + frozen model | 1.041 | 0.020 | 0.000 / 0.446 / 1.000 |
-| PATE-CTGAN (NHANES) | PATE-trained generative | 0.095 | 0.388 | 0.241 / 0.232 / 0.336 |
-
-![Figure 7](figures/fig06_transmission_family.png)
-
-**Figure 7:** One forced relationship on NHANES (race/ethnicity to diabetes), three mechanisms. MST and CoRTeC track the diagonal; PATE-CTGAN's output is very nearly flat.
-
-Three conclusions follow.
-
-- Whether a private conditional relationship survives depends on the mechanism family, not on whether a method carries a privacy guarantee. Two methods here are equally ε = 2 differentially private, and one reproduces the relationship to within 0.001 while the other is effectively blind to it. A practitioner selecting on published fidelity numbers, or on the presence of a guarantee, has no way to see the distinction.
-- The test establishes the narrower thing it was designed for: that CoRTeC's output is driven by the released statistics.
-- The utility gap of Section 6.1 cannot be explained by an inability to carry a conditional relationship. MST carries this one essentially perfectly on Diabetes 130 and with slope 0.946 on NHANES, where its random-forest student is still 0.082 AUC below a real sample's (Table 5); the 0.15 AUC gap of Section 6.1 is Adult's, where the protocol was not run.
-
-**What the marginal methods lose.** Ruling that out leaves the harder question of what they do lose. Table 15 decomposes each synthetic set's departure from real data into retention of the feature-to-target association $I(X;Y)$ and of pairwise feature dependence $I(X;X)$. Each is relative to the mean over 25 real samples at the same $n$, so that the plug-in estimator's small-sample bias cancels; the real-sample control scores 1.02 and 0.97, as it must.
-
-Two distinct failure modes appear. MST and AIM inflate pairwise feature dependence by factors of 2.8 and 2.2 against a real sample of the same size, where CoRTeC inflates it by 1.24. A graphical model fitted to a set of privately measured marginals imposes exactly the dependence structure those marginals imply, and at ε = 2 on a 15-attribute schema that structure is coarser and more strongly coupled than the data's own. A downstream model trained on over-coupled records learns dependencies that do not hold on real test data. AIM is the instructive case: it retains the feature-to-target association almost exactly (0.98) while training models 0.17 AUC lower, so the loss cannot be attributed to the target relationship. PATE-CTGAN fails differently, retaining 37% of the association with a decision rule nearly orthogonal to the real one.
-
-CoRTeC's own distortion is of a different kind. It over-couples the features to the target (1.74 against 1.02), because the generator reproduces the released conditional dependence at least as sharply as the release states it. That is a calibration error a downstream user can see and correct on real held-out data, whereas over-coupled features are learned as dependencies that do not exist. It is still a real distortion, and a deployment that consumes calibrated probabilities should recalibrate before use. Across all 29 draws of seven conditions, TSTR correlates with conditional fidelity at $r$ = −0.64 to −0.70 and with marginal fidelity at $|r|$ ≤ 0.16.
-
-**Table 15:** Two failure modes (Adult, $n$ = 300, earlier CoRTeC configuration). Retention is relative to a real sample of the same size.
-
-| method | $I(X;Y)$ retention | $I(X;X)$ retention | rule cosine | positive rate |
-|---|---|---|---|---|
-| *real sample (control)* | *1.02* | *0.97* | *0.46* | *0.241* |
-| CoRTeC (Claude Fable 5) | 1.74 | 1.24 | 0.35 | 0.249 |
-| AIM | 0.98 | 2.15 | 0.35 | 0.243 |
-| MST | 2.12 | 2.83 | 0.31 | 0.237 |
-| PATE-CTGAN | 0.37 | 2.01 | 0.04 | 0.447 |
-
-### 6.5 The privacy budget
-
-Table 16 gives the sweep on NHANES under the shipped configuration, one draw at each of ε = 0.3, 1 and 8 beside the earlier release's three draws at ε = 2, with MST refitted at each budget. On this dataset the budget matters. NHANES has 2,999 training records, and its auto-configured release spends each cohort's budget over ten queries and two outcome classes. At ε = 0.3 the per-query budget is therefore 0.024, and the Laplace scale on a histogram bin is 42 records inside cohorts of 314 to 1,900. On the earlier release, CoRTeC's utility falls from 0.752 at ε = 2 to 0.731 at ε = 1 and 0.570 at ε = 0.3, and its 1-way error rises from 0.015 to 0.063. MST degrades in the same way (0.687 to 0.587 on TSTR-LR). Between ε = 2 and ε = 8 the linear student and 1-way error do not move; the two tree students read 0.033 and 0.034 lower at ε = 8, on one draw, with no spread measured at that budget.
-
-**Table 16:** The privacy-utility curve on NHANES, $n$ = 300, on the earlier release. References at this $n$: real-sample floor 1-way 0.034, conditional-seen 0.015, TSTR-LR 0.773; permuted-target floor 0.043 / 0.047 / 0.493.
-
-| metric | method | ε = 0.3 | ε = 1 | ε = 2 | ε = 8 |
-|---|---|---|---|---|---|
-| 1-way TV ↓ | CoRTeC | 0.063 | 0.034 | 0.015 | 0.013 |
-| | MST | 0.046 | 0.029 | 0.024 | 0.021 |
-| cond. TV (seen) ↓ | CoRTeC | 0.034 | 0.024 | 0.006 | 0.005 |
-| | MST | 0.056 | 0.023 | 0.004 | 0.004 |
-| cond. TV (held-out) ↓ | CoRTeC | 0.045 | 0.027 | 0.036 | 0.035 |
-| | MST | 0.116 | 0.143 | 0.128 | 0.137 |
-| TSTR-LR ↑ | CoRTeC | 0.570 | 0.731 | 0.752 | 0.770 |
-| | MST | 0.587 | 0.632 | 0.687 | 0.692 |
-| TSTR-RF ↑ | CoRTeC | 0.606 | 0.729 | 0.732 | 0.699 |
-| | MST | 0.575 | 0.628 | 0.646 | 0.668 |
-| TSTR-GBM ↑ | CoRTeC | 0.600 | 0.712 | 0.711 | 0.677 |
-| | MST | 0.503 | 0.633 | 0.664 | 0.679 |
-
-On a large dataset the curve is flat. On Diabetes 130, with 81,410 training records and the earlier configuration, CoRTeC at ε = 0.3 is as good as at ε = 8 on every metric except conditional error over seen groups, which degrades from 0.009 to 0.019, still better than a real 300-record sample's 0.031. MST records lower 1-way error at every budget, by roughly 2.7×. CoRTeC's 2-way error is lower at every budget, and its conditional error is lower by 2.2 to 7.6×. Aggregate TSTR does not separate the two at any ε; both are in the range 0.54 to 0.57 against a floor of 0.557, because 30-day readmission is weakly separable. The release itself degrades gracefully there, and structurally: a histogram's sensitivity is 1 at every budget, and the release carries zero impossible standard-deviation values at any ε (technical report, H.2). On a small dataset the release, not the generator, binds at tight budgets, and its noise-to-signal ratio is computable from the release alone before any generator runs.
-
-### 6.6 The generator
-
-The architecture is defined by what it releases, but its output quality depends on the frozen model placed in Stage B, and that dependence is large. The technical report (Section 7.5) measures it on Adult with full-dataset generation from one release under the earlier configuration, across nine generator configurations, so the only variable is the generator.
-
-Gemini 3.1 Pro, GPT-5, Claude Opus 5 and Claude Fable 5 fall in a band of 0.041 to 0.046 on conditional error, across three independent pretraining corpora, and every one is below what a real 300-record sample achieves (0.062). That is also the strongest available cross-corpus evidence on contamination: three separately trained models cannot have memorised Adult identically, and all track an inversion that contradicts it (technical report, Section 7.5). Welch tests between the two Anthropic frontier models find no significant difference on any of the seven metrics (smallest p = 0.076). The lower block spans two vendors and three size tiers, and its common feature is that reasoning was suppressed or absent.
-
-The controlled demonstration is GPT-5 against itself: same release, same prompts, one flag changed (Table 19). Enabling reasoning improves conditional fidelity 3.8×. The two arms are 0.128 apart on conditional error, against standard deviations of 0.032 and 0.007. Downstream utility does not resolve the difference at any feasible draw count. The direction is consistent across all three students, but resolving even the most favourable of the gaps at 80% power would take 18 draws per arm, and the least favourable 112.
-
-The finding is that this measure cannot detect the difference. A practitioner choosing between these configurations on downstream utility would see two indistinguishable options and deploy the one that is 14.8× cheaper. They would have chosen output whose conditional structure is worse than a no-information control while it still records 95% of a real sample's downstream AUC. Output headroom is the obvious confound, and it contributes nothing: tripling Sonnet 5's output budget at fixed effort changes output per call not at all, and raising effort at fixed budget is the only step that moves the fidelity measures.
-
-**Table 19:** One flag. Both arms use one byte-identical release and identical token limits (earlier configuration).
-
-| GPT-5 configuration | draws | 1-way TV ↓ | cond. seen ↓ | TSTR-LR ↑ | thinking tokens | cost per draw |
-|---|---|---|---|---|---|---|
-| `reasoning_effort = minimal` | 3 | 0.109 ± 0.003 | 0.173 ± 0.032 | 0.786 ± 0.050 | 0 | $0.19 |
-| default | 3 | 0.040 ± 0.001 | 0.045 ± 0.007 | 0.802 ± 0.025 | 261k (94% of output) | $2.81 |
-
-Reasoning does not substitute for capability in either direction. Claude Sonnet 5 with reasoning verifiably firing on 34 of 34 calls reaches 0.128: a real improvement on its suppressed 0.154, but nearly three times the frontier band and only modestly clear of the no-information floor. Claude Opus 5 reaches 0.046 with reasoning verifiably off. What the band has in common is frontier-class capability. Reasoning produces a large within-model gain that a weaker model cannot convert into frontier output.
-
-**A second vendor on the shipped configuration.** The shipped configuration was re-generated through GPT-5 on finance and NHANES, three draws each from the Gemini arm's earlier release file, so the generator is the only variable (Table 34, Appendix F). The budget forced GPT-5's minimal reasoning level, at $0.25 per NHANES draw and $0.57 per finance draw against $2.70 per NHANES draw with reasoning on, so the comparison is a vendor change and a reasoning change at once. On finance the result replicates: no measure separates the two vendors after correction, the random forest is 0.021 lower at a Holm-adjusted p of 0.22, and against the real-sample floor the only comparison near significance is the random forest, 0.016 short at an adjusted p of 0.053. On NHANES utility replicates and conditional fidelity does not: no student separates (adjusted p of 0.78 or above), but conditional error over seen groups is 0.038 against Gemini's 0.006 (p = 0.0055, adjusted 0.072) and 1-way error 0.031 against 0.015. That is the direction the reasoning result of Table 19 predicts. The selected minimal-reasoning draws carry 0.100 to 0.110 positives against the release's 0.138, where the Gemini draws carry 0.137: the pools match the release exactly in both cases, because the quota forces it, and the selection prefers GPT-5's negatives. One NHANES draw at GPT-5's low reasoning level, $2.70 for a pool that stopped at 572 of 600 rows and was selected offline, returns the conditional error to 0.011 and the positive rate to 0.130, with 2-way error 0.104, the lowest of any arm, while its tree students train lower, 0.664 and 0.640. One draw is a signal and is reported as one. The replication the result still needs is three reasoning-on draws under a second vendor.
-
-**An open-weight generator.** The same releases were decoded through OpenAI's open-weight gpt-oss-120b (Apache-2.0), served locally through Ollama on one 80 GB GPU at its low reasoning level, so the generator is again the only variable. The arm stands in for a model an institution hosts itself, which is the deployment the architecture allows; it is not a recommendation of open weights, and the model is unmeasured by the tool's capability gate. On NHANES the open-weight generator trains the three students at 0.685 against 0.773, 0.660 against 0.728, 0.628 against 0.716 (no student separates from the real sample after correction), and no measure separates it from the Gemini arm on the same release; its 1-way error is 0.020 against the real sample's 0.034 and the Gemini arm's 0.016. On finance the open-weight generator trains the three students at 0.677 against 0.695, 0.730 against 0.727, 0.701 against 0.717 at one draw, a point value with no test; its 1-way error is 0.060 against the real sample's 0.041 and the Gemini arm's 0.029. Generation costs no API fee; a 25-row call took one to three minutes on the shared GPU.
-
-**The counts stated per outcome.** The open-weight gap was traced to a specification the prompt had left to the model: with per-bin counts stated as totals over the two outcomes, neither generator matched the positives' class block (mean 1-way distance 0.090 under Gemini, 0.175 under gpt-oss), and selection kept fewer positives from the open-weight pool. Stating the counts per outcome, now the default, puts every generator's pool at the same distance from the class blocks (0.009 to 0.011 on positives). Decoded again under that prompt, no measure separates gpt-oss from Gemini, nor either from its own totals-only arm, after Holm correction at three draws; the remaining point difference (random forest 0.637 against 0.678) is the model's, not the specification's, and is below what three draws resolve (Table 34, Appendix F). GPT-5 at medium reasoning under the same prompt (three draws) trains the students at 0.736, 0.696 and 0.682. On finance one GPT-5 draw under the per-outcome prompt trains the students at 0.697, 0.735 and 0.713 against the real sample's 0.695, 0.727 and 0.717; the other finance arms were generated under the totals-only prompt, so no comparison is made.
-
-The practical guidance is:
-
-- select a frontier-class model;
-- enable reasoning, and verify that it fired from evidence that survives the transport rather than from a setting (Section 9);
-- verify the output on a conditional criterion rather than on aggregate utility; and
-- re-verify after any change to the generator or its configuration.
-
-Open-weight models measured as controls transmit a forced relationship at every family we tested above 20B parameters. But on full-dataset generation a self-hosted 70B model's output is close to indistinguishable from an unconditioned prompt on the metrics this method exists to improve. That is why the deployment proposal names enterprise platforms.
-
-### 6.7 Auto-configuration
-
-Table 20 compares the auto-configured release against expert hand-tuning where a comparator exists, as a release-ceiling comparison at $n$ = 2,000. That comparison uses real features with the target redrawn from each cell's released rate, so it isolates the configuration and not the generator. Auto-configuration is within ±0.013 of hand-tuning everywhere and better on one dataset. On credit it selects `PAY_0`, `PAY_3` and `PAY_2`, the payment-history columns hand-tuning had missed and which we had independently diagnosed as a cause of that dataset's early utility gap.
-
-**Table 20:** Auto-configuration against expert hand-tuning, as a release-ceiling AUC at $n$ = 2,000.
-
-| dataset | no conditioning | hand-tuned | auto-configured | real target | delta |
-|---|---|---|---|---|---|
-| Adult | 0.655 | 0.825 | 0.812 | 0.858 | −0.013 |
-| Diabetes 130 | 0.488 | 0.595 | 0.607 | 0.624 | +0.012 |
-| credit | 0.502 | 0.682 | 0.677 | 0.702 | −0.005 |
-
-It generalises to datasets it has never seen. On six additional regulated benchmarks, three health and three finance, each declaring only what a deploying institution would know without looking at its own data, the adaptive selection budget configures every one. It captures 19 to 89% of the achievable range: heart disease 68%, cervical cancer 35%, retinopathy 50%, German credit 19%, Australian credit 86% and bank marketing 89%. A fixed 5% budget declines to configure three of the six, and on one silently produces a configuration worse than not conditioning at all.
-
-On NHANES the rule captures 87%, within two points of the best share on any dataset we tested. The columns it selected there, age, diastolic blood pressure and race/ethnicity, are genuine diabetes risk factors chosen without being told the domain, and Table 5 is generated from that release. The result holds through to generation on a second clinical dataset. On Diabetes 130 an auto-configured release generated through Gemini 3.5 Flash trains the three students at 0.609, 0.597 and 0.591; the hand-tuned release gives 0.578, 0.583 and 0.563, and a real sample of the same size 0.607, 0.587 and 0.567. The clinical result there therefore holds under a configuration no human chose, on a dataset whose floor-to-ceiling range is narrow (Section 6.5).
-
-### 6.8 Cohort-wise or cell-wise: a representativeness failure no metric reports
-
-Stage B can generate per cohort, as Algorithm 3 does, or per released conditional cell with an exact positive count, which expresses each cell's rate to within one row. On a constructed registry the cell-wise path reduced conditional rate error 77×, and we shipped it as the default on that basis. On real data it failed in a way that matters more than the metric it was chosen to improve.
-
-On the same release for each dataset, byte-identical by checksum, the cell-wise path is mildly better on Adult and never worse (technical report, Section 7.10). On NHANES it fails, and the failure is not visible in any aggregate number a practitioner checks: aggregate utility reads within 0.02 of the cohort-wise path (0.752 against 0.768), while 1-way error quadruples (0.029 to 0.123) and 2-way error doubles (0.131 to 0.260).
-
-The cause is that cell-wise generation emits rows only for released cells, so population the release does not cover is generated at rate zero. NHANES released four conditional cells, all inside a single diastolic-blood-pressure band and a single coarsened race/ethnicity group (the one holding the White and Black non-Hispanic categories), covering 25.4% of the population; Adult's release covered 99.9%. The technical report (Section 7.10) tabulates the consequence. Four of six race/ethnicity groups, 40% of the population, are absent from the output entirely, along with every record in the 50 to 60 age band. The cohort-wise path reproduces all six groups to within 0.016 on the same release, five of the six within 0.01.
-
-A deployment that shipped this would hold a synthetic cohort with no Asian, Mexican-American, other-Hispanic or multiracial records at all while every fidelity and utility check passed. The conditional criterion does not catch it either, because conditional error is computed over released cells, and those are precisely the cells that are present. The model is not distorting shape within bands; it is simply never asked for the missing cells. Nothing in our own evaluation suite flagged it, and it was found by inspecting per-column output against the release.
-
-The fix is a per-column coverage guard, and it is free. A conditioning column is damaged precisely when the released cells fail to span it, and is otherwise untouched. Coverage is computable from marginals already in the release, so checking it is post-processing. The floor is 90% of each conditioning column's own released mass, placed between the highest failing measurement (0.858) and the lowest passing one (0.911) across eleven per-column measurements on two datasets. An aggregate release-level rule was tried first and fails in both directions.
-
-Below the floor the research pipeline falls back to cohort-wise generation and says so. The shipped tool refuses outright, names the safe alternative and the knobs that change coverage, and names the columns the released cells fail to span. The cohort-wise path is the default of Algorithm 3 for this reason, and it avoids the underlying trade-off. On the NHANES release above, a coarser cell-wise release with full coverage matched the cohort-wise path's marginal fidelity, but was worse than the permuted-target floor on held-out conditional structure (0.055 against 0.053). The cohort-wise path on the richer release reached the real-sample floor on the two tree students at $n$ = 600 and came within 0.026 on the linear one (0.752, 0.738, 0.735 against 0.778, 0.735, 0.725), with every group and age band present.
-
-A second mechanism, which the guard cannot see, appeared on Diabetes 130: a conditioning column coarsened into opaque groups was pinned by group membership with the within-group distribution withheld, and the model spread each group uniformly, so the dominant discharge code (59.2% of records) came out at 14.3% while the column's coverage scored 100%. Supplying the within-group shares, a free renormalisation of proportions already in the release, reduced the column's error 10.7×; both implementations ship it (technical report, H.7).
-
-We present the guard as a heuristic mitigation rather than a solved component. It answers which bands of a conditioning column the released cells span, and not what the distribution is inside a band the cells did span. Establishing when a private conditional table can be conveyed to a language model without silent loss is, in our view, an open problem for this line of work. Ganev et al. [17] showed that differential privacy itself has a disparate impact on the minority subgroups of synthetic data. What we observe here is a different mechanism with the same victims: a generation path rather than the noise deletes them, and it is invisible to the same dashboards. The lesson we take is that a representativeness check over the declared schema's categories, against the release rather than against the output alone, belongs in the standard battery.
-
-### 6.9 Stage C on the primary clinical dataset
-
-Table 23 reports Stage C on the auto-configured NHANES release under the rule Algorithm 5 now ships, scored on the cells each release published. The first three rows are the shipped-configuration draws of Table 5 on the current release, one unseeded bound each, and the fourth pools them; the next four are the same configuration's earlier release, the draws the earlier build reported, under the same rule; the last two are the earlier configurations C and A of Section 5.5 on their own release, which the coverage guard of Section 6.8 refuses for A. An earlier version of this table labelled configuration C the shipped default, which it is not, and read every row at a fixed tolerance of 0.15 chosen by repetition on this dataset; the last column keeps that reading for comparison.
-
-**Table 23:** Stage C on NHANES under the shipped rule: the tolerance derived from each release (0.107 for the current release of the shipped configuration, 0.088 for its earlier release, 0.091 for the earlier configurations' release), and no verdict while a released cell holds fewer than 20 synthetic rows. One unseeded draw per row.
-
-| condition | $n$ | thin | worst-case bound | ceiling | floor | verdict under the shipped rule | at τ = 0.15 |
-|---|---|---|---|---|---|---|---|
-| shipped configuration, current release, draw 0 | 300 | 2 | 0.1520 | 0.0821 | 0.1784 | none: 2 thin cells | outside |
-| shipped configuration, current release, draw 1 | 300 | 3 | 0.0759 | 0.0841 | 0.1699 | none: 3 thin cells | within |
-| shipped configuration, current release, draw 2 | 300 | 3 | 0.1400 | 0.0701 | 0.1748 | none: 3 thin cells | within |
-| shipped configuration, current release, three draws pooled | 900 | 0 | 0.0874 | 0.0884 | 0.1394 | within bound (τ = 0.107) | within, and so is the floor |
-| shipped configuration, earlier release, draw 0 | 300 | 2 | 0.1658 | 0.0763 | 0.1828 | none: 2 thin cells | outside |
-| shipped configuration, earlier release, draw 1 | 300 | 3 | 0.1645 | 0.0687 | 0.1745 | none: 3 thin cells | outside |
-| shipped configuration, earlier release, draw 2 | 300 | 2 | 0.1291 | 0.0755 | 0.1788 | none: 2 thin cells | within |
-| shipped configuration, earlier release, three draws pooled | 900 | 0 | 0.1287 | 0.0880 | 0.1302 | none: the ceiling fails 0.088 | within, and so is the floor |
-| configuration C (earlier; cohort-wise, rate prompt) | 600 | 0 | 0.3294 | 0.0662 | 0.2199 | outside, by 0.24 | outside |
-| configuration A (earlier; cell-wise, refused by the guard) | 600 | 0 | 0.0924 | 0.0723 | 0.2300 | outside, by 0.001 | within |
-
-Under the shipped rule no single draw of the shipped configuration receives a verdict, on either release, and we state why rather than report the failures and the passes the earlier operating point gave. At $n$ = 300 two or three of the four released cells hold fewer than 20 synthetic rows, and in every draw the worst cell is the same one, the 50 to 60-year band, holding 13, 12 and 11 rows on the current release and 9, 9 and 14 on the earlier one: one positive among 13 is a rate of 0.077 against a released 0.185, and (4) carries no sampling term for it, so a verdict there would be a property of a dozen rows. Pooling the draws removes every thin cell. On the current release the pooled table is within the bound: its worst-case bound of 0.087 lies under the derived tolerance of 0.107, the real-sample ceiling clears that tolerance at 0.088 and the permuted floor does not at 0.139, so the controls discriminate and the verdict holds at 95% simultaneous confidence over the four cells. On the earlier release the same pooling gave no verdict, because its derived tolerance of 0.088, halfway between the noise term of 0.029 and the floor's limit of 0.147, is one the real-sample ceiling itself failed, at 0.088. The difference lies in the release, not in the generator: the current release's cell rates spread 0.155 from its base rate of 0.155, one cell rate having been clipped to zero by the noise, where the earlier release's lay within 0.117 of its base rate of 0.138, and the tolerance rises with that spread. On a release whose cell rates lie close to its base rate Stage C at these sample sizes has little power, and the rule says so instead of a verdict. Both earlier-configuration arms are outside their release's derived tolerance of 0.091: configuration C by 0.24 and configuration A by 0.001, where the earlier operating point had read A as within.
-
-Configuration C fails for a reason the contrast shows. Its worst cell is the same band, where 24 of 48 synthetic rows are positive against a private rate of 0.197: cohort-wise generation under the rate-based prompt pinned each cohort's marginals and showed the model the conditional table, but nothing forced the rate inside a fine cell to match it. The shipped configuration's exact-count batches and selection reduce that cell's gap to between 0.05 and 0.12 over three draws on the current release (0.10 to 0.14 on the earlier one). Table 5's conditional error over seen groups, 0.006, is not the quantity bounded here: it is a mean over the three stratification bands, where Stage C takes a worst case over the four finest cells, so the two are not reconciled by averaging. The budget must be large enough for the bound's own ceiling to pass: at $ε_{cert}$ = 0.5 the NHANES ceiling cleared in 21 of 40 repetitions, at 1.0 in 25 of 25 (technical report, H.6).
-
-Under the shipped rule no NHANES run in this paper clears the bound, so the claim the procedure is built to issue is not issued here. Where it is issued it reads: with probability at least 95%, simultaneously over the released cells, which cover 25.4% of the population here, the private and synthetic conditional rates differ by at most the stated bound. The Stage C cost is ε = 1.0 on top of ε = 2.0 for the release, for ε = 3.0 per row and, on this one-row-per-person dataset, per person.
-
-### 6.10 Membership inference
-
-Theorem 1 already bounds any membership adversary at ε = 2 to an advantage of 0.762 by (2). An empirical attack cannot improve on that and cannot validate it. We run one for three reasons the proof does not cover.
-
-- It tests the implementation rather than the mechanism. A suppression threshold not applied, a cohort of one, or a released histogram that is a delta on a single individual would each leave the theorem true and the released data leaky.
-- A measured number is what security reviewers ask for.
-- For a method built on a proprietary pretrained model, it is the one available answer to the objection that a private record might be memorised and reproduced. We cannot audit weights we did not train, but we can attack the artefact the method publishes, which is where such a record would have to surface to cause harm.
-
-**Setup.** The standard membership game [40], in the form Stadler et al. [41] apply to synthetic data. The adversary sees the synthetic dataset and decides whether a candidate record was in the private training set. The game runs over 1,000 members from the training split and 1,000 non-members from the held-out split, disjoint and identically distributed, so the attack cannot succeed merely by recognising the data distribution. We run four attacks of increasing strength:
-
-- nearest-neighbour distance;
-- exact and near-duplicate matching;
-- a discriminative shadow model trained to recognise the synthetic distribution; and
-- a per-record likelihood-ratio test in the style of Carlini et al. [8]: sixteen bootstrap density models over a projection, each candidate scored by its mean log-density across shadows divided by its standard deviation, so a record the synthetic data encodes unusually consistently scores high.
-
-Every attack is validated on a positive control, real training records passed off as synthetic, because a null from a blind attack is worthless.
-
-**Table 25:** Four attacks on four datasets, with a positive control on each. The attacked draws are the earlier-configuration arms of Section 5.5; all four attacks were also run on shipped-configuration draws (Appendix C.3). The positive control detects copying and does not calibrate the attacks against subtler leakage. The permitted advantage of bound (2) is for pure ε; the attacked arms' $(ε_L, δ)$ label with δ = 1.5 × 10⁻⁷ moves it by less than 10⁻⁶.
-
-| dataset | strongest advantage | exact matches | attack AUC | Youden's J | TPR at FPR 0.1% |
-|---|---|---|---|---|---|
-| census (Adult) | 0.034 | **0** | 0.501 | +0.000 | 0.001 |
-| healthcare (Diabetes 130) | 0.017 | **0** | 0.493 | −0.007 | 0.001 |
-| **healthcare (NHANES)** | 0.048 | **0** | 0.524 | +0.040 | 0.000 |
-| finance (credit) | 0.046 | **0** | 0.504 | +0.016 | 0.002 |
-| *chance* | *0* | | *0.500* | *0.000* | *0.001* |
-| *bound permitted at ε = 2* | *0.762* | | | | |
-| *positive control (leaking)* | *0.191–0.250* | | *0.595–0.761* | *+0.134–0.390* | *0.037–0.249* |
-
-On Adult the three cheaper attacks reach AUC 0.483 [0.459, 0.508], 0.498 [0.473, 0.524] and 0.500 against CoRTeC's 1,800 records, and 0.613, 0.616 and 0.625 against the leaking control, with 249 member matches and no non-member match. The per-record attack reaches AUC 0.497 against CoRTeC on the clinical data (advantage 0.006) and 0.595 against the control (advantage 0.191). The largest advantage in Table 25 is 0.048, against a bound of 0.762 (0.051 at ε = 8 in the budget sweep below), and no synthetic record in any dataset exactly matches any private record. The positive control separates on every dataset, so the nulls are properties of the output rather than of blind attacks.
-
-Across budgets the measured advantage stays flat where the bound grows: 0.031, 0.047, 0.028 and 0.051 at ε = 0.3, 1, 2 and 8 against permitted advantages of 0.149, 0.462, 0.762 and 0.999. Every attack AUC's interval contains chance (Table 25; technical report, Section 7.8). We report the low false-positive regime as well, following Carlini et al. [8], because an average-case summary can hide an attack that is confidently right about a few individuals. The true-positive rate at 0.1% false positives is at or below 0.002 on every dataset in Table 25, against 0.037 to 0.249 on the controls, and 0.004 on the shipped draws (Appendix C.3).
-
-**The shipped draws.** Table 25 attacks the earlier-configuration arms. We re-ran the four attacks on the three shipped-configuration Adult draws of Table 3, 900 records, at three independent candidate samples of 1,000 and one of 3,000 (Appendix C.3). The strongest advantage on any attack and any sample is 0.049; at 3,000 candidates it is 0.034. None of the twelve attack-and-sample combinations at 1,000 candidates has an interval that excludes chance. One tendency is consistent: the nearest-neighbour statistic reads at or below chance, between 0.476 and 0.502 at 1,000 candidates and 0.483 [0.469, 0.498] at 3,000; its interval at 3,000 candidates is below chance by 0.002, as it did on the earlier arm (0.483) and on the earlier release of the same configuration (0.463 to 0.493). Below chance means the private records lie slightly farther from the synthetic rows than held-out records do, the opposite of memorisation. The same attack on MST's and AIM's output from the same training split reads 0.485 [0.470, 0.499] and 0.485 [0.471, 0.500], so the tendency belongs to the split and the statistic and not to CoRTeC; an adversary who flips the score gains an advantage of at most 0.034 on any of the three, under a twentieth of the permitted 0.762. No synthetic record matches a private record. At its operating point the shadow-model attack on the shipped draws records accuracy 0.513 against a 50% base rate, F1 0.513 and a true-positive rate of 0.004 at 0.1% false positives, against 0.581, 0.161 Youden's J and 0.037 on the leaking control (technical report, Appendix C).
-
-### 6.11 Cost
-
-**Table 26:** Computational and monetary cost. Generation costs are measured from the token counts each vendor reported over our own runs, priced at list rates. Rates on 8 October 2026: Gemini 3.5 Flash $1.50 and $9.00 per million input and output tokens, reasoning tokens billed as output; Claude Fable 5 $10 and $50; Gemini 3.1 Pro $2 and $12; GPT-5 $1.25 and $10. An earlier build priced Gemini 3.5 Flash at the 2.5 Flash rate, 3.6 times lower on output, and its Gemini figures were low by that factor; the figures here are corrected. They are indicative rather than a benchmark. They exclude the reasoning-suppressed configurations of Section 6.6, whose apparent cheapness is not a saving.
-
-| method | fit cost | per-record generation cost | scaling |
-|---|---|---|---|
-| MST | 23–135 s | free after fit | stable across our datasets |
-| AIM | 23–44 min (Adult); 58 s (NHANES); 16–29 min (finance, 12 columns); over 3 h without completing (Diabetes 130; finance on 15 columns) | free after fit | governed jointly by attributes and rows |
-| PATE-CTGAN | 42–65 min | free after fit | stable |
-| DP-CTGAN | 2.2 h (Adult) | free after fit | |
-| CoRTeC, shipped configuration (Gemini 3.5 Flash) | seconds (the release) | $5.2–8.4 per 1,000 generated rows; ×2–3 for the pool, $15–25 per 1,000 kept records | linear in records requested |
-| CoRTeC without the pool (Gemini 3.5 Flash / Claude Fable 5 / Gemini 3.1 Pro / GPT-5) | seconds | $3.7 / $4.84 / $5.21 / $9.36 per 1,000 records | linear |
-
-The asymmetry runs both ways. AIM's and MST's cost is one-off, and then sampling is free, which is decisive at the scale of millions of records. CoRTeC's release takes seconds, its generation is trivially parallel and resumable, and it does not constrain where the compute runs. AIM's fit did not complete within three hours on the hospital dataset or on the full finance schema. The exact-count prompt roughly doubles the reasoning tokens a call spends, and the pool multiplies the rows generated per row kept. The nine shipped-configuration draws of Section 6.1 cost about $55 in all at the corrected rates: $8.7 on NHANES, $24 on Adult and $22.7 on finance.
-
-The cheapest generator we measured is not the weakest. On the hospital data Gemini 3.5 Flash matches Claude Fable 5's conditional error (0.010 against 0.009) with the lowest 1-way error of any CoRTeC configuration (0.035), at three quarters of Claude Fable 5's cost. It spends more reasoning per call than the Pro tier, which is consistent with Section 6.6. What the method needs is a reasoning-capable generator, not an expensive one.
-## 7. Deployment Architecture
-
-This section is written for the team that has to build, review and operate the system. It states where the trust boundary sits, what crosses it, and what the alternatives require. The reference architecture is drawn in the technical report (Figure 2): only one arrow crosses the trust boundary, and it carries $R$.
-
-$R$ is a differentially private release, and publishing it is what differential privacy was designed to make safe. Everything below the boundary is post-processing, so it can be repeated without limit, run by a different team, or re-run a year later, at no additional privacy cost.
-
-Trust zone 2 is the enterprise surface, not a public API endpoint. The weights are the same either way, and CoRTeC's privacy argument holds against a hostile endpoint by construction, since the request carries only $R$. What does not hold is the compliance argument, which rests on tenant isolation, private networking, data residency and a business associate agreement. Our capability results are properties of the model weights and the prompt, and the same weights are served on both surfaces. We tested that on NHANES with one release, one model and $n$ = 600, three draws through the public developer API and three through Vertex AI. No metric separates the two surfaces: the largest gap is 0.006 on 2-way total variation (p = 0.12), and every downstream gap is at most 0.009 AUC (p ≥ 0.44). The contractual properties were never exercised by our runs and are the deploying institution's to verify.
-
-**Controls.** The release artefact carries the parameters a reviewer needs, following NIST SP 800-226 [33] and SP 800-188 [32]: the variant (pure ε, central, δ = 0), the add/remove neighbouring relation, the privacy unit, and the composition rule and ε of every query. A privacy ledger is the sole source of noise scales and seals after release. A property test releases at five seeds and requires every numeric leaf of the release to move unless it is an allowlisted public quantity. That is the check that catches an undeclared query, which a ledger summing declared queries cannot (Section 9).
-
-The measured re-identification evidence of Section 6.10 is zero exact matches on four datasets and four attacks validated on a positive control. That is the kind of evidence the de-identification frameworks ISO/IEC 27559 [23] and ISO/IEC 20889 [22], Article 25 of the GDPR [16] and the HIPAA Expert Determination route [47], which requires a statistical assessment of re-identification risk, ask for; we claim conformance with none of them (technical report, H.6.1). The utility transmission bound of Stage C (Section 4.6) is deliberately excluded from that row. It bounds how much conditional structure survived generation, a utility quantity, and mapping it to a re-identification standard would be a category error with compliance consequences. The reference implementation's bound report names the standards it does not claim, with the reason for each.
-
-**Operational failure modes.** Every guardrail in the reference implementation corresponds to a failure observed in this project before it was guarded: a tool that re-released whenever its output directory was new and spent the budget twice (now a hash check before every run), a release that published exact cohort sizes beside correctly noised rates and passed a ledger audit (now the five-seed property test above), and the cell-wise and pool-coverage failures of Sections 6.8 and 4.5 (now refused). Section 9 discusses the ones that touched the guarantee; the technical report's Appendix G tabulates all of them with the test that now carries each defect's name.
-
-## 8. Discussion
-
-### 8.1 Choosing among the mechanisms
-
-The evidence supports a selection rule stated by deliverable rather than by method.
-
-*If the deliverable is a model trained on the synthetic data,* CoRTeC has the largest measured advantage on this deliverable among the mechanisms we ran. No student separates from the real-sample floor on Adult or finance; on NHANES the random forest is 0.049 short and the other two students within 0.036. Models trained on AIM's and MST's output are 0.02 to 0.18 AUC lower, and 0.15 to 0.18 lower on Adult after correction. On Adult that margin is over the library defaults and does not survive tuning: AIM with a larger model or a 3-way workload trains the tree students at the floor and the linear student 0.03 short, at 30 minutes and 13.4 hours of fitting (Section 6.1). The claim is the narrower one, that CoRTeC reaches the floor with no fitting, and Section 8.2 shows that most of the default margin is attributable to what is released.
-
-*If the deliverable is a marginal report, a contingency table or a published set of cross-tabulations,* the answer depends on scale. At $n$ = 300 CoRTeC's 1-way error is within 0.005 of MST's on Adult and finance, below it on NHANES, and below AIM's on every dataset. At adequate $n$ AIM records the lowest error on its own 3-way workloads, and both marginal methods sample any number of records at no cost once fitted. For a marginal report at scale, use them.
-
-*If the deliverable is a calibrated conditional rate,* a readmission probability for a patient group or a default rate for a credit segment, note that it is the conditional measures rather than the marginal ones that track downstream utility ($r$ = −0.64 to −0.70 against $|r|$ ≤ 0.16). On this axis the marginal methods' error is furthest from the real sample's, while their 1-way error is closest to it. A procurement decision made on 1-way total variation alone will therefore select against this deliverable.
-
-*If the constraint is scale,* the marginal methods pay their cost once and then sample freely, where CoRTeC pays per record, three times over under the shipped configuration. At millions of records that favours them regardless of the utility gap.
-
-*If the constraint is that no private data may leave the institution,* CoRTeC transmits a release and never a record, so the constraint is satisfied by construction even when the generator is a frontier model reached through the institution's own tenant-isolated endpoint. DP-SGD and PATE methods place the private data on the training hardware and so constrain where they run.
-
-*If the data is small,* check the release before generating. Its noise-to-signal ratio and its cell count are computable from the release at no cost, and Section 6.5 shows they say whether conditioning can contribute at all.
-
-### 8.2 A hybrid for institutions that will not run a language model
-
-Relabelling a marginal method's output using a private conditional table is pure post-processing of two already-private artefacts, so it costs nothing beyond the table. Table 28 measures it on Adult, five base draws per method crossed with three table draws for AIM and two for MST, under the same evaluator. Each private table is released at ε = 0.333, split equally across the levels it carries, on top of the base method's ε = 2, so every hybrid row is at ε = 2.333 per row. Relabelling moves AIM from TSTR-LR 0.675 to 0.777 and MST from 0.690 to 0.773. At level 4 the private table matches a non-private oracle to within 0.009, so the residual is draw-to-draw noise rather than a cost paid for privacy.
-
-Richness is necessary. A level-2 table fixes calibration and adds little utility, and the large gain arrives only with the richer table. Richer is not monotonic, since level 6 is worse than level 4 on every student for both base methods. This is also the strongest available answer to the objection that the marginal methods are merely under-tuned: the gap is largely attributable to what each mechanism releases, and a practitioner who wants the conditional structure can obtain much of it by augmenting the marginal method.
-
-Assignment is by an exact per-cell count with stochastic rounding over a random permutation of the cell. A rank-preserving assignment, our original default, was measured to be worse on three datasets at three seeds each (independent assignment within a cell scored higher in 9 of 9 runs). The guard meant to enable ranking scored the synthesiser's self-consistency rather than its validity, and so selected for the failure it was built to prevent.
-
-The hybrid ships as the second reference implementation ([`cortec-hybrid`](https://github.com/Calyie/cortec-framework/tree/main/cortec-hybrid)). It reports whether the correction helped and tells the user to keep their budget when it did not. Across eleven datasets the correction improves conditional calibration almost everywhere while moving downstream AUC in both directions.
-
-**Table 28:** The hybrid on Adult. Giving AIM and MST the quantity neither releases removes most of the gap to CoRTeC without altering either synthesiser's configuration.
-
-| condition | 1-way TV ↓ | cond. seen ↓ | TSTR-LR ↑ | TSTR-RF ↑ | TSTR-GBM ↑ |
-|---|---|---|---|---|---|
-| AIM alone | 0.037 | 0.054 | 0.675 | 0.700 | 0.691 |
-| AIM + private conditional table, level 2 | 0.037 | **0.014** | 0.700 | 0.726 | 0.680 |
-| **AIM + private conditional table, level 4** | 0.038 | 0.054 | **0.777** | **0.840** | **0.810** |
-| AIM + level 4, non-private oracle table | 0.039 | 0.053 | 0.786 | 0.841 | 0.810 |
-| AIM + level 6 | 0.038 | 0.071 | 0.742 | 0.778 | 0.735 |
-| MST alone | 0.024 | 0.169 | 0.690 | 0.728 | 0.681 |
-| MST + level 2 | 0.025 | **0.053** | 0.727 | 0.737 | 0.695 |
-| **MST + level 4** | 0.025 | 0.094 | **0.773** | **0.838** | **0.807** |
-| MST + level 4, non-private oracle table | 0.025 | 0.096 | 0.780 | 0.843 | 0.815 |
-| MST + level 6 | 0.025 | 0.118 | 0.717 | 0.757 | 0.716 |
-
-## 9. Threats to Validity: Measurement Artefacts
-
-Defects arose throughout this work, and every one of them produced a plausible but wrong scientific conclusion before it was caught. We report them because we believe the field under-reports them, and because each is a trap for any group building a comparable pipeline. The technical report tabulates twenty-eight that bear on measurement and privacy accounting. The ones a reader should weigh are these.
-
-**The instruments, not the results.** A released quantity that carries no noise is invisible to a budget audit built by instrumenting the noise mechanism. Our research pipeline published per-cohort record counts exact for most of the project while the audit reported a clean ε throughout, because the audit summed the queries it could see. The shipped tool had earlier been caught publishing exact cohort sizes and per-cell supports beside correctly noised rates, a real violation, again with a clean ledger.
-
-The corrected check is behavioural rather than structural: re-release the same data at several seeds and require that every published quantity moves unless it is explicitly public. It found the exact counts immediately, together with a rule that had been deleting rare categories from releases and, with them, real subpopulations (`race = Amer-Indian-Eskimo` from a census cohort, `race_ethnicity = other_multi` from a health-survey cohort). Neither changed a reported fidelity or utility number, because the counts were accurate and the categories were rare. Both changed what the release was entitled to claim about itself, which is the more serious kind of error. A verifier that sums declared queries cannot detect an undeclared one.
-
-**A saturated metric.** The original primary metric of this project scored the real-data ceiling and the unconditioned baseline identically, and a verdict had been drawn from it before anyone compared the two. Checking every metric's floor against its ceiling before trusting it caught that defect, and later a released standard deviation of 693.80 on an attribute whose range is a few decades. It produced Section 6.3.
-
-**The defect with a named victim.** Every other entry corrupts a number. Cell-wise generation removed people (Section 6.8). The synthetic dataset was internally consistent, passed its fidelity checks and trained models to within one point of the alternative, and it contained no Asian, Mexican-American, other-Hispanic or multiracial records at all. Nothing in our own evaluation suite flagged it, including the conditional criterion this paper advances, because conditional error is computed over released cells, and those were the cells that were present.
-
-Three more belong here. Telemetry needs the same floor-and-ceiling check as a metric: two claims about whether a model's reasoning fired rested on a token count that was absent rather than zero, and were withdrawn once the reasoning block itself became the evidence. A repaired defect returned through a dependency upgrade that changed how a missing value renders, and surfaced only when a published table was re-run in a second environment and one baseline moved from 0.019 to 0.110; a separate loader defect mislabelled 135 NHANES respondents because NaN ≥ 6.5 is false. And the evaluator's right-closed bins differ from the release's left-closed ones on edge integers (Section 5.3), by 0.003 on Adult's 1-way error, with method ordering unchanged. The technical report's Appendix I has all twenty-eight.
-
-Four practices caught these, and we recommend all four.
-
-- Check every metric's floor against its ceiling before trusting it.
-- Report several student models. This caught a hybrid result that reversed sign between linear and tree students.
-- Inspect raw responses before concluding a backend is incapable. A truncated prompt, an output budget consumed by hidden reasoning and a mis-set effort parameter are indistinguishable from a negative result at the level of summary statistics.
-- Check that a check can fail. Three separate verifications in this project gave false assurance: a ledger that summed only declared queries, an acceptance check whose name promised more than its assertion delivered, and a test module that had never run because of an import error.
-
-## 10. Limitations
-
-1. **The head-to-head is at $n$ = 300 under one generator family.** The shipped configuration is measured with Gemini 3.5 Flash at three draws per dataset. On NHANES the same release was decoded by three generators under the per-outcome prompt (Table 34): Gemini 3.5 Flash, the open-weight gpt-oss-120b at low reasoning and GPT-5 at medium reasoning (three draws); no measure separates them after Holm correction at three draws, and the point differences that remain (random forest 0.637 under gpt-oss against 0.678 under Gemini) are below what three draws resolve. The Gemini arm under that prompt reproduces the shipped NHANES row to within 0.019 on every measure. The cross-vendor check through Claude Opus 5 is one complete pool on Adult, and the powered six-draw equivalence test was run with Claude Fable 5 on the earlier release design. GPT-5 at minimal reasoning reproduces the finance result at three draws and the NHANES utility result at three draws, with conditional fidelity behind Gemini's (Appendix F). The inversion test and the Adult transmission sweep were repeated on GPT-5 under the current release path, which implements the pure-ε mechanism (Sections 6.3 and 6.4). The replication list, in order, is now: the shipped Adult and finance arms under the per-outcome prompt and under a second generator; three reasoning-on draws of GPT-5 on finance; and the remaining earlier-configuration arms under the current release path. At $n$ = 1,000 on Adult the point estimates favour the real sample, and we state the equivalence claim at the size where it was demonstrated with adequate power.
-2. **AIM enters the finance comparison only on a reduced schema and is absent from the hospital data.** Its fit exceeded three hours on the full 15-column finance schema and on Diabetes 130, against its own paper's 24-hour allowance. The cause is localised to the six high-cardinality amount columns. On NHANES it completes in under a minute, and Table 5 reports it there.
-
-3. **On NHANES the students and 2-way error do not reach the floor.** The random forest trains 0.049 short (p = 0.033), gradient boosting 0.036 (p = 0.10) and logistic regression 0.035 (p = 0.32), and 2-way error is 0.120 against the sample's 0.081. The remaining linear gap lies in the one cohort whose diabetic class does not clear $n_{min}$, where the output follows the generator's placement below bin resolution rather than the release's. Finer public bins where cohort sizes support them would leave the generator less room; sizing them is an auto-configuration rule we have not built.
-
-4. **The $n_{min}$ decisions behind the earlier releases read exact counts.** Algorithm 1 now makes every such decision from a noised, charged count, and Theorem 1 covers it. The releases behind the CoRTeC rows of Tables 3 to 6 were regenerated under that rule; the earlier releases, which compared exact counts with $n_{min}$ as the marginal-synthesis literature does, remain behind the earlier-configuration arms, the second-vendor arms at minimal reasoning, the equivalence test, the 3-way workload table (technical report, Section 7.3) and the tuning comparison of Appendix G. The noisy threshold reproduces the earlier releases' gate decisions with probability 0.26 on Adult, 0.24 on finance and 0.70 on NHANES, and Section 4.7 names the decisions that differ. The earlier-configuration arms additionally carry the $(ε_L, δ)$ guarantee of Section 4.7 rather than pure ε; the release path that produced them now implements the pure-ε mechanism, and re-running them is on the replication list of item 1.
-
-5. **ε protects a row.** On encounter-level data with repeated individuals the per-person guarantee is weaker by the maximum contribution count, 40 on Diabetes 130. The auto-configurator has no concept of a person; on that dataset it selected `number_inpatient`, a proxy for how many rows a patient contributes. MST, compared against us at row-level ε on the same data, inherits the same per-person figure. The mitigation is the contribution cap of Section 3, taken before the release.
-
-6. **Every real dataset is a public benchmark the generator has very likely seen.** The constructed registry of Section 6.3 rules out gross recitation and shows CoRTeC's margin over an ungrounded model unchanged when the prior is removed. It does not rule out recall of the marginal distributions. An institutional extract, or a model of known training provenance, remains the experiment we have not run. Section 5.6 states these controls before the results, and Appendix E reports the open-weight control.
-
-7. **The membership-inference result is bounded by the attacks we ran.** An absence of detectable leakage under four attacks validated on a positive control is not an absence of leakage. The attacks of Table 25 read earlier-configuration draws; Section 6.10 reports the same attacks on the shipped Adult draws. Adversaries stronger than these are excluded by the ε guarantee, not by our measurement.
-
-8. **The transmission sweeps are single-seed on the clinical datasets.** Each perturbs one relationship at three interior points, so the curve shape between endpoints rests on one measurement per model.
-
-9. **Quality is bounded by the generator and by its configuration.** A single flag moved conditional error 3.8×, and the flag must be verified from the vendor's reported reasoning evidence rather than from a setting. Open-weight models we measured as controls did not reach the frontier band, which is why the deployment proposal names enterprise platforms.
-
-10. **The coverage guard is a heuristic.** Its 90% floor lies in a five-point gap between the highest failing and lowest passing measurements. It answers which bands were released and not what is inside one. When a private conditional table can be conveyed to a language model without silent loss is open.
-
-11. **Per-record cost** is decisive against CoRTeC at the scale of millions of records, and the shipped configuration generates three rows for every one it keeps.
-
-## 11. Conclusion
-
-The question a practitioner asks of synthetic data is simple: if I train on this instead of on the real thing, how much accuracy do I lose? For CoRTeC at ε = 2 and $n$ = 300 on three datasets, the answer is nothing that any student can detect on Adult or finance, and at most 0.049 AUC on NHANES, where the random forest is the one student that separates at three draws. The two marginal mechanisms in deployment today, measured on this deliverable, lose 0.02 to 0.18 AUC over the same data at their library defaults; on Adult, AIM given a larger model or a 3-way workload and hours to fit reaches the floor too. CoRTeC's own marginal error is within 0.005 of the most accurate of them on Adult and finance and below it on NHANES, below a real sample of the same size on all three, at the release's own distance from the private data.
-
-The mechanism trains nothing. It spends the budget once, on cohort-conditioned histograms per outcome class and a conditional table over a disjoint partition, where parallel composition makes conditional structure cheap. It lets a frozen language model decode the release under exact counts, selection and a sub-bin rule, which together reach the release's own fidelity at no privacy cost. Because only the release crosses the trust boundary, the generator can be a tenant-isolated enterprise endpoint, and the choice of model becomes a quality decision rather than a compliance one.
-
-Two of the findings reach beyond the mechanism. Both criteria the field selects synthesisers on are saturated. Real data with its target permuted passes a 90% marginal-similarity bar, and on a public benchmark an ungrounded language model with no access to the private data comes within 0.010 of a real sample and exceeds the deployed mechanisms on aggregate downstream utility. Yet it is wrong about 72% of the subgroup where the institution's data departs from public knowledge, and it reports a 98.5% readmission rate for a group whose true rate is 21.4%. Only conditional and subgroup measures, reported against a real-sample floor and a no-information floor, separate a mechanism that transmits an institution's conditional structure from one that reproduces what was already public.
-
-And whether a private relationship survives synthesis is a property of the mechanism family, not of the guarantee. MST carries a forced two-way relationship as faithfully as CoRTeC does and, on the one dataset where both measurements exist, still trains a tree student 0.082 AUC below a real sample's; on Adult what it loses is measurable as a 2.8× inflation of pairwise feature dependence.
-
-Where CoRTeC belongs is narrow and useful. It is the mechanism to use when a downstream model or a calibrated conditional rate is the product, and not the mechanism to use when a marginal report at scale is.
+| Adult, 300 | CoRTeC, Qwen3-14B | 0.054 | 0.146 | 0.035 | 0.815 | 0.860 | 0.835 |
+| Adult, 300 | maximum-entropy decoder | 0.058 | 0.145 | 0.073 | 0.818 | 0.857 | 0.847 |
+| Adult, 300 | decoder with selection | 0.035 | 0.120 | 0.017 | 0.822 | 0.861 | 0.853 |
+| Adult, 300 | reference AIM | 0.052 | 0.120 | 0.061 | 0.832 | 0.866 | 0.839 |
+| Adult, 300 | auto-configured, no model, with selection | 0.020 | 0.109 | n/a | 0.830 | 0.870 | 0.859 |
+| Adult, 300 | *real sample* | *0.044* | *0.109* | *0.066* | *0.834* | *0.869* | *0.841* |
+| Adult, 1,000 | CoRTeC, Qwen3-14B | 0.039 | 0.112 | 0.027 | 0.829 | 0.863 | 0.860 |
+| Adult, 1,000 | maximum-entropy decoder | 0.041 | 0.107 | 0.033 | 0.825 | 0.868 | 0.863 |
+| Adult, 1,000 | decoder with selection | 0.027 | 0.090 | 0.007 | 0.832 | 0.871 | 0.871 |
+| Adult, 1,000 | reference AIM | 0.031 | 0.074 | 0.034 | 0.847 | 0.882 | 0.876 |
+| Adult, 1,000 | auto-configured, no model, with selection | 0.016 | 0.082 | n/a | 0.840 | 0.879 | 0.881 |
+| Adult, 1,000 | *real sample* | *0.024* | *0.061* | *0.035* | *0.849* | *0.890* | *0.885* |
+| NHANES, 300 | CoRTeC, Qwen3-14B | 0.044 | 0.161 | 0.021 | 0.710 | 0.689 | 0.667 |
+| NHANES, 300 | maximum-entropy decoder | 0.041 | 0.117 | 0.024 | 0.717 | 0.713 | 0.705 |
+| NHANES, 300 | reference AIM | 0.042 | 0.103 | 0.019 | 0.752 | 0.725 | 0.706 |
+| NHANES, 1,000 | CoRTeC, Qwen3-14B | 0.040 | 0.151 | 0.022 | 0.732 | 0.686 | 0.669 |
+| NHANES, 1,000 | maximum-entropy decoder | 0.031 | 0.087 | 0.018 | 0.769 | 0.745 | 0.722 |
+| NHANES, 1,000 | reference AIM | 0.030 | 0.071 | 0.022 | 0.734 | 0.701 | 0.676 |
+
+**RQ5. What does the architecture buy, and what does it cost? No row reaches the model, the backbone swaps at no privacy cost, nothing is copied or memorised into a draw, and generation costs dollars per thousand rows.** Four backbones decoded the same Adult release under the same prompts and flags (Appendix E.4). Single-column fidelity improves with capability and saturates at 14 billion parameters (1-way TV 0.110, 0.068, 0.046 and 0.049 for Qwen2.5-7B, Qwen3-8B, Qwen3-14B and Qwen3-32B at $n$ = 300, and 0.027 for Gemini 3.6 Flash); utility does not move with the backbone (0.80 to 0.82, 0.85 to 0.86, 0.82 to 0.84); the 7B backbone wrote its own prior for marital status and education over the released distributions, and the 8B writes range labels into numerical columns. The same Qwen3-14B under DP fine-tuning reaches 0.100 on single columns and 0.172 on pairs at $n$ = 1,000 against 0.036 and 0.108 under CoRTeC, so where the budget is spent decides more than the backbone does. Membership inference (Appendix F) runs four attacks [11, 33, 34], of the kinds the TAPAS toolbox packages for synthetic data [21], on 3,000 candidates, half members and half held-out, validated on a positive control of real rows passed off as synthetic: the strongest advantage is 0.022 to 0.035 on every Adult arm and 0.026 to 0.060 on NHANES, whose training split holds 2,999 rows, every value against a permitted 0.762, with no exact match anywhere. Distance to closest record finds no synthetic row that copies a training row in any arm, and a paired check against a held-out set of the same size finds no arm closer to training rows than to held-out rows (share 0.47 to 0.54 against 0.50 expected; Appendix F). The served Gemini backbone reproduces rows 2 to 25 of the public Adult file from its header, as prior work found for GPT-4 [4, 38], recalls no row from the body of the file, and none of those rows appears in any draw on any backbone, while the one-shot arm with no release copies them into most of its output (Appendix F). A 300-row Gemini draw costs 41 calls, 1.56 dollars at list price and about 33 minutes; the same draw on Qwen3-14B takes 42 calls and about 50 minutes on one rented A40; the release takes seconds; AIM's fit is one-off and its sampling free, which favours it at scale. An indicative summary that scales every method's fidelity against a real sample of the same size and its utility between the no-information floor and the ceiling puts the reference AIM at 78 and 85 percent, the decoder at 72 and 86 and with the selection step at 89 and 91, CoRTeC on Qwen3-14B at 68 and 79, the auto-configured release decoded with no model and selection at 93 and 93 over its two marginal measures, the DP fine-tunes at 21 to 27 and 61 to 71, Tab-PE at 17 and 84 and DP-2Stage at 19 and 15 (Appendix G).
+
+## 7. Limitations
+
+The reference AIM is ahead on pairs at every seed on both datasets, on utility at Adult $n$ = 1,000 for the fixed-rule release and on NHANES at $n$ = 300 (at $n$ = 1,000 the NHANES students do not separate, p = 0.73 to 0.96); the claim this paper supports is not that CoRTeC beats it but that the release spends the budget on a different structure, the seen conditionals, at a cost on pairs. The language model's contribution depends on the column names, so an institution whose schema the model does not know should expect the decoder's result, not the Gemini arm's; the open backbones are level with the decoder on aggregate fidelity on Adult and behind it on NHANES and bank marketing. The backbone ladder, the anonymised control, the one-shot control, the decoder at ε = 0.5 and 1, the bank dataset and the paper-protocol rows are single-split; the 8B arm has two draws at $n$ = 1,000 and the anonymised 32B arm two at $n$ = 300; the Gemini arms are $n$ = 300 only; the auto-configured Adult release was decoded with no model only, so what a language model adds to it is not measured; the Qwen3 backbones were not given the memorisation test. The reference AIM runs on CoRTeC's public bins, a conservative instance of the PrivTree-binned AIM that Tab-PE's authors run, which scores higher on Adult in their paper [39]. No claim is made about high-order correlations, the axis on which Tab-PE's stress test separates methods [39]; our measures stop at pairs and conditionals. Under the DP-LLMTGen protocol our run of that procedure reaches 0.795 and 0.841 against the published 0.831 and 0.879 (Table 4), with the numerical-understanding loss omitted and two DP epochs; the published row is the comparison, and the rerun understates the method. Every real dataset is a public benchmark; the anonymised control removes what the model knows about the schema, not what it may know about the marginals. CoRTeC draws whose pool fell short of the requested size are scored as delivered (Appendix D), which costs them sampling error that the references do not pay.
+
+## 8. Conclusion
+
+The contribution is a release: class-conditional histograms and a conditional table inside public cohorts, spent once, shipped as an auditable artefact of counts, and decodable by anyone at no further privacy cost. It is ahead of the reference AIM on the conditional structure it budgets for and behind it on pairs, and decoded with no language model at all it is a competitive differentially private synthesiser. A frozen language model decoding it adds plausibility that comes from its knowledge of the column names: it repairs the pairs it recognises, invents the pairs it expects, and keeps its advantage only on the single columns and the named conditionals that the selection step enforces, which the same step gives a model-free pool as well; without the release the same model recites the public file. The reference AIM remains ahead on pairs; on utility it is ahead of the fixed-rule release at larger $n$ and level with or behind the auto-configured one, whose coarser cohorts trade named conditionals for marginal precision. Seen from AIM's side, the release is a fixed workload decoded by the estimator AIM uses: AIM's adaptive selection gives the pairs, the fixed workload gives the named conditionals, an interpretable artefact and seconds of compute, and the language model is a second decoder of the same artefact. The reason to use the design is the privacy architecture: the model never sees a row, every draw is post-processing, the backbone can change without touching the guarantee, and the measured membership advantage of the draws, 0.02 to 0.05, is a small fraction of the 0.762 the budget permits. For a deployment: decode the release with the maximum-entropy model and the selection step first, at no cost, and add a language model where the schema is one it knows and per-pair plausibility is the deliverable.
 
 ## Ethics Statement
 
-This work uses public benchmark datasets and a national health survey that is released for research. No private institutional data was used. The membership-inference attacks were run against synthetic data we generated from those benchmarks, with the positive controls constructed from the same public records. The mechanism is intended to reduce the privacy risk of sharing tabular data, and we have tried to state its guarantee and its limits precisely. The row-level privacy unit, the uncharged suppression decisions behind the earlier-release arms, the pretraining corpus outside the guarantee, and the difference between a utility bound and a privacy audit are each stated where they arise. A reader who takes any of them for more than it is would be worse protected than they believe.
+This work uses public benchmark datasets and a national health survey released for research; no private institutional data was used. The membership-inference attacks and the memorisation tests were run against synthetic data we generated and against a served commercial model with the public Adult file, which that model reproduces in part. The mechanism is intended to reduce the privacy risk of sharing tabular data; its guarantee covers the release and its draws and not the model's pretraining corpus, and its limits are stated where they arise.
 
 ## Reproducibility Statement
 
-Two repositories accompany this paper. The research repository ([Calyie/cortec](https://github.com/Calyie/cortec)) holds the pipeline that produced every table, the figure and build scripts, and the companion [technical report](https://github.com/Calyie/cortec/blob/main/paper/CoRTeC.pdf). The per-draw result records every published number is re-derived from, and the audit suite that re-derives them, are retained in the project's internal tree and are available from the authors on request. The audit suite has four scripts. One recomputes every headline number from the stored records. One asserts that the paper and the shipped tools agree on every parameter and rule. One scans the code for the defect patterns of Section 9. One checks that every number in this paper appears in the technical report.
+The repository ([Calyie/cortec](https://github.com/Calyie/cortec)) holds the Apache-2.0 reference implementation with its tests, the research pipeline that produced every CoRTeC arm, the papers and the frozen auto-configurations. Released statistics cannot be regenerated bit for bit, because the noise source is cryptographically secure and ignores any seed; every stored release is kept and every draw reuses it by file. The reference-AIM wrapper, the maximum-entropy decoder, the decoder-with-selection and one-shot controls, the anonymisation of releases and the scorers are in the repository, and the released implementation decodes a release with no model as `cortec decode` (Private-PGM and the selection step); the synthetic draws, the per-draw score files, the membership-attack files and the stored releases of every arm are deposited with the Zenodo record of this paper (10.5281/zenodo.22945315). Every number in this paper is traceable to a stored result file.
 
-The tools repository ([Calyie/cortec-framework](https://github.com/Calyie/cortec-framework)) holds the two Apache-2.0 reference implementations with a test suite in which every regression test is named after the defect it prevents. The technical report's Appendix A gives the environment, the commands and the spend. Released statistics cannot be regenerated bit for bit, because the noise source is cryptographically secure and ignores any seed; every stored release is therefore kept, and every draw reuses it by file.
+## AI-Use Statement
+
+Language models appear in this work as the objects of study: the generators named in every table. Language-model assistants were also used in drafting and editing the text and the code. Every experiment was designed, run and checked by the author, and every number was produced by the described pipeline from stored result files.
+
+## Compute and Cost
+
+The Qwen3 backbones and the DP fine-tuning baselines ran on one rented NVIDIA A40 (vLLM [45] for generation; Opacus [41] for DP-SGD), the reference AIM and MST fits and the maximum-entropy decoder on CPU, and the Gemini arms through Google's interface. The named and anonymised Gemini 3.6 Flash pairs cost 9.37 dollars in total; the memorisation test 0.33 dollars; the one-shot control 2.52 dollars (156 calls). A 300-row CoRTeC draw takes 41 to 46 calls of 25 rows.
+
 ## References
 
 [1] Martín Abadi, Andy Chu, Ian Goodfellow, H. Brendan McMahan, Ilya Mironov, Kunal Talwar, and Li Zhang. Deep learning with differential privacy. In *ACM SIGSAC Conference on Computer and Communications Security (CCS)*, pp. 308–318, 2016.
 
-[2] Michael Aerni, Javier Rando, Edoardo Debenedetti, Nicholas Carlini, Daphne Ippolito, and Florian Tramèr. Measuring non-adversarial reproduction of training data in large language models. In *International Conference on Learning Representations (ICLR)*, 2025.
+[2] Meenatchi Sundaram Muthu Selva Annamalai and Emiliano De Cristofaro. Nearly tight black-box auditing of differentially private machine learning. In *NeurIPS*, 2024.
 
 [3] Tejumade Afonja, Hui-Po Wang, Raouf Kerkouche, and Mario Fritz. DP-2Stage: Adapting language models as differentially private tabular data generators. *Transactions on Machine Learning Research*, 2025.
 
-[4] American Diabetes Association. Classification and diagnosis of diabetes: Standards of medical care in diabetes, 2017. *Diabetes Care*, 40(Supplement 1):S11–S24, 2017.
+[4] Sebastian Bordt, Harsha Nori, and Rich Caruana. Elephants never forget: Testing language models for memorization of tabular data. In *NeurIPS Table Representation Learning Workshop*, 2023.
 
 [5] Vadim Borisov, Kathrin Seßler, Tobias Leemann, Martin Pawelczyk, and Gjergji Kasneci. Language models are realistic tabular data generators. In *International Conference on Learning Representations (ICLR)*, 2023.
 
-[6] Mark Bun and Thomas Steinke. Concentrated differential privacy: Simplifications, extensions, and lower bounds. In *Theory of Cryptography Conference (TCC)*, pp. 635–658, 2016.
+[6] Claire McKay Bowen and Joshua Snoke. Comparative study of differentially private synthetic data algorithms from the NIST PSCR differential privacy synthetic data challenge. *Journal of Privacy and Confidentiality*, 11(1), 2021.
 
 [7] Kuntai Cai, Xiaoyu Lei, Jianxin Wei, and Xiaokui Xiao. Data synthesis via differentially private Markov random fields. *Proceedings of the VLDB Endowment*, 14(11):2190–2202, 2021.
 
-[8] Nicholas Carlini, Steve Chien, Milad Nasr, Shuang Song, Andreas Terzis, and Florian Tramèr. Membership inference attacks from first principles. In *IEEE Symposium on Security and Privacy*, pp. 1897–1914, 2022.
+[8] Rodrigo Castellon, Achintya Gopal, Brian Bloniarz, and David Rosenberg. DP-TBART: A transformer-based autoregressive model for differentially private tabular data generation. *arXiv:2307.10430*, 2023.
 
-[9] CDC/NCHS. National Health and Nutrition Examination Survey (NHANES) 2017–2018 data files. Centers for Disease Control and Prevention, National Center for Health Statistics, 2020.
+[9] CDC/NCHS. National Health and Nutrition Examination Survey (NHANES) 2017–2018 data files. National Center for Health Statistics, 2020.
 
-[10] Kai Chen, Xiaochen Li, Chen Gong, Ryan McKenna, and Tianhao Wang. Benchmarking differentially private tabular data synthesis. *arXiv preprint arXiv:2504.14061*, 2025.
+[10] Kai Chen, Xiaochen Li, Chen Gong, Ryan McKenna, and Tianhao Wang. Benchmarking differentially private tabular data synthesis. *Proceedings of the ACM on Management of Data*, 3(6), 2025.
 
-[11] W. Edwards Deming and Frederick F. Stephan. On a least squares adjustment of a sampled frequency table when the expected marginal totals are known. *Annals of Mathematical Statistics*, 11(4):427–444, 1940.
+[11] Nicholas Carlini, Steve Chien, Milad Nasr, Shuang Song, Andreas Terzis, and Florian Tramèr. Membership inference attacks from first principles. In *IEEE Symposium on Security and Privacy*, pp. 1897–1914, 2022.
 
-[12] Dheeru Dua and Casey Graff. UCI machine learning repository. University of California, Irvine, School of Information and Computer Sciences, 2019.
+[12] W. Edwards Deming and Frederick F. Stephan. On a least squares adjustment of a sampled frequency table when the expected marginal totals are known. *Annals of Mathematical Statistics*, 11(4):427–444, 1940.
 
-[13] Cynthia Dwork, Frank McSherry, Kobbi Nissim, and Adam Smith. Calibrating noise to sensitivity in private data analysis. In *Theory of Cryptography Conference (TCC)*, pp. 265–284, 2006.
+[13] Dheeru Dua and Casey Graff. UCI machine learning repository. University of California, Irvine, 2019.
 
-[14] Cynthia Dwork and Aaron Roth. The algorithmic foundations of differential privacy. *Foundations and Trends in Theoretical Computer Science*, 9(3–4):211–407, 2014.
+[14] Cynthia Dwork, Frank McSherry, Kobbi Nissim, and Adam Smith. Calibrating noise to sensitivity in private data analysis. In *Theory of Cryptography Conference (TCC)*, pp. 265–284, 2006.
 
-[15] Cynthia Dwork, Guy N. Rothblum, and Salil Vadhan. Boosting and differential privacy. In *IEEE Symposium on Foundations of Computer Science (FOCS)*, pp. 51–60, 2010.
+[15] Cynthia Dwork and Aaron Roth. The algorithmic foundations of differential privacy. *Foundations and Trends in Theoretical Computer Science*, 9(3–4):211–407, 2014.
 
-[16] European Union. Regulation (EU) 2016/679 of the European Parliament and of the Council (General Data Protection Regulation), Article 25 and Recital 26. *Official Journal of the European Union*, 2016.
+[16] Georgi Ganev, Meenatchi Sundaram Muthu Selva Annamalai, and Bogdan Kulynych. Tight auditing of differential privacy in MST and AIM. In *Theory and Practice of Differential Privacy (TPDP)*, 2026.
 
-[17] Georgi Ganev, Bristena Oprisanu, and Emiliano De Cristofaro. Robin Hood and Matthew effects: Differential privacy has disparate impact on synthetic data. In *International Conference on Machine Learning (ICML)*, pp. 6944–6959, 2022.
+[17] Georgi Ganev, Bristena Oprisanu, and Emiliano De Cristofaro. Robin Hood and Matthew effects: Differential privacy has disparate impact on synthetic data. In *ICML*, pp. 6944–6959, 2022.
 
-[18] Georgi Ganev, Meenatchi Sundaram Muthu Selva Annamalai, and Bogdan Kulynych. Tight auditing of differential privacy in MST and AIM. In *Theory and Practice of Differential Privacy (TPDP)*, 2026. arXiv:2604.18352.
+[18] Michael Hay, Ashwin Machanavajjhala, Gerome Miklau, Yan Chen, and Dan Zhang. Principled evaluation of differentially private algorithms using DPBench. In *ACM SIGMOD*, pp. 139–154, 2016.
 
-[19] Michael Hay, Ashwin Machanavajjhala, Gerome Miklau, Yan Chen, and Dan Zhang. Principled evaluation of differentially private algorithms using DPBench. In *ACM SIGMOD International Conference on Management of Data*, pp. 139–154, 2016.
+[19] Jingang Qu, David Holzmüller, Gaël Varoquaux, and Marine Le Morvan. TabICL: A tabular foundation model for in-context learning on large data. In *International Conference on Machine Learning (ICML)*, 2025.
 
-[20] Sture Holm. A simple sequentially rejective multiple test procedure. *Scandinavian Journal of Statistics*, 6(2):65–70, 1979.
+[20] Edward J. Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang, and Weizhu Chen. LoRA: Low-rank adaptation of large language models. In *International Conference on Learning Representations (ICLR)*, 2022.
 
-[21] Naoise Holohan, Stefano Braghin, Pól Mac Aonghusa, and Killian Levacher. Diffprivlib: The IBM differential privacy library. *arXiv preprint arXiv:1907.02444*, 2019.
+[21] Florimond Houssiau, James Jordon, Samuel N. Cohen, Owen Daniel, Andrew Elliott, James Geddes, Callum Mole, Camila Rangel-Smith, and Lukasz Szpruch. TAPAS: A toolbox for adversarial privacy auditing of synthetic data. In *NeurIPS Workshop on Synthetic Data for Empowering ML Research*, 2022.
 
-[22] ISO. ISO/IEC 20889:2018, Privacy enhancing data de-identification terminology and classification of techniques. International Organization for Standardization, 2018.
+[22] James Jordon, Jinsung Yoon, and Mihaela van der Schaar. PATE-GAN: Generating synthetic data with differential privacy guarantees. In *International Conference on Learning Representations (ICLR)*, 2019.
 
-[23] ISO. ISO/IEC 27559:2022, Information security, cybersecurity and privacy protection: Privacy enhancing data de-identification framework. International Organization for Standardization, 2022.
+[23] Ron Kohavi and Barry Becker. Adult data set. UCI Machine Learning Repository, 1996.
 
-[24] James Jordon, Jinsung Yoon, and Mihaela van der Schaar. PATE-GAN: Generating synthetic data with differential privacy guarantees. In *International Conference on Learning Representations (ICLR)*, 2019.
+[24] Zinan Lin, Sivakanth Gopi, Janardhan Kulkarni, Harsha Nori, and Sergey Yekhanin. Differentially private synthetic data via foundation model APIs 1: Images. In *International Conference on Learning Representations (ICLR)*, 2024.
 
-[25] Ron Kohavi. Scaling up the accuracy of naive-Bayes classifiers: A decision-tree hybrid. In *International Conference on Knowledge Discovery and Data Mining (KDD)*, pp. 202–207, 1996.
+[25] Sérgio Moro, Paulo Rita, and Paulo Cortez. Bank marketing data set. UCI Machine Learning Repository, 2014.
 
-[26] Zinan Lin, Sivakanth Gopi, Janardhan Kulkarni, Harsha Nori, and Sergey Yekhanin. Differentially private synthetic data via foundation model APIs 1: Images. In *International Conference on Learning Representations (ICLR)*, 2024.
+[26] Ryan McKenna, Daniel Sheldon, and Gerome Miklau. Graphical-model based estimation and inference for differential privacy. In *International Conference on Machine Learning (ICML)*, pp. 4435–4444, 2019.
 
-[27] Ryan McKenna, Daniel Sheldon, and Gerome Miklau. Graphical-model based estimation and inference for differential privacy. In *International Conference on Machine Learning (ICML)*, pp. 4435–4444, 2019.
+[27] Ryan McKenna, Gerome Miklau, and Daniel Sheldon. Winning the NIST contest: A scalable and general approach to differentially private synthetic data. *Journal of Privacy and Confidentiality*, 11(3), 2021.
 
-[28] Ryan McKenna, Gerome Miklau, and Daniel Sheldon. Winning the NIST contest: A scalable and general approach to differentially private synthetic data. *Journal of Privacy and Confidentiality*, 11(3), 2021.
+[28] Ryan McKenna, Brett Mullins, Daniel Sheldon, and Gerome Miklau. AIM: An adaptive and iterative mechanism for differentially private synthetic data. *Proceedings of the VLDB Endowment*, 15(11):2599–2612, 2022.
 
-[29] Ryan McKenna, Brett Mullins, Daniel Sheldon, and Gerome Miklau. AIM: An adaptive and iterative mechanism for differentially private synthetic data. *Proceedings of the VLDB Endowment*, 15(11):2599–2612, 2022.
+[29] Frank McSherry. Privacy integrated queries: An extensible platform for privacy-preserving data analysis. In *ACM SIGMOD*, pp. 19–30, 2009.
 
-[30] Frank McSherry. Privacy integrated queries: An extensible platform for privacy-preserving data analysis. In *ACM SIGMOD International Conference on Management of Data*, pp. 19–30, 2009.
+[30] Nicolas Papernot, Martín Abadi, Úlfar Erlingsson, Ian Goodfellow, and Kunal Talwar. Semi-supervised knowledge transfer for deep learning from private training data. In *International Conference on Learning Representations (ICLR)*, 2017.
 
-[31] Ilya Mironov. On significance of the least significant bits for differential privacy. In *ACM Conference on Computer and Communications Security (CCS)*, pp. 650–661, 2012.
+[31] Nicolas Papernot, Shuang Song, Ilya Mironov, Ananth Raghunathan, Kunal Talwar, and Úlfar Erlingsson. Scalable private learning with PATE. In *International Conference on Learning Representations (ICLR)*, 2018.
 
-[32] NIST. De-identifying government datasets: Techniques and governance. *NIST Special Publication 800-188*, Simson L. Garfinkel, Joseph Near, Aref N. Dajani, Phyllis Singer, and Barbara Guttman, National Institute of Standards and Technology, 2023.
+[32] Lucas Rosenblatt, Xiaoyan Liu, Samira Pouyanfar, Eduardo de Leon, Anuj Desai, and Joshua Allen. Differentially private synthetic data: Applied evaluations and enhancements. *arXiv:2011.05537*, 2020.
 
-[33] NIST. Guidelines for evaluating differential privacy guarantees. *NIST Special Publication 800-226*, Joseph P. Near, David Darais, Naomi Lefkovitz, and Gary S. Howarth, National Institute of Standards and Technology, 2025.
+[33] Reza Shokri, Marco Stronati, Congzheng Song, and Vitaly Shmatikov. Membership inference attacks against machine learning models. In *IEEE Symposium on Security and Privacy*, pp. 3–18, 2017.
 
-[34] OpenDP. SmartNoise Synth, version 1.0.8. https://github.com/opendp/smartnoise-sdk, 2024.
+[34] Theresa Stadler, Bristena Oprisanu, and Carmela Troncoso. Synthetic data: Anonymisation groundhog day. In *USENIX Security Symposium*, pp. 1451–1468, 2022.
 
-[35] Nicolas Papernot, Martín Abadi, Úlfar Erlingsson, Ian Goodfellow, and Kunal Talwar. Semi-supervised knowledge transfer for deep learning from private training data. In *International Conference on Learning Representations (ICLR)*, 2017.
+[35] Ilya Mironov. On significance of the least significant bits for differential privacy. In *ACM CCS*, pp. 650–661, 2012.
 
-[36] Nicolas Papernot, Shuang Song, Ilya Mironov, Ananth Raghunathan, Kunal Talwar, and Úlfar Erlingsson. Scalable private learning with PATE. In *International Conference on Learning Representations (ICLR)*, 2018.
+[36] Yuchao Tao, Ryan McKenna, Michael Hay, Ashwin Machanavajjhala, and Gerome Miklau. Benchmarking differentially private synthetic data generation algorithms. *arXiv:2112.09238*, 2021.
 
-[37] Diane Ridgeway, Mary F. Theofanos, Terese W. Manley, and Christine Task. Challenge design and lessons learned from the 2018 differential privacy challenges. *NIST Technical Note 2151*, 2021.
+[37] Marika Swanberg, Ryan McKenna, Edo Roth, Albert Cheu, and Peter Kairouz. Is API access to LLMs useful for generating private synthetic tabular data? *arXiv:2502.06555*, 2025.
 
-[38] Lucas Rosenblatt, Xiaoyan Liu, Samira Pouyanfar, Eduardo de Leon, Anuj Desai, and Joshua Allen. Differentially private synthetic data: Applied evaluations and enhancements. *arXiv preprint arXiv:2011.05537*, 2020.
+[38] Toan V. Tran and Li Xiong. Differentially private tabular data synthesis using large language models. *arXiv:2406.01457*, 2024.
 
-[39] Nabeel Seedat, Nicolas Huynh, Boris van Breugel, and Mihaela van der Schaar. Curated LLM: Synergy of LLMs and data curation for tabular augmentation in low-data regimes. In *International Conference on Machine Learning (ICML)*, 2024.
+[39] Toan Tran, Arturs Backurs, Zinan Lin, Victor Reis, Li Xiong, and Sergey Yekhanin. Differentially private synthetic data via APIs 4: Tabular data. In *International Conference on Machine Learning (ICML)*, 2026.
 
-[40] Reza Shokri, Marco Stronati, Congzheng Song, and Vitaly Shmatikov. Membership inference attacks against machine learning models. In *IEEE Symposium on Security and Privacy*, pp. 3–18, 2017.
+[40] Florian Tramèr, Gautam Kamath, and Nicholas Carlini. Position: Considerations for differentially private learning with large-scale public pretraining. In *International Conference on Machine Learning (ICML)*, 2024.
 
-[41] Theresa Stadler, Bristena Oprisanu, and Carmela Troncoso. Synthetic data: Anonymisation groundhog day. In *USENIX Security Symposium*, pp. 1451–1468, 2022.
+[41] Ashkan Yousefpour, Igor Shilov, Alexandre Sablayrolles, Davide Testuggine, Karthik Prasad, Mani Malek, John Nguyen, Sayan Ghosh, Akash Bharadwaj, Jessica Zhao, Graham Cormode, and Ilya Mironov. Opacus: User-friendly differential privacy library in PyTorch. *arXiv:2109.12298*, 2021.
 
-[42] Beata Strack, Jonathan P. DeShazo, Chris Gennings, Juan L. Olmo, Sebastian Ventura, Krzysztof J. Cios, and John N. Clore. Impact of HbA1c measurement on hospital readmission rates: Analysis of 70,000 clinical database patient records. *BioMed Research International*, 2014:781670, 2014.
+[42] Lei Xu, Maria Skoularidou, Alfredo Cuesta-Infante, and Kalyan Veeramachaneni. Modeling tabular data using conditional GAN. In *NeurIPS*, 2019.
 
-[43] Marika Swanberg, Ryan McKenna, Edo Roth, Albert Cheu, and Peter Kairouz. Is API access to LLMs useful for generating private synthetic tabular data? *arXiv preprint arXiv:2502.06555*, 2025.
+[43] Chulin Xie, Zinan Lin, Arturs Backurs, Sivakanth Gopi, Da Yu, Huseyin A. Inan, Harsha Nori, Haotian Jiang, Huishuai Zhang, Yin Tat Lee, Bo Li, and Sergey Yekhanin. Differentially private synthetic data via foundation model APIs 2: Text. In *International Conference on Machine Learning (ICML)*, 2024.
 
-[44] Yuchao Tao, Ryan McKenna, Michael Hay, Ashwin Machanavajjhala, and Gerome Miklau. Benchmarking differentially private synthetic data generation algorithms. *arXiv preprint arXiv:2112.09238*, 2021.
+[44] Liyang Xie, Kaixiang Lin, Shu Wang, Fei Wang, and Jiayu Zhou. Differentially private generative adversarial network. *arXiv:1802.06739*, 2018.
 
-[45] Toan V. Tran and Li Xiong. Differentially private tabular data synthesis using large language models. *arXiv preprint arXiv:2406.01457*, 2024.
+[45] Woodrow Kwon, Zhuohan Li, Siyuan Zhuang, Ying Sheng, Lianmin Zheng, Cody Hao Yu, Joseph E. Gonzalez, Hao Zhang, and Ion Stoica. Efficient memory management for large language model serving with PagedAttention. In *SOSP*, 2023.
 
-[46] Toan Tran, Arturs Backurs, Zinan Lin, Victor Reis, Li Xiong, and Sergey Yekhanin. Differentially private synthetic data via APIs 4: Tabular data. In *International Conference on Machine Learning (ICML)*, 2026. arXiv:2606.08259.
+[46] Jun Zhang, Graham Cormode, Cecilia M. Procopiuc, Divesh Srivastava, and Xiaokui Xiao. PrivBayes: Private data release via Bayesian networks. *ACM Transactions on Database Systems*, 42(4), 2017.
 
-[47] U.S. Department of Health and Human Services. Guidance regarding methods for de-identification of protected health information in accordance with the HIPAA Privacy Rule. Office for Civil Rights, 2012.
+[47] Chaoyi Zhu, Jiayi Tang, Juan F. Pérez, Marten van Dijk, and Lydia Y. Chen. DP-TLDM: Differentially private tabular latent diffusion model. In *International Conference on Availability, Reliability and Security (ARES)*, 2025.
 
-[48] Chulin Xie, Zinan Lin, Arturs Backurs, Sivakanth Gopi, Da Yu, Huseyin A. Inan, Harsha Nori, Haotian Jiang, Huishuai Zhang, Yin Tat Lee, Bo Li, and Sergey Yekhanin. Differentially private synthetic data via foundation model APIs 2: Text. In *International Conference on Machine Learning (ICML)*, pp. 54531–54560, 2024.
+## Appendix A. Privacy Analysis
 
-[49] Liyang Xie, Kaixiang Lin, Shu Wang, Fei Wang, and Jiayu Zhou. Differentially private generative adversarial network. *arXiv preprint arXiv:1802.06739*, 2018.
+*Proof of Theorem 1.* Consider neighbours $D, D'$ differing in one record $x$.
 
-[50] Lei Xu, Maria Skoularidou, Alfredo Cuesta-Infante, and Kalyan Veeramachaneni. Modeling tabular data using conditional GAN. In *Advances in Neural Information Processing Systems (NeurIPS)*, 2019.
+(i) *Stratification is free.* $\Pi$ is a function of public attribute domains, so $\Pi(x)$ is computed from $x$'s own attributes without reference to any other record; the partition is data-independent and releasing it costs nothing.
 
-[51] I-Cheng Yeh and Che-hui Lien. The comparisons of data mining techniques for the predictive accuracy of probability of default of credit card clients. *Expert Systems with Applications*, 36(2):2473–2480, 2009.
+(ii) *Within a cohort, sequential composition.* Fix a cohort $P$. Each released histogram is a counting query of L1 sensitivity 1: $x$ contributes to exactly one bin of one attribute, so removing it changes that histogram's L1 norm by 1 and every other histogram not at all. The Laplace mechanism at scale $1/ε_q$ gives $ε_q$-differential privacy per query. Under the pooled block the $q$ queries on $P$ compose sequentially to $q ε_q = ε_{marg}$. Under the class-conditional blocks $P$ is partitioned by $y$, so $x$ lies in exactly one of $P \cap \{y = 0\}$ and $P \cap \{y = 1\}$; it is touched by the class-balance query and by the $|A|$ histograms of its own block and by nothing in the other block, a chain of $q$ queries and the same $q ε_q$. The two blocks are disjoint and compose in parallel. The pooled histogram is a function of released quantities only.
 
-[52] Jun Zhang, Graham Cormode, Cecilia M. Procopiuc, Divesh Srivastava, and Xiaokui Xiao. PrivBayes: Private data release via Bayesian networks. *ACM Transactions on Database Systems*, 42(4):25:1–25:41, 2017.
+(iii) *Across cohorts, parallel composition.* The cohorts are disjoint and defined by a public rule; $x$ lies in exactly one, so it can influence only that cohort's queries, and the cost across cohorts is $ε_{marg}$ independent of their number.
 
-## Appendix A. The Prompt
+(iv) *Within a conditional level, parallel composition.* The cells of a level partition $D$, so the level costs $ε_L$ however many cells it contains. Within a cell the positive count and the cell size each have sensitivity 1 under add/remove adjacency and are noised at $\mathrm{Lap}(2/ε_L)$, a scale that depends on nothing private; they touch the same records and compose sequentially to $ε_L$. The published rate $\tilde{k}_c / \max(\tilde{n}_c, n_{min})$, clipped to [0, 1], is post-processing of two released counts and the public floor. Noising the rate directly at a scale set by the private $|c|$ is rejected: two Laplace densities of different scale have an unbounded likelihood ratio in one tail, so that mechanism is not pure ε.
 
-The reference implementation freezes and fingerprints its templates, verifies the fingerprint before every render, and requires a user who needs a different template to register it under a new version. It does so because two elements are essential and their removal is not visible in the output: the pipeline still runs and still produces plausible rows, and is simply no longer conditioned on the data. The system message and the cohort template follow, with the exact-count block that Algorithm 3 fills.
+(v) *Across levels, sequential composition; the cohort sizes.* Levels describe the same individuals and are not disjoint, so $|L| ε_L = ε_{cond}$. Each cohort size is a counting query of sensitivity 1 noised at $\mathrm{Lap}(1/ε_{count})$; cohorts are disjoint, so the cost across cohorts is $ε_{count}$, composing sequentially with the cohort's other queries. Every $n_{min}$ decision compares a noised count with the public floor, and every cohort and cell of the public domains is queried whether or not it holds a record, so which groups appear in $R$ is post-processing.
 
-```
-SYSTEM
-You generate synthetic tabular records for privacy research. You will be
-given summary statistics that were computed under differential privacy.
-Reproduce the distributions and relationships they describe as closely as
-you can, EVEN IF THIS CONTRADICTS YOUR EXPECTATIONS about how these
-variables usually relate. The statistics describe this specific
-population; your general knowledge does not. Output only CSV rows. No
-commentary, no explanation, no markdown fences.
-
-USER
-Generate exactly {n_rows} synthetic records for the following subgroup.
-
-SUBGROUP: {cohort_name}
-
-These statistics were measured on the real data for THIS subgroup, under
-differential privacy. Match them. Where a statistic below conflicts with
-what you would otherwise expect, follow the statistic: it is a
-measurement of the actual population and your expectation is not.
-
-NUMERIC DISTRIBUTIONS (released histograms; reproduce the shape, not just
-the mean)
-{numeric_block}
-
-CATEGORICAL DISTRIBUTIONS (all released categories and their proportions)
-{categorical_block}
-
-OUTCOME RATE IN THIS SUBGROUP
-{class_balance_block}
-
-CONDITIONAL OUTCOME TABLE (P({target} = {positive} | cell), measured under
-differential privacy)
-This table is the most important part of this prompt. Each row states the
-outcome rate for a specific cell of the population. Your generated records
-must reproduce these rates, even where a rate is the opposite of what you
-would expect for that group.
-{conditional_block}
-
-EXACT COUNTS FOR THIS BATCH (the number of rows, out of {n_rows}, that
-must fall in each bin, each category and each outcome; these are the
-counts this subgroup still owes)
-{counts_block}
-
-OUTPUT FORMAT
-Exactly {n_rows} CSV data rows, plus one header row, with these columns in
-this order:
-{columns}
-
-Rules:
-  - every numeric value must lie within its stated range
-  - {target} must be exactly "{positive}" or "{negative}"
-  - do not repeat identical rows; vary records the way real data varies
-  - output nothing except the header and the {n_rows} data rows
-```
-
-In a cohort with class-conditional blocks, the numeric and categorical blocks are given once per outcome class. The matched header-only control of Section 6.3 is this prompt with the five released blocks removed and nothing else changed; the plain header-only control gives the model only the column names. Every value in every block is a released quantity; the prompt never carries a private record.
-
-## Appendix C. Parameters, Artefact and Audits
-
-This appendix carries what an implementer needs from the paper. The operational manual, with the full failure-mode catalogue, the deployment checklist with its rationale, the two deployment patterns, the surface adapters and the cost model, ships as [documentation in the tools repository](https://github.com/Calyie/cortec-framework/blob/main/cortec/docs/deployment.md).
-
-**C.1 Parameters.** Table 29 lists the shipped defaults and what each was set from.
-
-**Table 29:** Shipped parameters.
-
-| parameter | default | set from |
-|---|---|---|
-| $ε_{total}$ | 2.0 | the budget every head-to-head in this paper runs at; on a large dataset the output is flat over [0.3, 8], on a small one it is not (Section 6.5) |
-| conditional share $α$ | 0.2 | a sweep of the release decoded with no model: a fifth costs no measurable conditional accuracy once the release carries class blocks, and the histograms' error falls by a third |
-| count share $γ$ | 0.02 (research pipeline); in the tool 0.05 of the available budget plus min(0.05 of the available budget, 0.25 of the marginal share), half to cohort sizes and half to cell supports, the cell half divided across the declared levels | the published cohort sizes and cell supports are private counts, paid for out of the marginal share, and every $n_{min}$ decision reads them |
-| suppression floor $n_{min}$ | 150 | a conditional rate over fewer than about 50 records is dominated by its own Laplace noise; 150 leaves the class blocks estimable on cohorts of a few hundred; the tool refuses $n_{min}$ < 50 |
-| batch size $B$ | 25 rows | the largest batch on which the frontier models reproduce every count line exactly |
-| pool factor $k$ | 3 (2 on NHANES) | the selection's gain saturates between 2× and 3×; each further unit costs one generation spend |
-| pool coverage floor | 1.1× the rows each cohort owes | the failed pool of Section 4.5 |
-| cell-wise coverage floor | 90% of each conditioning column's released mass | placed between the highest failing measurement (0.858) and the lowest passing one (0.911) over eleven per-column measurements on two datasets |
-| sub-bin rule | `release` (opt-out `generator`) | Table 10; technical report, H.17 |
-| reasoning | `on` | Table 19; suppressing it warns with the measured 3.8× cost |
-| Stage C tolerance $τ$ | derived from the release: $\ln(k/α)/(n_{min} ε_{cert}) + \frac{1}{2}\max_c |\tilde{ρ}_c − \bar{ρ}|$ | the permuted floor's large-sample limit is the largest released gap plus the noise term; the rule sits halfway between the noise term and that limit and reads released quantities only; the earlier fixed 0.15 was chosen by repetition on NHANES (Section 6.9) |
-| Stage C minimum synthetic rows per cell | 20 | below it a cell rate moves by a third on three rows and (4) has no sampling term; no verdict is issued |
-
-**C.2 The release artefact.** The release is a JSON document containing no private record; its noise is drawn with the Laplace mechanism of diffprivlib [21]. Per cohort it carries the published size, the class balance, and one histogram per attribute and per outcome class, or one pooled histogram where a class fell below $n_{min}$. Per conditional level it carries each surviving cell's published positive count, size and rate. Its audit block records every query with its ε, sensitivity, composition rule and partition key, and the totals: `epsilon_accounted` (per row), the privacy unit with `max_rows_per_person` and `epsilon_per_person`, the variant (pure ε, central, δ = 0), and the neighbouring relation (add/remove). A documented-gaps block names the floating-point Laplace mechanism, the pretraining provenance of the generator and an undeclared privacy unit; it records that every $n_{min}$ decision was a noisy threshold on a charged count, and names the uncharged suppression decisions only when `charge_suppression=False` was chosen.
-
-The ledger seals after release, and any later attempt to spend raises. The artefact cannot be regenerated, because the noise source is cryptographically secure and ignores any seed. The stored artefact is therefore the only copy of that release, every draw must reuse it by file, and the generator verifies it by hash before every run. The guardrails enforced in code and the deployment checklist are in the technical report, Appendix G.2 and G.3.
-
-**C.3 Membership inference on the shipped draws.** Table 32 reports the four attacks of Section 6.10 on the three shipped-configuration Adult draws (900 records), at three candidate samples of 1,000 and one of 3,000, with MST's and AIM's output from the same training split attacked the same way as a control on the nearest-neighbour statistic. Entries are attack AUC with a 95% bootstrap interval.
-
-**Table 32:** Membership inference on the shipped Adult draws.
-
-| candidate sample | nearest neighbour | shadow model | per-record LiRA | exact matches | strongest advantage |
-|---|---|---|---|---|---|
-| 1,000, seed 42 | 0.478 [0.453, 0.504] | 0.508 [0.482, 0.533] | 0.506 [0.481, 0.530] | 0 | 0.045 |
-| 1,000, seed 7 | 0.476 [0.450, 0.500] | 0.516 [0.491, 0.542] | 0.519 [0.496, 0.544] | 0 | 0.049 |
-| 1,000, seed 99 | 0.502 [0.476, 0.528] | 0.506 [0.482, 0.531] | 0.510 [0.485, 0.534] | 0 | 0.020 |
-| 3,000, seed 42 | 0.483 [0.469, 0.498] | 0.493 [0.479, 0.508] | 0.511 [0.497, 0.526] | 0 | 0.034 |
-| *MST, 1,500 records, 3,000 candidates* | *0.485 [0.470, 0.499]* | *0.501 [0.486, 0.515]* | *0.495 [0.480, 0.510]* | *0* | *0.031* |
-| *AIM, 1,500 records, 3,000 candidates* | *0.485 [0.471, 0.500]* | *0.509 [0.494, 0.523]* | *0.513 [0.497, 0.527]* | *0* | *0.030* |
-| *positive control (leaking), 3,000 candidates, AUC* | *0.534* | *0.536* | *0.526* | *0.549* | |
-
-## Appendix E. The Open-Weight Control
-
-To establish that the mechanism is not a property of one vendor's model, the Diabetes 130 transmission sweep of Section 6.4 was repeated on nine self-hosted open-weight models spanning six families and four scales, as scientific controls on the mechanism and not a deployment recommendation (Section 6.6); every row, the API reference row included, is the same `number_inpatient` sweep.
-
-**Table 33:** Transmission of a planted relationship across model families. Mean absolute error is the quantity to read; slope is anchored by the endpoints and can read near unity while the midpoint is wrong by 0.3.
-
-| model | family | parameters | quantisation | slope | mean absolute error | midpoint error |
-|---|---|---|---|---|---|---|
-| Claude Fable 5 (API) | Anthropic | not public | none | 0.995 | 0.009 | +0.014 |
-| llama3.3:70b-instruct | Meta | 70.6B | Q4_K_M | 0.988 | 0.020 | +0.040 |
-| qwen2.5:72b-instruct | Alibaba | 72.7B | Q4_K_M | 1.011 | 0.030 | +0.079 |
-| mistral-small:24b-instruct | Mistral | 23.6B | Q4_K_M | 0.877 | 0.049 | −0.013 |
-| gemma2:27b-instruct | Google | 27.2B | Q4_K_M | 0.890 | 0.067 | +0.093 |
-| gpt-oss:20b | OpenAI | 20.9B | MXFP4 | 0.913 | 0.078 | +0.121 |
-| qwen2.5:32b-instruct | Alibaba | 32.8B | Q4_K_M | 1.014 | 0.098 | +0.282 |
-| qwen2.5:14b-instruct | Alibaba | 14.8B | Q4_K_M | 1.011 | 0.105 | +0.306 |
-| qwen2.5:7b-instruct | Alibaba | 7.6B | Q4_K_M | 0.208 | 0.406 | −0.422 |
-
-Every family tested at 20B parameters or above transmits the private relationship with a mean error of 0.10 or less. Every open-weight model is 4-bit quantised, so the table compares quantised weights and not released models, and gemma2's 8,192-token training context, four times smaller than any other model's, confounds its weaker score. Transmission fidelity is not generation fidelity: on full-dataset generation a self-hosted 70B model's output is close to indistinguishable from an unconditioned prompt on the metrics this method exists to improve, which is why the deployment proposal names enterprise platforms.
-
-## Appendix F. The Second-Vendor Replication
-
-**Table 34:** The shipped configuration generated through GPT-5 from the earlier release files of the Gemini arms, scored under the protocol of Section 5.3 beside the Gemini arms and the real-sample floor. The current-release rows are the arms of Tables 3 to 5, placed here for comparison; the GPT-5 arms were generated from the earlier release files, so they are read against the earlier-release rows. The minimal-reasoning arms are three draws; the low-reasoning NHANES arm is one draw from a pool that stopped at 572 of 600 rows at its spend cap and was selected offline.
-
-| condition | draws | 1-way TV ↓ | 2-way TV ↓ | cond. seen ↓ | cond. held-out ↓ | TSTR-LR ↑ | TSTR-RF ↑ | TSTR-GBM ↑ |
+*Stage B is post-processing.* The row allocation reads released sizes; the per-bin counts a batch is asked for are apportioned from released histograms; the counts still owed are a difference of released targets and generated rows; the prompt carries $R$ and those counts; the model is frozen and reads only the prompt; the acceptance rule reads public domains; the inclusion weights, the rake, the refinement and the sub-bin redraw read $R$, the generated rows and independent randomness. None increases the privacy loss, at any pool factor and for arbitrarily many draws. The maximum-entropy decoder reads $R$ only and is post-processing in the same way.
+
+Summing the dependent components, $ε_{count} + ε_{marg} + ε_{cond} = ε_{total}$. Under auto-configuration the candidate columns' noised contingency tables are counting queries of sensitivity 1 on the same records and compose sequentially to $ε_{sel}$; everything downstream of their noised counts is post-processing; the release that follows spends $ε_{release}$, and $ε_{sel} + ε_{release} = ε_{total}$. Stage C's $k$ rate queries are counting-rate queries over $\max(|c|, n_{min})$ with sensitivity at most $1/n_{min}$ on disjoint cells at a public scale and cost $ε_{cert}$ together. $\square$
+
+The floating-point attack on the Laplace mechanism [35] applies to every implementation in the comparison, including ours; the release's audit block declares it as an open gap. The empirical privacy of the private-pgm mechanisms we compare against has been audited as close to their stated guarantee [16].
+
+## Appendix B. Metrics, Floors and Tests
+
+**Fidelity.** 1-way total variation is half the summed absolute difference between the synthetic and private histograms of a column over the public bins, averaged over columns; 2-way total variation is the same over the joint histogram of every pair of columns, averaged over pairs. Both are measured against the full private training table. Conditional total variation is the mean absolute difference between $P(y = 1 \mid g)$ in the synthetic table and in the private table over a family of groups $g$: the cohort bands of the stratification rule ("seen", the groups every release describes) and families of groups defined over columns that share nothing with the conditioning ("held-out").
+
+**Utility.** Train-on-synthetic, test-on-real AUC: logistic regression (balanced, 2,000 iterations, standardised inputs), a random forest (300 trees, balanced) and gradient boosting (scikit-learn's histogram implementation) are each fitted on the synthetic table and scored on the real test split of the same seed. The three students are reported separately because a result can reverse sign between a linear and a tree student.
+
+**References in every table.** The real sample is a fresh draw of $n$ rows of the training split, drawn once per table at that table's $n$, so its value varies across tables by design; the permuted target is the same rows with the target column permuted, which keeps every marginal and removes every feature-to-target relationship; the ceiling trains the students on a real sample of 4,000 training rows, or on the whole training split where it holds fewer (NHANES, 2,999 rows); its fidelity cells are that sample's distance from the full training table, which is the sampling error at 4,000 rows and 0 where the sample is the whole split. The two floors separate on every conditional and utility measure and not on the marginal ones, which is why no marginal measure is read alone.
+
+**Repetition and tests.** Every cell is the mean over three draws from one release with the sample standard deviation. The replication draws a fresh split and a fresh release at seeds 43 and 44 and reports, for each pair of conditions, the mean paired difference over the three seeds, the sign count and a paired t-test (two-sided, scipy). With three pairs the test has little power; a difference is read as replicated when its sign is the same at every seed, and its p-value is reported beside it.
+
+**The bin convention.** The evaluator's intervals are right-closed and the release's left-closed, so an integer on an edge counts in different bins under the two; on Adult this moves 1-way error by 0.003 and no ordering.
+
+## Appendix C. Datasets, Preprocessing and the Anonymised Schema
+
+**Adult.** The 32,561 rows of the UCI training file, with "?" kept as a category; 6 numerical columns (age, final weight, education number, capital gain, capital loss, hours per week) and 8 categorical; the target is income over 50K. Public bins follow the schema's declared edges. Cohorts are formed by the schema's own stratification rule over education and hours per week; the conditional levels are the first and the fourth of the declared hierarchy. The auto-configured Adult release (Section 5, Appendix D) takes its cohorts and levels from the auto-configurator instead.
+
+**NHANES 2017-2018.** The demographic, glycohaemoglobin, body-measures and blood-pressure files joined on the respondent identifier and restricted to adults aged 18 to 80: 5 numerical columns (age, BMI, waist, systolic and diastolic blood pressure) and 4 categorical (sex, race and ethnicity, education, income bracket); the target is HbA1c at or above 6.5 %. Bin edges are public clinical knowledge (WHO BMI categories, ACC/AHA blood-pressure stages). The release is auto-configured: three age cohorts and two conditional levels over age, diastolic blood pressure and race and ethnicity, chosen by the charged column ranking of the auto-configurator.
+
+**Bank marketing.** The UCI file of 45,211 rows, of which 13 of the 16 input columns are used: 5 numerical (age, balance, call duration, campaign contacts, days since the previous campaign) and 8 categorical (job, marital status, education, default, housing loan, personal loan, contact type, previous outcome); the day, month and previous-contact-count columns are not used. The target is a term-deposit subscription; split 80/20 at seed 42; the release is auto-configured in the same way.
+
+**The anonymised schema.** Every column name, category label, band label and the dataset description are replaced by neutral tokens by a deterministic public rule: numerical columns in schema order become n1 to n6, categorical columns k1 to k8, the target y with classes A and B; each categorical column's sorted category list becomes k3_v01, k3_v02 and so on; numerical band labels become n3_b1, n3_b2 and so on. Numeric values, public bounds, bins, the stratification rule, the conditional levels and the held-out families are unchanged, so a release of Adult maps one-to-one onto a release of the anonymised schema and the model sees byte-identical prompt templates with the meaning removed. The draws are mapped back before scoring, so the scorer is the same.
+
+## Appendix D. Configuration, the Prompt and the Baselines
+
+**CoRTeC flags.** ε = 2 (0.5 and 1 where stated); conditional share α = 0.2; count share γ = 0.02; $n_{min}$ = 150; 25 rows per call; counts stated per outcome class; pool factor 3 (2 on NHANES); selection with the sub-bin rule; cohort workers 1; seed 42 for the generator and the selection. The Qwen3 backbones ran through vLLM [45] with the model's default sampling; the Gemini backbone ran with reasoning enabled through Google's interface. A CoRTeC draw is scored as delivered: where the pool fell short of the requested size, the draw holds fewer rows than $n$ (on the Qwen3 arms between 276 and 300 rows at $n$ = 300 and between 949 and 1,000 at $n$ = 1,000; on the Qwen2.5-7B arm between 257 and 279 and between 807 and 864; the Gemini and the bank marketing arms within 1 % of $n$), while the real-sample and permuted references in every table are drawn at the full $n$. Fewer rows add sampling error to a draw's own fidelity measures, so the shortfall works against CoRTeC and against no other method. A call whose output does not parse is retried; the retry and parse rates per backbone are in the stored manifests; the Qwen3-14B produced no parse failure in about 1,500 calls, the Qwen3-8B writes the prompt's range labels into numerical columns at small quotas, and the quantised 32B fails about three NHANES calls in four on one cohort and completes on resumption.
+
+**The prompt.** The system message and the cohort template are fixed and fingerprinted in the reference implementation. The system message instructs the model to reproduce the distributions and relationships the statistics describe "even if this contradicts your expectations about how these variables usually relate", to treat the statistics as describing this specific population, and to output only CSV rows. The cohort template states the subgroup, the released numerical histograms, the released categorical proportions, the outcome rate, the conditional outcome table with the instruction that it is the most important part of the prompt, the exact counts the batch must carry per bin, per category and per outcome, the output format and four rules (values inside their ranges, the target as one of its two labels, no repeated rows, nothing but the header and the rows). In a cohort with class blocks the numerical and categorical blocks are given once per outcome class. The full text is in the reference implementation's template file and in the deployment guide.
+
+**The integer rule.** Whether a numerical column is integer-valued is decided from the public bin edges and bounds, which must all be integral, together with the majority of the pool's values. The rule before version 1.1.1 of the released implementation decided it from every value, so that a single model-written "45.0" or "37.5" re-typed the column to real values and the sub-bin redraw produced fractional ages, hours and capital values, which an evaluator that compares exact values treats as far from the data (the anonymised Qwen3-14B draws scored 0.117 on single columns before flooring and 0.065 after). Every CoRTeC draw in this paper is scored after its integer columns are floored, and the released implementation carries the corrected rule (from version 1.1.1) with a regression test. The Tab-PE and DP-2Stage draws are scored as their methods deliver them, with fractional values in integer columns; flooring those columns would lower their 1-way and 2-way distances by at most 0.011 and 0.017 on the draws we measured, so no ordering depends on it. Two anonymised Qwen3-32B draws carry 25 and 24 empty hours-per-week cells, which the scorer drops from that column's histogram.
+
+**Reference AIM and MST.** private-pgm (mbi 1.1) at the authors' defaults: 80 MB maximum model size, 2-way workload, 1,000 mirror-descent iterations, the exponential mechanism for AIM's selection, δ = 10⁻⁹, the corrected sampler for both. The wrapper is invoked as `pgm_baselines.py --train <split> --dataset <name> --epsilon 2 --n-out <n> --draws 3 --seed 42 --methods aim mst --max-model-size 80 --degree 2 --max-iters 1000` with `PGM_ORACLE=stable` and `PGM_CONSISTENCY_GATE=0.08` in the environment; it is in the repository with the decoder, the scorers and the anonymisation map. Under mbi's default message-passing oracle the fit raised "probabilities contain NaN" inside mirror descent on the seed-43 and seed-44 splits of both datasets (and on seeds 45 to 47, 53, 54 and 60 to 63 in a sweep), and the library's fallback of a halved step returned near-uniform models (seed 43, NHANES, $n$ = 300: 1-way total variation 0.182, students at 0.50, a diabetes rate of 43 % against 14 %); none of those fits is reported. With the log-space oracle (`marginal_oracles.message_passing_stable`) the same seeds converge at the first attempt. The consistency check is the mean total variation between the fitted marginals and the noisy measurements they were fitted to, a quantity that reads released values only; the library's threshold is 0.15, and it was set to 0.08 because the first-attempt fits on every seed and size measure between 0.005 and 0.036, so a threshold of about twice the largest accepted value refuses a fallback fit while admitting every legitimate one. Every reported fit passed at its first attempt, and the seed-42 fits under the two oracles agree to the third decimal. The corrected sampler: mbi 1.1's `synthetic_data` indexes each child's conditional table in the model's attribute order rather than in the order of the parents already sampled, so where the two orders differ the joint structure of some columns is scrambled while every 1-way marginal survives; the wrapper samples each column from its conditional with the axes aligned, after which the sampled conditionals match the fitted model's to within 0.01.
+
+**The maximum-entropy decoder.** Private-PGM's estimator fed exactly the released cohort sizes, class balances, histograms and conditional table of CoRTeC's release as its measurements, with no further noise and no further query, and sampled at the requested $n$.
+
+**The decoder with the selection step.** On each of the three splits, the decoder of that split's release sampled at three times $n$ (three pools per size), each pool passed through Algorithm 2 with the sub-bin rule under the seeds the CoRTeC arms use, integer columns floored; the selection fell one to three rows short of $n$ in six of the eighteen draws. Post-processing of the release, no privacy cost, CPU only.
+
+**The auto-configured Adult release.** The released implementation's Stage A (`release_statistics` with the auto-configurator) on each split, which chose three age cohorts and a relationship, then relationship-by-marital-status hierarchy on the seed-42 and seed-44 splits and education-number cohorts with a relationship, then relationship-by-native-country hierarchy on the seed-43 split: 0.05 of the budget on the hierarchy selection, 0.05 plus the gate charge on the published counts, a fifth of the remainder on the conditional cells and the rest on the marginals; 105 queries, ε accounted 2.000 and the ledger sealed on every split. Decoded by `cortec decode` (the maximum-entropy fit, a pool of three times $n$, the selection step) with the seeds 42 to 44, the fit's consistency with the release 0.004; no language-model arm was run on it.
+
+**The one-shot control.** The research pipeline's header-only prompt: the dataset's one-line description, the column names in order, the two labels of the target and a request for 25 realistic rows per call; no release and no private data. Gemini 3.6 Flash with reasoning at its default as in the Gemini arms; twelve calls per 300-row draw and forty per 1,000-row draw; integer columns floored; scored as delivered. The draws' positive rate is 36 to 38 % against the data's 24 %, and about 70 % of their rows are verbatim copies of the public file's first 25 rows (Appendix F.3).
+
+**DP-2Stage.** The authors' released code: GPT-2, full fine-tuning, DP-Adam, clipping 1, δ = 10⁻⁵, loss weight 0.65, five pseudo-data epochs and ten private epochs, temperature 0.7 with rejection sampling; run on our seed-42 split at ε = 2 and, under their protocol, on their own split at ε = 1.
+
+**DP fine-tuning of the same backbones.** DP-LLMTGen's procedure applied to Qwen3-14B, Qwen2.5-7B and Llama-2 7B: stage 1, five epochs on random tables drawn from the public names, categories and ranges, learning rate 10⁻⁴; stage 2, two epochs of DP-SGD (Opacus [41]) on the private rows with LoRA [20] rank 8 on the attention projections (10.5 million trainable parameters on the 14B), learning rate 5 × 10⁻⁴, batch 32, clipping 1, the weighted cross-entropy with α = 0.65, δ = 10⁻⁵, ε spent 1.994 of 2; sampling at temperature 0.7 with 99.7 % of attempts valid. The numerical-understanding loss of the original is omitted because its coefficients are not given.
+
+**Tab-PE.** The authors' DPSDA code and their Adult example: mutation rate 0.5 decaying polynomially to 0.01 with γ = 0.2, the composite population with sampling then ranking, the L2 nearest-neighbour histogram, δ = 1/(n ln n), 29 to 30 iterations, noise multiplier 11.3 at ε = 2 on our split; populations of 1,000 (600 on NHANES) and, under their protocol, 2,000 on their 70/15/15 split with 30 iterations.
+
+## Appendix E. Full Tables
+
+**E.1 NHANES at ε = 2, seed 42, three draws.** Lower is better on the first four columns, higher on the last three.
+
+| condition, $n$ = 300 | 1-way TV | 2-way TV | cond. seen | cond. held-out | TSTR-LR | TSTR-RF | TSTR-GBM |
+|---|---|---|---|---|---|---|---|
+| *all 2,999 training rows (utility ceiling)* | *0.000* | *0.000* | *0.000* | *0.000* | *0.797* | *0.763* | *0.747* |
+| *real sample (floor)* | *0.034* | *0.081* | *0.015* | *0.036* | *0.773* | *0.728* | *0.716* |
+| *permuted target* | *0.043* | *0.093* | *0.047* | *0.060* | *0.493* | *0.514* | *0.515* |
+| CoRTeC, Qwen3-14B | 0.029 | 0.158 | 0.036 | 0.075 | 0.678 | 0.657 | 0.645 |
+| CoRTeC, Qwen3-32B (AWQ) | 0.047 | 0.157 | 0.036 | 0.046 | 0.681 | 0.677 | 0.657 |
+| CoRTeC, Qwen3-8B | 0.042 | 0.181 | 0.017 | 0.050 | 0.651 | 0.646 | 0.655 |
+| maximum-entropy decoder | 0.042 | 0.117 | 0.025 | 0.041 | 0.705 | 0.694 | 0.691 |
+| reference AIM | 0.042 | 0.100 | 0.017 | 0.044 | 0.747 | 0.721 | 0.710 |
+| reference MST (5 draws) | 0.045 | 0.110 | 0.026 | 0.060 | 0.709 | 0.668 | 0.642 |
+| DP-2Stage, GPT-2 | 0.175 | 0.295 | 0.117 | 0.115 | 0.527 | 0.537 | 0.553 |
+| DP fine-tuned Qwen3-14B | 0.116 | 0.205 | 0.074 | 0.077 | 0.575 | 0.544 | 0.527 |
+| Tab-PE (600-row population) | 0.064 | 0.151 | 0.030 | 0.053 | 0.739 | 0.729 | 0.724 |
+| **condition, $n$ = 1,000** | | | | | | | |
+| *real sample (floor)* | *0.016* | *0.039* | *0.008* | *0.016* | *0.783* | *0.752* | *0.744* |
+| *permuted target* | *0.017* | *0.044* | *0.039* | *0.047* | *0.516* | *0.484* | *0.470* |
+| CoRTeC, Qwen3-14B | 0.027 | 0.150 | 0.031 | 0.069 | 0.696 | 0.648 | 0.639 |
+| CoRTeC, Qwen3-32B (AWQ) | 0.036 | 0.123 | 0.023 | 0.031 | 0.748 | 0.727 | 0.701 |
+| CoRTeC, Qwen3-8B | 0.034 | 0.156 | 0.023 | 0.040 | 0.748 | 0.688 | 0.671 |
+| maximum-entropy decoder | 0.031 | 0.088 | 0.022 | 0.029 | 0.758 | 0.720 | 0.686 |
+| reference AIM | 0.029 | 0.070 | 0.027 | 0.032 | 0.752 | 0.714 | 0.660 |
+| reference MST (5 draws) | 0.028 | 0.075 | 0.016 | 0.048 | 0.727 | 0.692 | 0.679 |
+| DP-2Stage, GPT-2 | 0.169 | 0.284 | 0.120 | 0.110 | 0.538 | 0.520 | 0.512 |
+| DP fine-tuned Qwen3-14B | 0.117 | 0.195 | 0.089 | 0.078 | 0.571 | 0.516 | 0.501 |
+| Tab-PE (1,000-row population) | 0.060 | 0.132 | 0.027 | 0.041 | 0.743 | 0.721 | 0.716 |
+
+**E.2 Replication: means over seeds with the sample standard deviation across seeds, and the paired differences.** Each seed's value is the mean of three draws; p is a two-sided paired t-test over the three seeds; the sign count gives how many seeds have the difference positive and negative. The decoder-with-selection rows are the fixed-rule release decoded with no model and passed through the selection step on each split; the auto-configured rows are the release the auto-configurator derives on Adult, decoded the same way (Section 5). Their conditional cells are not comparable and are left out: the evaluator's seen bands are the fixed rule's cohorts, which that release does not condition on, and two of the three held-out families (relationship; native country) are columns it conditions on. Over the one family that shares no column with its conditioning, workclass by race, its conditional error is 0.043 against the reference AIM's 0.061 at $n$ = 300 and 0.020 against 0.036 at $n$ = 1,000 (0 of 3 seeds in AIM's favour at both sizes; the decoder reads 0.061 and 0.043).
+
+| Adult, $n$ = 300 | 1-way TV | 2-way TV | cond. seen | cond. held-out | TSTR-LR | TSTR-RF | TSTR-GBM |
+|---|---|---|---|---|---|---|---|
+| CoRTeC Qwen3-14B | 0.054 ± 0.008 | 0.146 ± 0.006 | 0.035 ± 0.007 | 0.048 ± 0.002 | 0.815 ± 0.009 | 0.860 ± 0.002 | 0.835 ± 0.002 |
+| maximum-entropy decoder | 0.058 ± 0.002 | 0.145 ± 0.003 | 0.073 ± 0.008 | 0.049 ± 0.003 | 0.818 ± 0.000 | 0.857 ± 0.001 | 0.847 ± 0.002 |
+| decoder with selection | 0.035 ± 0.003 | 0.120 ± 0.002 | 0.017 ± 0.002 | 0.043 ± 0.004 | 0.822 ± 0.002 | 0.861 ± 0.004 | 0.853 ± 0.008 |
+| reference AIM | 0.052 ± 0.004 | 0.120 ± 0.003 | 0.061 ± 0.006 | 0.048 ± 0.001 | 0.832 ± 0.011 | 0.866 ± 0.003 | 0.839 ± 0.006 |
+| auto-configured, no model, with selection | 0.020 ± 0.001 | 0.109 ± 0.001 | n/a | n/a | 0.830 ± 0.004 | 0.870 ± 0.006 | 0.859 ± 0.002 |
+| CoRTeC minus decoder | −0.004 [1+/2−] 0.47 | +0.001 [2+/1−] 0.88 | −0.038 [0+/3−] 0.04 | −0.001 [1+/2−] 0.44 | −0.003 [1+/2−] 0.63 | +0.003 [3+/0−] 0.12 | −0.012 [0+/3−] 0.01 |
+| CoRTeC minus AIM | +0.002 [2+/1−] 0.80 | +0.027 [3+/0−] 0.03 | −0.027 [0+/3−] <0.01 | −0.000 [2+/1−] 0.86 | −0.017 [1+/2−] 0.28 | −0.006 [0+/3−] 0.02 | −0.004 [1+/2−] 0.42 |
+| decoder minus AIM | +0.006 [3+/0−] 0.18 | +0.026 [3+/0−] 0.01 | +0.012 [3+/0−] 0.27 | +0.001 [2+/1−] 0.81 | −0.014 [0+/3−] 0.18 | −0.009 [0+/3−] 0.05 | +0.008 [3+/0−] 0.13 |
+| selection minus decoder | −0.023 [0+/3−] 0.01 | −0.025 [0+/3−] 0.01 | −0.056 [0+/3−] 0.01 | −0.006 [0+/3−] 0.20 | +0.003 [3+/0−] 0.17 | +0.005 [3+/0−] 0.19 | +0.006 [3+/0−] 0.31 |
+| selection minus AIM | −0.017 [0+/3−] 0.03 | +0.001 [2+/1−] 0.76 | −0.045 [0+/3−] <0.01 | −0.005 [1+/2−] 0.23 | −0.010 [0+/3−] 0.20 | −0.004 [0+/3−] 0.01 | +0.014 [3+/0−] 0.01 |
+| auto-configured minus AIM | −0.032 [0+/3−] 0.01 | −0.011 [0+/3−] 0.05 | n/a | n/a | −0.002 [2+/1−] 0.86 | +0.004 [2+/1−] 0.28 | +0.020 [3+/0−] 0.03 |
+| auto-configured minus selection | −0.015 [0+/3−] 0.01 | −0.012 [0+/3−] 0.02 | n/a | n/a | +0.009 [3+/0−] 0.13 | +0.008 [3+/0−] 0.08 | +0.006 [2+/1−] 0.28 |
+
+| Adult, $n$ = 1,000 | 1-way TV | 2-way TV | cond. seen | cond. held-out | TSTR-LR | TSTR-RF | TSTR-GBM |
+|---|---|---|---|---|---|---|---|
+| CoRTeC Qwen3-14B | 0.039 ± 0.004 | 0.112 ± 0.005 | 0.027 ± 0.006 | 0.033 ± 0.003 | 0.829 ± 0.002 | 0.863 ± 0.004 | 0.860 ± 0.003 |
+| maximum-entropy decoder | 0.041 ± 0.001 | 0.107 ± 0.001 | 0.033 ± 0.003 | 0.042 ± 0.003 | 0.825 ± 0.001 | 0.868 ± 0.003 | 0.863 ± 0.003 |
+| decoder with selection | 0.027 ± 0.001 | 0.090 ± 0.001 | 0.007 ± 0.001 | 0.033 ± 0.004 | 0.832 ± 0.004 | 0.871 ± 0.003 | 0.871 ± 0.002 |
+| reference AIM | 0.031 ± 0.001 | 0.074 ± 0.001 | 0.034 ± 0.005 | 0.031 ± 0.001 | 0.847 ± 0.007 | 0.882 ± 0.005 | 0.876 ± 0.006 |
+| auto-configured, no model, with selection | 0.016 ± 0.000 | 0.082 ± 0.002 | n/a | n/a | 0.840 ± 0.006 | 0.879 ± 0.009 | 0.881 ± 0.006 |
+| CoRTeC minus decoder | −0.002 [1+/2−] 0.52 | +0.005 [3+/0−] 0.27 | −0.005 [1+/2−] 0.38 | −0.009 [0+/3−] 0.07 | +0.004 [3+/0−] 0.13 | −0.005 [0+/3−] 0.20 | −0.002 [0+/3−] 0.25 |
+| CoRTeC minus AIM | +0.009 [3+/0−] 0.04 | +0.038 [3+/0−] <0.01 | −0.007 [0+/3−] 0.09 | +0.002 [2+/1−] 0.36 | −0.017 [0+/3−] 0.07 | −0.019 [0+/3−] 0.07 | −0.016 [0+/3−] 0.08 |
+| decoder minus AIM | +0.011 [3+/0−] <0.01 | +0.033 [3+/0−] <0.01 | −0.002 [1+/2−] 0.69 | +0.011 [3+/0−] 0.03 | −0.021 [0+/3−] 0.03 | −0.014 [0+/3−] 0.04 | −0.014 [0+/3−] 0.07 |
+| selection minus decoder | −0.014 [0+/3−] <0.01 | −0.017 [0+/3−] <0.01 | −0.025 [0+/3−] <0.01 | −0.009 [0+/3−] 0.03 | +0.007 [3+/0−] 0.05 | +0.003 [3+/0−] 0.01 | +0.009 [3+/0−] 0.07 |
+| selection minus AIM | −0.003 [0+/3−] 0.05 | +0.017 [3+/0−] <0.01 | −0.027 [0+/3−] 0.02 | +0.002 [2+/1−] 0.60 | −0.014 [0+/3−] 0.02 | −0.011 [0+/3−] 0.06 | −0.005 [0+/3−] 0.16 |
+| auto-configured minus AIM | −0.015 [0+/3−] <0.01 | +0.009 [3+/0−] <0.01 | n/a | n/a | −0.007 [1+/2−] 0.36 | −0.003 [1+/2−] 0.56 | +0.004 [3+/0−] 0.35 |
+| auto-configured minus selection | −0.011 [0+/3−] <0.01 | −0.008 [0+/3−] 0.03 | n/a | n/a | +0.008 [3+/0−] 0.23 | +0.007 [3+/0−] 0.17 | +0.009 [3+/0−] 0.11 |
+
+| NHANES, $n$ = 300 | 1-way TV | 2-way TV | cond. seen | cond. held-out | TSTR-LR | TSTR-RF | TSTR-GBM |
+|---|---|---|---|---|---|---|---|
+| CoRTeC Qwen3-14B | 0.044 ± 0.013 | 0.161 ± 0.011 | 0.021 ± 0.013 | 0.057 ± 0.020 | 0.710 ± 0.033 | 0.689 ± 0.028 | 0.667 ± 0.029 |
+| maximum-entropy decoder | 0.041 ± 0.001 | 0.117 ± 0.001 | 0.024 ± 0.001 | 0.040 ± 0.002 | 0.717 ± 0.016 | 0.713 ± 0.023 | 0.705 ± 0.015 |
+| reference AIM | 0.042 ± 0.001 | 0.103 ± 0.003 | 0.019 ± 0.003 | 0.041 ± 0.007 | 0.752 ± 0.005 | 0.725 ± 0.004 | 0.706 ± 0.005 |
+| CoRTeC minus decoder | +0.003 [2+/1−] 0.78 | +0.044 [3+/0−] 0.02 | −0.002 [1+/2−] 0.77 | +0.017 [2+/1−] 0.26 | −0.007 [1+/2−] 0.75 | −0.024 [1+/2−] 0.21 | −0.037 [0+/3−] 0.17 |
+| CoRTeC minus AIM | +0.001 [2+/1−] 0.87 | +0.058 [3+/0−] 0.02 | +0.002 [1+/2−] 0.83 | +0.016 [2+/1−] 0.37 | −0.042 [0+/3−] 0.12 | −0.036 [0+/3−] 0.13 | −0.039 [0+/3−] 0.18 |
+| decoder minus AIM | −0.001 [1+/2−] 0.22 | +0.014 [3+/0−] 0.01 | +0.004 [3+/0−] 0.15 | −0.001 [1+/2−] 0.73 | −0.035 [0+/3−] 0.06 | −0.012 [1+/2−] 0.45 | −0.002 [2+/1−] 0.87 |
+
+| NHANES, $n$ = 1,000 | 1-way TV | 2-way TV | cond. seen | cond. held-out | TSTR-LR | TSTR-RF | TSTR-GBM |
+|---|---|---|---|---|---|---|---|
+| CoRTeC Qwen3-14B | 0.040 ± 0.013 | 0.151 ± 0.008 | 0.022 ± 0.008 | 0.054 ± 0.016 | 0.732 ± 0.031 | 0.686 ± 0.037 | 0.669 ± 0.034 |
+| maximum-entropy decoder | 0.031 ± 0.002 | 0.087 ± 0.002 | 0.018 ± 0.003 | 0.026 ± 0.003 | 0.769 ± 0.011 | 0.745 ± 0.023 | 0.722 ± 0.032 |
+| reference AIM | 0.030 ± 0.002 | 0.071 ± 0.001 | 0.022 ± 0.007 | 0.035 ± 0.016 | 0.734 ± 0.027 | 0.701 ± 0.033 | 0.676 ± 0.022 |
+| CoRTeC minus decoder | +0.009 [2+/1−] 0.34 | +0.064 [3+/0−] <0.01 | +0.004 [3+/0−] 0.25 | +0.028 [3+/0−] 0.09 | −0.037 [0+/3−] 0.10 | −0.059 [0+/3−] 0.06 | −0.053 [0+/3−] 0.08 |
+| CoRTeC minus AIM | +0.009 [2+/1−] 0.33 | +0.080 [3+/0−] <0.01 | −0.000 [2+/1−] 0.96 | +0.018 [3+/0−] 0.21 | −0.002 [2+/1−] 0.96 | −0.015 [1+/2−] 0.73 | −0.007 [1+/2−] 0.81 |
+| decoder minus AIM | +0.000 [2+/1−] 0.85 | +0.016 [3+/0−] 0.01 | −0.004 [1+/2−] 0.34 | −0.010 [1+/2−] 0.47 | +0.035 [3+/0−] 0.24 | +0.044 [3+/0−] 0.21 | +0.046 [3+/0−] 0.07 |
+
+**E.3 Per-pair reading.** For every pair of columns the pairwise total variation of the model's draws and of the decoder's draws against the private table was compared on the seed-42 split. On Adult the model is below the decoder on the pairs it recognises as logical: education with education number (0.26 to 0.40 under the decoder against 0.08 to 0.32 under the model across backbones and sizes), marital status with relationship (0.08 to 0.30 against the decoder's 0.33 to 0.40), relationship with sex (0.03 to 0.19 against 0.22 to 0.26), workclass with occupation; and at or above it on the pairs the release describes only through the cohorts. On bank the model repairs days since contact with the previous outcome and raises the error on education with contact, contact with the previous outcome, marital status with education and loan with contact, four near-independent pairs on which the decoder is at the floor. The same signature appears at both sizes and on every backbone.
+
+**E.4 The backbone ladder.** One Adult release, one NHANES release, the same prompts, flags and evaluator; only the model changes. Single-column and pairwise total variation, then the three students.
+
+| backbone | Adult $n$ = 300 | utility | Adult $n$ = 1,000 | utility | NHANES $n$ = 300 | utility | NHANES $n$ = 1,000 | utility |
 |---|---|---|---|---|---|---|---|---|
-| **NHANES** | | | | | | | | |
-| CoRTeC (Gemini 3.5 Flash, reasoning on; current release) | 3 | 0.016 | 0.120 | 0.013 | 0.036 | 0.738 | 0.679 | 0.681 |
-| CoRTeC (gpt-oss-120b, low reasoning; current release) | 3 | 0.020 | 0.134 | 0.023 | 0.052 | 0.685 | 0.660 | 0.628 |
-| CoRTeC (Gemini 3.5 Flash, reasoning on; current release, counts per outcome) | 3 | 0.017 | 0.128 | 0.014 | 0.032 | 0.733 | 0.678 | 0.662 |
-| CoRTeC (gpt-oss-120b, low reasoning; current release, counts per outcome) | 3 | 0.019 | 0.137 | 0.027 | 0.028 | 0.716 | 0.637 | 0.643 |
-| CoRTeC (GPT-5, medium reasoning; current release, counts per outcome) | 3 | 0.017 | 0.107 | 0.014 | 0.032 | 0.736 | 0.696 | 0.682 |
-| CoRTeC (Gemini 3.5 Flash, reasoning on; earlier release) | 3 | 0.015 | 0.119 | 0.006 | 0.036 | 0.752 | 0.732 | 0.711 |
-| CoRTeC (GPT-5, minimal reasoning) | 3 | 0.031 | 0.116 | 0.038 | 0.063 | 0.751 | 0.710 | 0.702 |
-| CoRTeC (GPT-5, low reasoning; one draw) | 1 | 0.020 | 0.104 | 0.011 | 0.069 | 0.727 | 0.664 | 0.640 |
-| *real sample, n = 300* | *3* | *0.034* | *0.081* | *0.015* | *0.036* | *0.773* | *0.728* | *0.716* |
-| **finance** | | | | | | | | |
-| CoRTeC (Gemini 3.5 Flash, reasoning on; current release) | 3 | 0.029 | 0.123 | 0.016 | 0.028 | 0.689 | 0.721 | 0.699 |
-| CoRTeC (gpt-oss-120b, low reasoning; current release; one draw) | 1 | 0.060 | 0.178 | 0.037 | 0.037 | 0.677 | 0.730 | 0.701 |
-| CoRTeC (GPT-5, medium reasoning; current release, counts per outcome; one draw) | 1 | 0.028 | 0.120 | 0.019 | 0.022 | 0.697 | 0.735 | 0.713 |
-| CoRTeC (Gemini 3.5 Flash, reasoning on; earlier release) | 3 | 0.029 | 0.125 | 0.014 | 0.022 | 0.680 | 0.731 | 0.712 |
-| CoRTeC (GPT-5, minimal reasoning) | 3 | 0.033 | 0.125 | 0.019 | 0.026 | 0.683 | 0.711 | 0.703 |
-| *real sample, n = 300* | *3* | *0.041* | *0.099* | *0.059* | *0.045* | *0.695* | *0.727* | *0.717* |
-| **Adult** | | | | | | | | |
-| CoRTeC (Gemini 3.5 Flash, reasoning on; current release) | 3 | 0.026 | 0.106 | 0.017 | 0.040 | 0.839 | 0.875 | 0.844 |
-| *real sample, n = 300* | *3* | *0.043* | *0.107* | *0.062* | *0.036* | *0.830* | *0.870* | *0.840* |
+| Qwen2.5-7B | 0.110 / 0.220 | 0.81 / 0.85 / 0.83 | 0.089 / 0.178 | 0.81 / 0.86 / 0.85 | 0.045 / 0.160 | 0.64 / 0.64 / 0.61 | 0.039 / 0.145 | 0.66 / 0.64 / 0.62 |
+| Qwen3-8B | 0.068 / 0.164 | 0.80 / 0.85 / 0.82 | 0.048 / 0.124 (2 draws) | 0.82 / 0.85 / 0.84 | 0.042 / 0.181 | 0.65 / 0.65 / 0.66 | 0.034 / 0.156 | 0.75 / 0.69 / 0.67 |
+| Qwen3-14B | 0.046 / 0.139 | 0.81 / 0.86 / 0.83 | 0.036 / 0.108 | 0.83 / 0.86 / 0.86 | 0.029 / 0.158 | 0.68 / 0.66 / 0.65 | 0.027 / 0.150 | 0.70 / 0.65 / 0.64 |
+| Qwen3-32B (AWQ) | 0.049 / 0.138 | 0.82 / 0.86 / 0.84 | 0.035 / 0.103 | 0.82 / 0.86 / 0.85 | 0.047 / 0.157 | 0.68 / 0.68 / 0.66 | 0.036 / 0.123 | 0.75 / 0.73 / 0.70 |
+| Gemini 3.6 Flash | 0.027 / 0.110 | 0.81 / 0.86 / 0.84 | not run | | not run | | not run | |
+| *maximum-entropy decoder* | *0.058 / 0.146* | *0.82 / 0.86 / 0.85* | *0.041 / 0.106* | *0.83 / 0.87 / 0.86* | *0.042 / 0.117* | *0.71 / 0.69 / 0.69* | *0.031 / 0.088* | *0.76 / 0.72 / 0.69* |
+| *reference AIM* | *0.056 / 0.122* | *0.85 / 0.87 / 0.85* | *0.029 / 0.072* | *0.85 / 0.89 / 0.88* | *0.042 / 0.100* | *0.75 / 0.72 / 0.71* | *0.029 / 0.070* | *0.75 / 0.71 / 0.66* |
+| *real sample* | *0.043 / 0.107* | *0.83 / 0.87 / 0.84* | *0.026 / 0.061* | *0.86 / 0.89 / 0.88* | *0.034 / 0.081* | *0.77 / 0.73 / 0.72* | *0.016 / 0.039* | *0.78 / 0.75 / 0.74* |
 
-The comparisons the table supports are stated in Section 6.6; the Holm families are the fourteen-test families of Section 5.4.
+**E.5 Bank marketing at ε = 2, one split, three draws.** The held-out conditional family is not defined on this schema.
 
-## Appendix G. The AIM Tuning Sweep
+| condition | $n$ | 1-way TV | 2-way TV | cond. seen | TSTR-LR | TSTR-RF | TSTR-GBM |
+|---|---|---|---|---|---|---|---|
+| *real sample* | 300 | *0.025* | *0.052* | *0.014* | *0.833* | *0.849* | *0.833* |
+| *permuted target* | 300 | *0.027* | *0.056* | *0.096* | *0.415* | *0.467* | *0.463* |
+| CoRTeC, Qwen3-14B | 300 | 0.040 | 0.112 | 0.013 | 0.802 | 0.799 | 0.781 |
+| maximum-entropy decoder | 300 | 0.026 | 0.066 | 0.036 | 0.824 | 0.802 | 0.802 |
+| reference AIM | 300 | 0.034 | 0.068 | 0.021 | 0.815 | 0.805 | 0.772 |
+| *real sample* | 1,000 | *0.014* | *0.028* | *0.008* | *0.862* | *0.871* | *0.860* |
+| *permuted target* | 1,000 | *0.013* | *0.031* | *0.089* | *0.503* | *0.483* | *0.485* |
+| CoRTeC, Qwen3-14B | 1,000 | 0.034 | 0.101 | 0.011 | 0.810 | 0.784 | 0.759 |
+| maximum-entropy decoder | 1,000 | 0.013 | 0.043 | 0.013 | 0.837 | 0.848 | 0.837 |
+| reference AIM | 1,000 | 0.024 | 0.049 | 0.006 | 0.839 | 0.824 | 0.805 |
+| *real sample of 4,000 rows (utility ceiling)* | | *0.007* | *0.014* | *0.005* | *0.869* | *0.890* | *0.891* |
 
-**Table 35:** AIM on Adult at ε = 2 and $n$ = 300 under the smartnoise-synth defaults and under the two settings a practitioner would try first, fitted on the same training split under the same public bins and scored under the protocol of Section 5.3. Fit times are wall-clock on one four-core machine.
+**E.6 Other budgets.** The reference AIM and MST at ε = 0.5 and 1 on our protocol (Adult, five draws; NHANES, five draws), with the Qwen2.5-7B CoRTeC arm and the release's own maximum-entropy decoder at the same budgets (three draws; the decoder's ε = 2 rows repeat Table 3); and the DP-LLMTGen protocol at ε = 0.5. The ε = 2 rows of Table 3 are the reference. At ε = 0.5 and 1 the decoder is ahead of the 7B arm on single columns, pairs and every student at both sizes, so that arm's errors are the backbone's and not the release's; against the reference AIM the decoder is behind on fidelity at every budget and, at $n$ = 300 and ε = 0.5, ahead on the students (0.819, 0.855, 0.850 against 0.811, 0.814, 0.787; one split).
 
-| condition | draws | fit | 1-way TV ↓ | 2-way TV ↓ | cond. seen ↓ | cond. held-out ↓ | TSTR-LR ↑ | TSTR-RF ↑ | TSTR-GBM ↑ |
-|---|---|---|---|---|---|---|---|---|---|
-| AIM, defaults (80 MB model, 2-way workload) | 5 | 23 min | 0.037 | 0.119 | 0.054 | 0.101 | 0.675 | 0.700 | 0.691 |
-| AIM, 300 MB model | 3 | 30 min | 0.034 | 0.107 | 0.045 | 0.029 | 0.772 | 0.867 | 0.835 |
-| AIM, 3-way workload | 3 | 13.4 h | 0.032 | 0.102 | 0.046 | 0.026 | 0.812 | 0.876 | 0.847 |
-| CoRTeC (Gemini 3.5 Flash), shipped configuration, earlier release | 3 | none | 0.029 | 0.110 | 0.017 | 0.039 | 0.842 | 0.876 | 0.849 |
-| *real sample, n = 300* | *3* | | *0.043* | *0.107* | *0.062* | *0.036* | *0.830* | *0.870* | *0.840* |
+| Adult, $n$ = 300 | ε | 1-way TV | 2-way TV | cond. seen | cond. held-out | TSTR-LR | TSTR-RF | TSTR-GBM |
+|---|---|---|---|---|---|---|---|---|
+| reference AIM | 0.5 | 0.050 | 0.126 | 0.061 | 0.084 | 0.811 | 0.814 | 0.787 |
+| reference AIM | 1 | 0.054 | 0.125 | 0.078 | 0.051 | 0.823 | 0.859 | 0.830 |
+| reference MST | 0.5 | 0.053 | 0.129 | 0.132 | 0.054 | 0.774 | 0.810 | 0.780 |
+| reference MST | 1 | 0.051 | 0.127 | 0.144 | 0.042 | 0.741 | 0.798 | 0.754 |
+| CoRTeC, Qwen2.5-7B | 0.5 | 0.127 | 0.255 | 0.066 | 0.060 | 0.754 | 0.826 | 0.809 |
+| CoRTeC, Qwen2.5-7B | 1 | 0.115 | 0.223 | 0.122 | 0.067 | 0.763 | 0.826 | 0.798 |
+| CoRTeC, Qwen2.5-7B | 2 | 0.110 | 0.220 | 0.090 | 0.054 | 0.813 | 0.852 | 0.830 |
+| maximum-entropy decoder | 0.5 | 0.086 | 0.190 | 0.074 | 0.071 | 0.819 | 0.855 | 0.850 |
+| maximum-entropy decoder | 1 | 0.066 | 0.157 | 0.069 | 0.060 | 0.821 | 0.859 | 0.857 |
+| maximum-entropy decoder | 2 | 0.058 | 0.146 | 0.082 | 0.049 | 0.818 | 0.856 | 0.847 |
+| **Adult, $n$ = 1,000** | | | | | | | | |
+| reference AIM | 0.5 | 0.037 | 0.087 | 0.037 | 0.031 | 0.841 | 0.880 | 0.873 |
+| reference AIM | 1 | 0.033 | 0.080 | 0.051 | 0.032 | 0.837 | 0.873 | 0.861 |
+| reference MST | 0.5 | 0.032 | 0.089 | 0.135 | 0.037 | 0.758 | 0.806 | 0.791 |
+| reference MST | 1 | 0.032 | 0.086 | 0.136 | 0.044 | 0.781 | 0.817 | 0.802 |
+| CoRTeC, Qwen2.5-7B | 0.5 | 0.107 | 0.208 | 0.052 | 0.046 | 0.808 | 0.863 | 0.848 |
+| CoRTeC, Qwen2.5-7B | 1 | 0.095 | 0.183 | 0.078 | 0.044 | 0.807 | 0.853 | 0.840 |
+| CoRTeC, Qwen2.5-7B | 2 | 0.089 | 0.178 | 0.061 | 0.039 | 0.808 | 0.855 | 0.849 |
+| maximum-entropy decoder | 0.5 | 0.078 | 0.164 | 0.034 | 0.062 | 0.817 | 0.864 | 0.854 |
+| maximum-entropy decoder | 1 | 0.052 | 0.123 | 0.036 | 0.048 | 0.819 | 0.867 | 0.857 |
+| maximum-entropy decoder | 2 | 0.041 | 0.106 | 0.034 | 0.045 | 0.826 | 0.870 | 0.863 |
+| **NHANES, $n$ = 300** | | | | | | | | |
+| reference AIM | 0.5 | 0.053 | 0.122 | 0.025 | 0.046 | 0.716 | 0.681 | 0.665 |
+| reference AIM | 1 | 0.040 | 0.104 | 0.040 | 0.042 | 0.716 | 0.709 | 0.693 |
+| reference MST | 0.5 | 0.050 | 0.126 | 0.033 | 0.063 | 0.704 | 0.655 | 0.642 |
+| reference MST | 1 | 0.045 | 0.109 | 0.027 | 0.046 | 0.703 | 0.658 | 0.622 |
+| Tab-PE (1,000-row population) | 0.5 | 0.163 | 0.280 | 0.028 | 0.048 | 0.702 | 0.674 | 0.667 |
+| Tab-PE (1,000-row population) | 1 | 0.098 | 0.184 | 0.053 | 0.049 | 0.701 | 0.682 | 0.653 |
+
+| DP-LLMTGen protocol, ε = 0.5 | 1-way | 2-way | 3-way | 4-way | 5-way | ACC | AUC |
+|---|---|---|---|---|---|---|---|
+| DP-LLMTGen (published) | 0.058 | 0.095 | 0.126 | 0.154 | 0.183 | 0.833 | 0.887 |
+| RAP++ (published) | 0.066 | 0.116 | 0.162 | 0.208 | 0.251 | 0.766 | 0.758 |
+| CoRTeC, Qwen2.5-7B (ours) | 0.075 | 0.145 | 0.225 | 0.320 | 0.424 | 0.833 | 0.885 |
+| maximum-entropy decoder (ours) | 0.049 | 0.112 | 0.193 | 0.293 | 0.409 | 0.819 | 0.882 |
+| reference AIM (ours) | 0.021 | 0.057 | 0.106 | 0.173 | 0.259 | 0.821 | 0.845 |
+| reference MST (ours) | 0.020 | 0.061 | 0.117 | 0.190 | 0.281 | 0.808 | 0.823 |
+| DP fine-tuned Llama-2 7B, our run | 0.103 | 0.181 | 0.253 | 0.329 | 0.412 | 0.772 | 0.815 |
+| *training set, our scorer* | *0.009* | *0.025* | *0.057* | *0.112* | *0.190* | *0.877* | *0.931* |
+
+The published Tab-PE row's embedding-space precision and recall are 34.3 and 77.3; our Tab-PE rerun reads 66.7 and 74.6 and our CoRTeC rows 61 to 72 and 71 to 84 with a 64-16-64 autoencoder trained per run, so the precision column is implementation-dependent and is not compared.
+
+**E.7 Stage C on NHANES.** Under the rule the implementation ships, with the tolerance derived from the release (0.107 for the auto-configured release) and no verdict while a released cell holds fewer than 20 synthetic rows, no single 300-row draw receives a verdict, because two or three of the four released cells are thin; the three draws pooled (900 rows) are within the bound at 0.087 against the tolerance of 0.107, the real-sample ceiling clears it at 0.088 and the permuted floor fails it at 0.139, so the verdict holds at 95 % simultaneous confidence over the four cells. The Stage C cost was ε = 1 on top of ε = 2 for the release.
+
+## Appendix F. Membership Inference, Distance to Closest Record and Memorisation
+
+**F.1 Membership inference.** The standard membership game [33] in the form Stadler et al. apply to synthetic data [34]: 3,000 candidates, half from the training split and half held out, the adversary sees the three draws of $n$ = 300 (900 rows) and must say whether a candidate was in the training set. Four attacks: nearest-neighbour distance, a discriminative shadow model, a per-record likelihood-ratio test in the style of Carlini et al. [11] over sixteen bootstrap density models, and exact matching. Advantage is $2 \cdot \mathrm{AUC} - 1$. The positive control passes 900 real training rows off as synthetic; because the 1,500 member candidates are drawn from the 26,048-row Adult training split, only a small share of them can be among those 900 rows, so the control's exact-match advantage on Adult is small, 0.098 as measured, where on NHANES, whose training split has 2,999 rows, it is 0.48; the other three attacks separate the control on both datasets.
+
+| arm, ε = 2 | dataset | strongest advantage (attack) | nearest-neighbour AUC (95 %) | exact matches |
+|---|---|---|---|---|
+| CoRTeC, Qwen3-14B | Adult | 0.022 (shadow model) | 0.491 (0.477 to 0.506) | 0 |
+| CoRTeC, Qwen3-32B (AWQ) | Adult | 0.035 (likelihood ratio) | 0.492 (0.478 to 0.507) | 0 |
+| CoRTeC, Qwen3-8B | Adult | 0.026 (nearest neighbour) | 0.487 (0.473 to 0.502) | 0 |
+| CoRTeC, Gemini 3.6 Flash | Adult | 0.022 (nearest neighbour) | 0.489 (0.475 to 0.503) | 0 |
+| CoRTeC, anonymised, Gemini 3.6 Flash | Adult | 0.021 (nearest neighbour) | 0.489 (0.475 to 0.504) | 0 |
+| maximum-entropy decoder | Adult | 0.025 (nearest neighbour) | 0.488 (0.473 to 0.503) | 0 |
+| maximum-entropy decoder with the selection step | Adult | 0.024 (likelihood ratio) | 0.493 (0.478 to 0.508) | 0 |
+| auto-configured release, no model, with selection | Adult | 0.025 (likelihood ratio) | 0.488 (0.475 to 0.503) | 0 |
+| one-shot from the column names (no release) | Adult | 0.012 (nearest neighbour) | 0.494 (0.480 to 0.510) | 5 |
+| reference AIM | Adult | 0.024 (nearest neighbour) | 0.488 (0.474 to 0.503) | 0 |
+| reference MST | Adult | 0.032 (nearest neighbour) | 0.484 (0.470 to 0.499) | 0 |
+| DP-2Stage, GPT-2 | Adult | 0.021 (shadow model) | 0.493 (0.478 to 0.507) | 0 |
+| DP fine-tuned Qwen3-14B | Adult | 0.024 (likelihood ratio) | 0.493 (0.479 to 0.508) | 0 |
+| CoRTeC, Qwen3-14B | NHANES | 0.026 (likelihood ratio) | 0.509 (0.478 to 0.537) | 0 |
+| CoRTeC, Qwen3-32B (AWQ) | NHANES | 0.049 (likelihood ratio) | 0.516 (0.486 to 0.545) | 0 |
+| maximum-entropy decoder | NHANES | 0.044 (likelihood ratio) | 0.503 (0.474 to 0.533) | 0 |
+| reference AIM | NHANES | 0.048 (shadow model) | 0.506 (0.478 to 0.535) | 0 |
+| reference MST | NHANES | 0.039 (shadow model) | 0.504 (0.473 to 0.533) | 0 |
+| DP fine-tuned Qwen3-14B | NHANES | 0.060 (likelihood ratio) | 0.473 (0.445 to 0.501) | 0 |
+| Tab-PE | NHANES | 0.037 (shadow model) | 0.511 (0.480 to 0.541) | 0 |
+| *permitted advantage at ε = 2* | | *0.762* | | |
+
+Every nearest-neighbour interval contains chance. These attacks bound leakage only as far as they are strong; a black-box audit of the kind Annamalai and De Cristofaro give for DP-SGD [2] would return an empirical ε in place of a null, and is the natural next measurement. On Adult the statistic reads slightly below chance for every method, CoRTeC, the decoder, AIM and MST alike: the private rows lie slightly farther from the synthetic rows than held-out rows do, which belongs to the split and the statistic, not to any method.
+
+**F.2 Distance to closest record.** For every synthetic row, the L1 distance to the nearest training row over the 15 Adult columns, numerical columns scaled to [0, 1] on the training split and categorical columns counted 1 on mismatch; the reference curve is the real test split against the training split. Figure 2 shows the Adult ε = 2 arms. No arm contains an exact copy of a training row (the real test split itself contains 0.11 % exact duplicates). The medians are 0.145 for real held-out rows, 0.185 for the Gemini arm, 0.19 for the reference AIM, 0.34 for MST, 0.38 and 0.44 for the Qwen3-14B arm at the two sizes, 1.18 for the decoder, 1.8 for DP-2Stage, 3.6 for Tab-PE and 0.105 for the DP fine-tuned Qwen3-14B. The last is the smallest, so a paired check was run: the distance to a random 6,513-row subset of the training split against the distance to the 6,513-row test split. A generator that copies training rows sits closer to the first; one that produces typical rows sits equally close to both. The share of rows closer to the training subset is between 0.47 and 0.54 for every arm, against 0.50 expected, so the fine-tuned model's small distances are typicality and not copying.
+
+![Figure 2](figures/fig02_dcr_adult.png){: .wide}
+
+**Figure 2:** Distance to the closest training row, Adult at ε = 2, each arm against the real test split's curve.
+
+**F.3 Memorisation tests of the served backbone.** The tests of Bordt, Nori and Caruana [4] (package tabmemcheck 0.1.6) on the Adult training file, run against gemini-3.6-flash with reasoning off at temperature 0, 304 calls. Header test: given the header and the first characters of row 1, the model reproduced data rows 2 to 25 of the file verbatim, including the final-weight values; the opening of the Adult file appears in countless tutorials and the model has memorised it, as prior work found for GPT-4. Row completion at random positions, ten real rows as the prefix: 0 of 25. Completion of the near-unique final-weight column from the other fourteen: 0 of 25. First-token test: 8 of 25 against a most-common-token baseline of 7 of 25. Feature completion of each categorical column from the other columns, 25 rows each with five examples: every column is completed at or below what a gradient-boosting classifier trained on the other columns achieves (education 25 of 25 against a predictability of 1.00, occupation 7 of 25 against 0.39, workclass 14 of 25 against 0.76, relationship 22 of 25 against 0.79, income 21 of 25 against 0.87), and above the majority choice on every column, which is the knowledge of the column meanings that the anonymised control removes. None of the file's first fifty rows appears in any CoRTeC draw on Gemini, named or anonymised, or on Qwen3-14B or 32B at either size. The one-shot control of Table 3, which has no release, is that recitation measured in a draw: 208 to 211 of its 300 rows and 697 to 703 of its 1,000 are verbatim copies of the file's first 25 rows (22 to 24 distinct rows, each repeated about nine and thirty times), and its three $n$ = 300 draws hold five exact matches among the 3,000 membership candidates, three members and two held-out, which no attack turns into an advantage (0.012). Against the whole public file (32,561 rows), no draw of any CoRTeC arm, of the decoder with or without selection or of the reference AIM holds a verbatim row, and rows that agree on the fourteen columns other than the near-unique final weight occur in the CoRTeC draws at the reference AIM's rate (10 to 16 % against 8 to 14 % of a draw at $n$ = 300), which is coincidence on a table with many near-duplicate rows and not copying. The Qwen3 backbones were not given these tests.
+
+## Appendix G. An Indicative Summary in Percent
+
+For a reader who wants one number per axis, fidelity is scaled against a real sample of the same size and utility between the no-information floor and the ceiling: fidelity % = 100 times the mean over the four fidelity measures of min(1, real-sample error / method error), so that 100 means as close to the private table as a real sample of that size and 50 means twice as far; utility % = 100 times the mean over the three students of (method AUC − permuted-target AUC) / (ceiling AUC − permuted-target AUC), clipped to [0, 100]. Averaged over every dataset, $n$ and seed an arm was run on at ε = 2 (the cells column counts them), the summary is indicative only; the tables above are the evidence. Rows are ordered by the number of cells and then by fidelity; the arms with one or two cells are single-split signals; the auto-configured arm's fidelity mean is over the two marginal measures, its conditional cells being not comparable.
+
+| method | cells | fidelity % | utility % |
+|---|---|---|---|
+| reference AIM | 14 | 78 | 85 |
+| maximum-entropy decoder of the release | 14 | 72 | 86 |
+| CoRTeC, Qwen3-14B | 14 | 68 | 79 |
+| auto-configured release, no model, with selection | 6 | 93 | 93 |
+| maximum-entropy decoder with the selection step | 6 | 89 | 91 |
+| DP fine-tuned Qwen3-14B | 6 | 27 | 63 |
+| DP fine-tuned Qwen2.5-7B | 6 | 26 | 61 |
+| Tab-PE | 5 | 17 | 84 |
+| CoRTeC, Qwen3-32B (AWQ) | 4 | 66 | 80 |
+| CoRTeC, Qwen2.5-7B | 4 | 49 | 67 |
+| DP fine-tuned Llama-2 7B | 4 | 21 | 71 |
+| DP-2Stage, GPT-2 | 4 | 19 | 15 |
+| CoRTeC, Qwen3-8B | 2 | 71 | 83 |
+| one-shot from the column names (no release) | 2 | 23 | 85 |
+| CoRTeC, Gemini 3.6 Flash | 1 | 96 | 86 |

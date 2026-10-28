@@ -1,0 +1,20 @@
+# The research pipeline's dependencies (research/). The package itself installs from the root pyproject.
+diffprivlib>=0.6.0
+# scikit-learn is pinned below 1.9 for diffprivlib compatibility (the deployment guide, Section 9);
+# diffprivlib itself needs >=1.4.0. Tested: 1.6.1 and 1.8.x.
+scikit-learn>=1.4.0,<1.9
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Model backends of src/llm_generator.py: the vendor SDKs (the floors follow the API surface the code
+# uses: reasoning_effort on chat completions, ThinkingConfig on the google-genai client) and httpx for
+# a local Ollama server. A vLLM server is reached through the openai SDK with OPENAI_BASE_URL set.
+anthropic>=0.25.0
+openai>=1.60.0
+google-genai>=1.0.0
+httpx>=0.24.0
+
+# The controls under research/controls/ (the reference AIM and MST wrapper, the maximum-entropy decoder) need
+# private-pgm's mbi package at version 1.1 and JAX; neither is needed by the pipeline or the package.
+# mbi==1.1.0 ; from https://github.com/ryan112358/private-pgm
+# jax>=0.4

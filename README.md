@@ -1,94 +1,69 @@
 # CoRTeC
 
-**Cohort-conditioned differentially private synthetic tabular data from a frozen language model.**
+**A differentially private release for synthetic tabular data, decodable with or without a language model.**
 
-CoRTeC spends a differential privacy budget on released statistics rather than on training a model.
-Cohorts come from a public stratification rule, at no privacy cost. Each cohort releases one DP
-histogram per attribute; a histogram has L1 sensitivity 1 regardless of bin count, so an entire
-distributional shape costs what a single counting query costs. A conditional target table over a
-disjoint cell partition costs one query's worth of ε however many cells it holds. A frozen,
-un-finetuned language model then generates records from those statistics alone.
+![The pipeline](paper/figures/fig01_pipeline.png)
 
-The generator never sees a private record, so generation is post-processing. It adds no privacy
-cost, and unlimited synthetic datasets may be drawn from a single release.
+CoRTeC's contribution is a release: it spends a differential privacy budget once, on a small release of statistics built for a
+downstream classifier, shipped as an auditable artefact of counts that anyone can decode at no further privacy cost: inside cohorts formed by a public rule, one Laplace histogram per attribute
+and outcome class, a noisy class balance and cohort size, and a table of outcome rates over disjoint
+cells. A frozen language model then reads that release, and nothing else, and writes rows that carry
+exactly the per-bin counts it is asked for; a pool of such rows is raked and refined to the released
+cells. The model never sees a private record, so every draw is post-processing of the release: it
+spends no budget, can be repeated without limit, and can run on any model, including one reached
+through an interface the institution does not control.
 
 ## Documents
 
 | Document | What it is |
 |---|---|
-| [The paper](paper/CoRTeC_arxiv.pdf) | The arXiv version: the mechanism, its algorithms, the privacy proof and the results |
-| [The technical report](paper/CoRTeC.pdf) | Every intermediate experiment, the per-dataset walkthroughs and the defect catalogue. Every number in the paper is checked against it |
-| [The three-page summary](paper/CoRTeC_summary.pdf) | The problem, the mechanism and the main results, for a first reading |
+| [The paper](paper/CoRTeC_arxiv.pdf) | The mechanism, its privacy analysis, and the measurements with their controls (12 pages of main text, appendices A to G) |
+| [The deployment guide](paper/CoRTeC.pdf) | The architecture, the parameters, the full prompt, a checklist, the controls mapped to standards, the failure modes with their guards, and the cost (7 pages) |
+| [The summary](paper/CoRTeC_summary.pdf) | The problem, the mechanism and the findings on two pages |
 
-Section references below (§x.y) are to the technical report.
+## What the paper finds
 
-## The result, and its boundary
-
-At matched ε = 2.0 and matched sample size on UCI Adult at n = 300, models trained on CoRTeC's
-synthetic records are statistically indistinguishable from models trained on a real sample of the
-same size. The differences are +0.007, −0.003 and +0.012 AUC across logistic regression, random
-forest and gradient boosting, with the gap bounded inside ±0.027 and every p > 0.18.
-
-That equivalence was first claimed at one dataset and one sample size, and we measured where it
-stopped. On the finance dataset the pooled release reaches TSTR-LR 0.652 against a matched real
-sample's 0.695, a significant shortfall. With one histogram per outcome at the same ε the
-two tree students reach the real-sample floor (§7.11). Under the configuration the tools now ship, no
-student separates from a real sample of the same size on Adult or finance at three draws each (all
-three within 0.018 AUC of the floor), one tree model is 0.049 AUC short on NHANES, and 1-way marginal
-error is within 0.005 of MST's on all three and below a real sample's (§7.12). That configuration is a
-class-conditional release gated on noised, charged counts, with a fifth of the budget on the
-conditional table, batches told the exact counts they owe, and output selected from a threefold pool
-of generated rows. The head-to-head is at n = 300 under one generator family; on NHANES the same
-release decoded by three generators under the per-outcome prompt (Gemini 3.5 Flash, the open-weight
-gpt-oss-120b and GPT-5) does not separate after correction at three draws (§7.12).
-
-Over the same Adult data, AIM and MST at library defaults train models 0.14 to 0.17 AUC lower
-(Holm-adjusted p ≤ 0.0024); with a 300 MB model or a 3-way workload, at hours of fitting against
-none, AIM's tree students reach the floor (§7.2). We report this as calibration rather than as a
-verdict: those methods optimise a different objective, and on their own 3-way workloads at adequate
-n AIM records the lowest error.
-CoRTeC pays per generated record, three times over under the shipped configuration, where the
-marginal methods pay once at fit time.
-
-Two findings hold whether or not CoRTeC is adopted.
-
-- **Both standard acceptance criteria are saturated.** Real data with its target column permuted
-  records 95.7% 1-way similarity and passes a 90% bar. On Adult, an unconditioned prompt with no
-  access to the private data trains a logistic-regression student at 0.824 AUC against a matched real
-  sample's 0.834, AIM's 0.675 and MST's 0.690, so on a public benchmark neither criterion can tell a
-  mechanism that reads the release from one that recites its prior. The paper's inversion test
-  (Section 6.3) exists for that reason.
-- **Whether a private conditional relationship survives is a property of the mechanism family, not
-  of holding a DP guarantee.** At identical ε = 2.0 on identical data, MST transmits a forced
-  relationship at slope 0.998 and PATE-CTGAN at 0.054.
+- **The release carries the result.** Decoded with no language model at all, by the maximum-entropy
+  table that fits its counts, the release trains models as well as CoRTeC does: on UCI Adult at
+  ε = 2 and n = 1,000, 1-way total variation 0.041 and downstream AUC of 0.83 to 0.87 against
+  CoRTeC's 0.036 and 0.83 to 0.86, an ordering that holds on three seeds.
+- **The language model adds plausibility driven by the column names.** It repairs the logical pairs
+  it recognises, invents dependences between near-independent columns, and loses its edge on pairs
+  and on utility when every name is replaced by a neutral token. The selection step applied to the
+  decoder's own pool brings single-column and seen-conditional error below a real sample's with no
+  model, over three splits, and without the release the same backbone recites the public file into
+  most of its one-shot output.
+- **The reference AIM is ahead on pairwise fidelity at every seed and, against the fixed-rule release, on utility at n = 1,000.**
+  The release is level with it on single columns and ahead on the conditionals it budgets for (0.035
+  against 0.061 at n = 300), and with the selection step its single-column error is below a real
+  sample's (0.027 on Gemini and 0.033 with no model, against 0.043). The release the auto-configurator
+  derives on Adult, decoded with no model and the selection step (`cortec decode`), is level with or ahead
+  of AIM on utility at both sizes over three splits and ahead on single columns; AIM keeps pairs at n = 1,000.
+- **What survives every control is the privacy architecture.** One release serves unlimited draws;
+  the backbone can be replaced at no privacy cost; the strongest membership attack on any arm reaches
+  an advantage of 0.02 to 0.05 against a permitted 0.762; no synthetic row copies a training row;
+  and the served backbone's memorised head of the Adult file never reaches a draw.
 
 ## Install
 
-The reference implementations live in the companion repository
-[cortec-framework](https://github.com/Calyie/cortec-framework): two Apache-2.0 packages, `cortec`
-and `cortec-hybrid`, in which every guarantee the paper establishes is enforced in code. This
-repository holds the papers, the research harness and the figure and build scripts. It does not
-depend on the packages to run.
+Python 3.10 or later. The package is not on PyPI; install it from a clone of this repository. One
+install gives the two packages, `cortec` (Stages A, B and C) and `cortec_hybrid` (the model-free
+correction of a marginal synthesiser's output), and the two commands, `cortec` and `cortec-hybrid`.
 
 ```bash
-git clone https://github.com/Calyie/cortec-framework   # beside this repository
-pip install './cortec-framework/cortec[anthropic]'     # Claude, recommended on AWS Bedrock
-pip install './cortec-framework/cortec[openai]'        # GPT, recommended on Azure OpenAI
-pip install './cortec-framework/cortec[gemini]'        # Gemini, recommended on Google Vertex AI
-pip install ./cortec-framework/cortec-hybrid           # no model server in the dependency tree
+git clone https://github.com/Calyie/cortec
+cd cortec
+pip install '.[gemini]'        # Gemini (also the `vertex` extra for Google Vertex AI)
+pip install '.[openai]'        # GPT, Azure OpenAI, and any server with an OpenAI-compatible interface (vLLM)
+pip install '.[anthropic]'     # Claude (also the `bedrock` extra for AWS Bedrock)
+pip install '.[pgm]'           # decode a release with no language model (Private-PGM and JAX)
+pip install '.[dev]'           # pytest and scikit-learn, for the tests and the evaluator
+python3 -m pytest tests -q     # offline; every test is named after the defect it prevents
 ```
 
-**Where this runs.** CoRTeC is proposed for enterprise-hosted, tenant-isolated model surfaces inside
-your own cloud account, with private networking, data residency, contractual exclusion of training on
-inputs, and a BAA where HIPAA applies. We do not recommend the vendors' public developer APIs for
-regulated data, even though the model weights are the same. What differs is the contractual envelope,
-and that is what a compliance review assesses. The paper's own measurements were made against those
-public APIs; §6.2 says so and says exactly which results that does and does not affect.
+## Quick start
 
-## Quickstart
-
-The API is the `cortec` package's. The schema declares only public knowledge: the column list, the
-bounds, the bin edges and the target.
+The schema declares public knowledge only: the columns, their bounds, the bin edges and the target.
 
 ```python
 from cortec import Schema, release_statistics, Generator
@@ -99,87 +74,81 @@ schema = Schema(
     categorical={"admission_type": ["Emergency", "Elective", "Urgent"]},
     target="readmitted_30d", positive="YES", negative="NO",
     bins={"age": [18, 40, 55, 70, 95], "length_of_stay": [1, 3, 6, 10, 30]},
-)                                                    # no `conditional`: the hierarchy is derived
+)                                                     # no `conditional`: the hierarchy is derived
 
 release = release_statistics(schema, private_df, epsilon_total=2.0, n_min=150,
-                             max_rows_per_person=1)  # Stage A: the only code that sees private_df
-release.to_json("release.json")                      # contains no private record
+                             max_rows_per_person=1)   # Stage A: the only code that sees private_df
+release.to_json("release.json")                       # contains no private record
 
-gen = Generator(schema, backend="anthropic", model="claude-fable-5", reasoning="on")
-synthetic = gen.generate_selected(release, n_rows=5000, pool_factor=3)   # Stage B: post-processing, repeat freely
+gen = Generator(schema, backend="gemini", model="gemini-3.5-flash", reasoning="on")
+synthetic = gen.generate_selected(release, n_rows=1000, pool_factor=3)   # Stage B: post-processing
 ```
 
-The conditional hierarchy is derived from the declared schema plus one DP-noised selection step. The
-release carries one histogram block per cohort and outcome class by default, with a fifth of the
-budget on the conditional table. Generation asks each batch for the exact counts it owes, stated per
-outcome where the release carries class blocks, and keeps, from a threefold pool, the rows whose cell
-counts match the release (technical report §3.3, §4.4, §7.12).
-`release.json` is the controlled artefact: store it, hash it, and reuse it by file. Every further
-draw is free in ε.
+`cortec run --data private.csv --schema my_schema.py --backend gemini` runs the three stages on a
+table from the command line; `cortec decode --schema my_schema.py --release results/<name>/release.json`
+decodes the same release with no language model (Private-PGM plus the selection step, the paper's
+decoder-with-selection control; needs the `pgm` extra); and `cortec --help` lists what can be run. The setup guide,
+[`docs/setup.md`](docs/setup.md), goes through each step: where the model runs and the credentials,
+the data, the schema, the release and its audit, generation and selection, the utility bound, the
+evaluation against a real sample and a no-information floor, and the troubleshooting of every
+refusal. A self-hosted backbone behind an OpenAI-compatible server (the paper's Qwen3 arms ran that
+way through vLLM) is reached through `backend="openai"` with `OPENAI_BASE_URL` set.
+
+**Where this should run.** For regulated data, the enterprise-hosted, tenant-isolated surface in
+your own cloud account (Vertex AI, Azure OpenAI or Bedrock) or a model on your own hardware. The
+vendors' public developer APIs are supported and are not recommended for regulated data: the weights
+are the same, the contract and the network path are not. The privacy argument does not depend on
+the endpoint, because the request carries only the release; the compliance argument does.
+
+## Reproducing a CoRTeC arm of the paper
+
+The research pipeline that produced every CoRTeC arm is under [`research/`](research/). Datasets are
+fetched from public sources on first use and cached under `research/data/`, which is not committed.
+
+```bash
+pip install -r research/requirements.txt
+cd research
+python3 run_dataset.py --dataset adult --stage generate --backend gemini --model gemini-3.5-flash \
+    --n-synthetic 300 --draws 3 --rows-per-call 25 --epsilon-total 2.0 --cond-frac 0.2 --n-min 150 \
+    --quota --pool-factor 3 --seed 42 --skip-header-only --no-by-cell --outdir results/adult_gemini
+python3 evaluate_generic.py --dataset adult --spec-json <arms.json> --seed 42
+```
+
+A release already present in the output directory is reused rather than redrawn, so further draws
+cost no privacy budget. Released statistics cannot be regenerated bit for bit, because the noise
+source ignores any seed; the frozen auto-configurations under `research/results/autoconfig/` are
+reused by file for the same reason. The reference-AIM wrapper, the maximum-entropy decoder, the decoder-with-selection and one-shot
+controls, the anonymisation of releases and the scorers are under `research/controls/`; the synthetic draws, per-draw score files and
+stored releases of every arm are deposited with the paper's Zenodo record, DOI 10.5281/zenodo.22945315.
 
 ## Repository layout
 
 | Path | Contents |
 |---|---|
-| `paper/` | The arXiv paper (`CoRTeC_arxiv.md/.pdf`), the technical report (`CoRTeC.md/.pdf`) and the three-page summary (`CoRTeC_summary.md/.pdf`), the figures, and the scripts that regenerate the figures and build the PDFs |
-| `src/` | The research harness: dataset specifications, the Stage A release, prompt construction, generation backends and auto-configuration |
-| `*.py` (root) | Pipeline drivers, baselines, evaluation and statistics. Appendix B of the technical report maps each one |
-| `results/autoconfig/` | The fourteen frozen auto-configurations (`<dataset>_nmin{0,150}.json`) that the `*_auto` dataset specifications load. Each was derived once under DP and is reused by file, never re-derived |
-
-The reference implementations are in the companion repository
-[cortec-framework](https://github.com/Calyie/cortec-framework).
-
-## Reproducing an arm
-
-```bash
-pip install -r requirements.txt
-CORTEC_GEMINI_SURFACE=vertex python3 run_dataset.py --dataset adult --stage generate \
-    --backend gemini --model gemini-3.5-flash --n-synthetic 300 --draws 3 --rows-per-call 25 \
-    --epsilon-total 2.0 --cond-frac 0.2 --n-min 150 --quota --pool-factor 3 --seed 42 \
-    --skip-header-only --no-by-cell --outdir results/adult_v2_gemini
-python3 evaluate_generic.py --dataset adult --spec-json <arms.json> --seed 42
-python3 paper/build_pdf.py paper/CoRTeC_arxiv.md paper/CoRTeC_arxiv.pdf      # rebuild the paper
-```
-
-Every CoRTeC arm in the papers is one invocation of `run_dataset.py`, and the technical report
-records the exact arm specification behind each table. `--quota` gives every batch the exact counts
-it owes (per outcome by default; `--no-quota-by-class` states the totals, as the §7.12 tables were
-generated), and `--pool-factor 3` selects the output from a threefold pool; together they are the
-shipped configuration of §7.12. A release already present in the output directory is reused rather
-than redrawn, so further draws cost no privacy budget. Datasets are fetched from public sources on
-first use and cached under `data/`, which is not committed.
-
-Three notes on what this repository does and does not contain.
-
-- The Vertex AI surface reads `GOOGLE_CLOUD_PROJECT` and Application Default Credentials. Leave
-  `CORTEC_GEMINI_SURFACE` unset to use the public API.
-- The per-draw result records that every published number is re-derived from, and the audit suite
-  that recomputes them (a number audit, a paper-to-tools parity audit, a defect-pattern scan, and a
-  check that every number in the arXiv paper appears in the technical report), are kept in the
-  project's internal tree and are available from the authors on request. `paper/make_figures.py`
-  and `paper/make_fig07_enterprise_ladder.py` read those records, so they are included for
-  inspection rather than for re-running. The rendered figures are in `paper/figures/`.
-- `paper/build_pdf.py` needs the `markdown` package and the `weasyprint` command.
+| `src/cortec/`, `src/cortec_hybrid/` | The two packages, Apache-2.0 |
+| `tests/` | Their tests, offline |
+| `docs/` | The setup guide, the hybrid's guide, the design notes (the measurements behind the defaults) and the result format |
+| `examples/example.py` | A runnable tour of the three stages with no API key |
+| `paper/` | The paper, the deployment guide and the summary, with their sources and figures |
+| `research/` | The pipeline driver, the evaluator, the Stage C script, the membership-inference script, the dataset specifications and the frozen auto-configurations |
+| `research/controls/` | The paper's controls: the reference AIM and MST wrapper with its corrected sampler, the maximum-entropy decoder of a release alone and with the selection step, the one-shot control, the anonymisation of a release and its draws, the per-pair scorer and the three paper-protocol scorers |
 
 ## Where the guarantee does not hold
 
-Stated here because a release is only as good as its documented gaps (NIST SP 800-226).
-
-- **ε protects one ROW, not one person.** Under group privacy an individual contributing `k` rows
-  receives `k · ε`. CoRTeC as specified is a mechanism for one-row-per-person data. On
-  encounter-level data, cap each person's contribution before Stage A. `certify.py` requires the
-  per-person row bound to be declared, and the library refuses a vacuous one.
+- **ε protects one row, not one person.** A person contributing `k` rows receives `k · ε`. Cap each
+  person's rows before Stage A; the library requires the per-person row bound and refuses a vacuous
+  one.
 - **Floating-point Laplace.** The library mechanism is vulnerable to the Mironov (2012) attack on
-  the low bits of the sampled noise. This is a genuine deployment blocker and we name it as one.
-- **Pretraining provenance.** The guarantee says nothing about the generator's pretraining corpus.
-- **Endpoint.** The measurements used public developer APIs, not the enterprise surfaces
-  recommended above.
+  the low bits of the sampled noise.
+- **Pretraining provenance.** The guarantee says nothing about the model's training corpus; the
+  paper's memorisation tests and membership attacks are the measured evidence.
+- **Endpoint.** The paper's measurements used the public developer APIs and self-hosted backbones,
+  not the enterprise surfaces recommended above.
 
-## Citation
+## AI use
 
-See [`CITATION.cff`](CITATION.cff).
+Language models appear in this work as the objects of study: the backbones named in the paper's tables. Language-model assistants were also used in drafting and editing the text and the code in this repository. Every experiment was designed, run and checked by the author, and every number in the documents was produced by the described pipeline from stored result files.
 
-## Licence
+## Citation and licence
 
-Apache-2.0; see [`LICENSE`](LICENSE). Both packages in the companion repository carry the same
-licence.
+See [`CITATION.cff`](CITATION.cff). The licence is Apache-2.0, [`LICENSE`](LICENSE).
