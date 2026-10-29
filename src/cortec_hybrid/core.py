@@ -6,9 +6,9 @@ excellent at the statistic they optimise — low-order marginals — and are eva
 own papers. They do not release a conditional target table: on UCI Adult at matched budget and
 sample size the reference AIM's seen-conditional error is 0.055 and MST's 0.140 against a real
 sample's 0.062 and CoRTeC's 0.027 (the paper's Table 3), while the reference AIM's downstream
-utility is at the real sample's level. The 9 October 2026 version of this work (Zenodo record
-10.5281/zenodo.23258254) measured the two at a library's defaults with a defective sampler and reported
-a utility gap; the 28 October paper withdraws it.
+utility is at the real sample's level. Measured at a library's defaults during development, with a
+sampler later found defective, the two had shown a large utility gap; that gap was the sampler's, and
+the paper reports the reference implementations instead (its Appendix D).
 
 This tool spends a *small, separately accounted* slice of the privacy budget on one thing those
 mechanisms do not target: a conditional target table, P(y | cell) over a disjoint partition. It
@@ -19,12 +19,12 @@ beyond the table itself.
 **What this tool does NOT claim.** It is not "CoRTeC without the LLM", and it is not a general
 improvement over its inputs. In our own runs a coarse 12-cell table, the obvious implementation,
 fixed calibration and added little utility (+0.025 AUC on AIM, +0.037 on MST). The gain requires a
-*rich* table (measured for the 9 October version against the library-default AIM and MST), and it is worth having in one specific situation: your marginal synthesiser's output has
+*rich* table (measured during development against the library-default AIM and MST), and it is worth having in one specific situation: your marginal synthesiser's output has
 weak conditional target structure and you need a calibrated rate. Measure before and after with
 `estimate_gain()`; if the gain is small, use the marginal synthesiser alone and keep the budget.
 
-**A correction found while testing this package.** The first version of this tool held
-that rank-preserving assignment was necessary for the correction to pay for itself. That is true
+**A correction found while testing this package.** Rank-preserving assignment was assumed
+necessary for the correction to pay for itself. That is true
 only when the input synthetic data already carries within-cell structure. When its target is close
 to noise — precisely the case this tool targets — a ranking model fitted on that target learns the
 noise, and ordering by it injects spurious structure that a downstream model mistakes for signal.
@@ -385,8 +385,8 @@ def relabel(schema: Schema, synthetic: pd.DataFrame, table: ConditionalTable, *,
         diabetes         MST 0.581 -> rank 0.528 (-0.053) -> i.i.d. 0.549 (-0.032)
         adult            MST 0.705 -> rank 0.788 (+0.083) -> i.i.d. 0.821 (+0.116)
 
-    i.i.d. beat ranking in **9 of 9 runs**. The first version of this module claimed that i.i.d.
-    assignment "bought essentially nothing (+0.002 AUC)"; that claim did not survive replication.
+    i.i.d. beat ranking in **9 of 9 runs**. A single development run had suggested that i.i.d.
+    assignment "bought essentially nothing (+0.002 AUC)"; that reading did not survive replication.
 
     Why the guard did not catch it: `_rank_scores` gated on whether the synthetic target is
     PREDICTABLE from the synthetic features (CV AUC >= RANK_INFORMATIVENESS_FLOOR). A synthesiser

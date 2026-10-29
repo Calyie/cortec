@@ -758,9 +758,9 @@ def test_a_depleted_account_is_fatal_not_a_parse_failure():
     """
     from cortec.generate import _classify_api_error, FatalAPIError
 
-    # Each string isolates ONE marker. An earlier version of this test used realistic multi-marker
-    # messages -- the observed Gemini refusal contains both "RESOURCE_EXHAUSTED" and "credits" --
-    # so it still passed with a marker deleted, i.e. it could not fail for the reason it claimed.
+    # Each string isolates ONE marker. A test built on realistic multi-marker messages -- the
+    # observed Gemini refusal contains both "RESOURCE_EXHAUSTED" and "credits" -- still passes
+    # with a marker deleted, i.e. it cannot fail for the reason it claims.
     # Mutation-check this test by removing any single marker below; exactly one case must fail.
     # "resource exhausted" was a fatal marker until a live Vertex run showed it is how that
     # surface spells a transient rate limit ("Resource exhausted. Please try again later.");
@@ -794,8 +794,8 @@ def test_a_depleted_account_is_fatal_not_a_parse_failure():
         "account not found":  "RefreshError: Invalid grant: account not found",
     }
     # Self-enforcing: each probe must hit EXACTLY the marker it is named for. Without this the
-    # test silently degrades as markers are added -- which is how the first version of it came to
-    # pass with a marker deleted.
+    # test silently degrades as markers are added -- which is how a multi-marker version of it
+    # passes with a marker deleted.
     from cortec.generate import _FATAL_MARKERS
 
     # No marker may be subsumed by a shorter one: the shorter always matches first, so the longer
@@ -1304,8 +1304,8 @@ class TestThePrivacyUnitIsStatedNotAssumed:
 # The capability table used to assign tiers from the TRANSMISSION SWEEP alone, and two
 # self-hosted 70B models scored inside the frontier band on it. Measured on full-dataset
 # generation the same models close 12% of the conditional-error gap to an UNCONDITIONED
-# prompt and nothing on 2-way TV. The design notes (section 8) withdraw the "70B matches a frontier
-# model" conclusion; the tool had kept recommending those models by default. These pin the alignment.
+# prompt and nothing on 2-way TV. The design notes (section 8) show that the "70B matches a frontier
+# model" reading does not hold; a tool that recommended those models by default would be wrong. These pin the alignment.
 # ─────────────────────────────────────────────────────────────────────────────────────
 class TestSweepOnlyModelsAreNotRecommended:
 
@@ -1318,7 +1318,7 @@ class TestSweepOnlyModelsAreNotRecommended:
         for m in ("llama", "qwen2.5"):
             assert m not in listed, (
                 f"{m} is recommended as validated, but it passes only the transmission sweep; "
-                f"the design notes (section 8) withdraw the claim that 70B-class models match a frontier model")
+                f"the design notes (section 8) show that 70B-class models do not match a frontier model on full-dataset generation")
 
     def test_a_sweep_only_model_is_refused_by_default(self):
         from cortec.models import check_model, ModelCapabilityError, Tier, profile_for
@@ -1408,9 +1408,9 @@ class TestTheAuditIsInternallyRecomputable:
     def test_the_scale_actually_drawn_is_the_scale_the_ledger_charged(self):
         """Instrument the DRAW, not the ledger's own arithmetic.
 
-        A first version of this test compared each query's recorded noise_scale against its
-        recorded sensitivity/epsilon -- which `spend()` computes itself, so it agreed by
-        construction and passed even with the defect deliberately reinstated. A test that cannot
+        Comparing each query's recorded noise_scale against its recorded sensitivity/epsilon
+        -- which `spend()` computes itself -- agrees by construction and passes even with the
+        defect deliberately reinstated. A test that cannot
         fail is worse than no test. This one records the scales actually passed to the RNG and
         requires each to be one the ledger handed out.
         """
@@ -1538,7 +1538,7 @@ def test_generation_evidence_notes_agree_with_the_profile_table():
     `MEASURED_ON_GENERATION_ONLY` was written when GPT-5 and Gemini 3.1 Pro had no profile, and its
     notes said so in prose ("not in PROFILES").  Both were later promoted to VALIDATED on
     full-dataset generation and the notes were not touched, so the tool shipped a capability table
-    contradicted by the capability table beside it -- and the 9 October 2026 version of the paper repeated the stale
+    contradicted by the capability table beside it -- and a document built from it repeated the stale
     version.  Neither table is derivable from the other, so assert they agree.
     """
     from cortec.models import MEASURED_ON_GENERATION_ONLY, Tier, profile_for

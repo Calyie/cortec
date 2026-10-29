@@ -189,7 +189,7 @@ def release_statistics(spec: DatasetSpec, raw_train: pd.DataFrame, *, epsilon_st
         # the pooled block did, and the pooled histogram is their noisy mixture -- post-processing,
         # released for free. Measured with a naive independent decoder and no model at all, this
         # release reaches the real-sample floor on two of three students where the pooled one
-        # trails it by 0.03-0.06 (the 9 October 2026 version of this work (Zenodo record 10.5281/zenodo.23258254)). Where either class's NOISED
+        # trails it by 0.03-0.06 (development measurement; design notes, section 3). Where either class's NOISED
         # count (the charged class-balance query above) falls below n_min the cohort keeps the
         # pooled block: the decision is post-processing of a charged query, never a read of
         # the exact class sizes.
@@ -743,8 +743,8 @@ def build_cell_prompt(spec, cohort_stats: dict, cell_key: str, n_rows: int,
             lines.append("")
     num = {k: v for k, v in (cohort_stats.get("numerical", {}) or {}).items() if k not in _fixed}
     if num and not by_class:
-        # The released DP histogram is the channel that carries SHAPE. The first version of this
-        # prompt sent only mean and std; the model then emitted a smooth continuous spread, giving
+        # The released DP histogram is the channel that carries SHAPE. A prompt that sends only
+        # mean and std makes the model emit a smooth continuous spread, giving
         # 90% non-integer ages against integer-valued real data and a worse 1-way TV than the
         # rate-based path it replaced. Mean and std do not determine a distribution — send the bins.
         lines += ["NUMERICAL FEATURES — approximate distribution for this cohort.",

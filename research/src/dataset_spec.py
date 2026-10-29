@@ -21,7 +21,7 @@ Two fields deserve explanation because they carry the method's assumptions:
   `heldout_groups`  group families used to measure conditional fidelity that share NO column
                with `stratify` or with the conditional-table levels. Without this the
                generalisation metric is contaminated and a method that merely parrots its
-               released table scores well (the 9 October 2026 version of this work (Zenodo record 10.5281/zenodo.23258254)).
+               released table scores well (a development measurement).
 """
 from __future__ import annotations
 from dataclasses import dataclass, field

@@ -2,10 +2,11 @@
 
 This document records the measurements behind the package's defaults and guardrails. The setup
 guide (`setup.md`) says how to run the package; this is the evidence. The numbers of sections 2
-and 11 are those of the paper of 28 October 2026 (`paper/CoRTeC_arxiv.pdf`); the measurements of
-sections 3 to 10 were made for the 9 October 2026 version of this work (Zenodo record 10.5281/zenodo.23258254), called
-"the 9 October version" below, against AIM and MST at a library's defaults, and are kept because each
-explains a default or a guard. Where a number of that version is withdrawn, the section says so.
+and 11 are those of the paper (`paper/CoRTeC_arxiv.pdf`); the measurements of sections 3 to 10 are
+development measurements made before the paper's campaign (on Adult, NHANES and a finance benchmark, with
+Gemini 3.5 Flash and Claude Fable 5, against AIM and MST at a library's defaults) and are kept because each
+explains a default or a guard. They are marked "development measurement" below; where the paper
+supersedes one, the section says so.
 
 ## 1. When to use the package, and when not
 
@@ -35,14 +36,15 @@ on the package's output are within 0.025 AUC of models trained on a real sample 
 every student: 0.807, 0.862 and 0.833 on Qwen3-14B and 0.805, 0.863 and 0.838 on Gemini against the
 sample's 0.830, 0.870 and 0.840. The single-column error is 0.046 on Qwen3-14B and 0.027 on Gemini
 against the sample's 0.043; the seen-conditional error is 0.027 and 0.013 against the sample's
-0.062. Replicated on three splits with three fresh releases, the ordering holds (Table 6 of the
-paper). At n = 1,000 the students are 0.03 AUC below the real sample's (0.827, 0.860, 0.859 against
+0.062. Replicated on three splits with three fresh releases, the ordering holds (Figure 3 and
+Appendix E.2 of the paper). At n = 1,000 the students are 0.03 AUC below the real sample's (0.827, 0.860, 0.859 against
 0.855, 0.892, 0.883): a fixed release does not get richer as you ask for more records. On the
 clinical survey NHANES the students are 0.07 to 0.10 below a real sample's at n = 300 (0.678, 0.657,
 0.645 against 0.773, 0.728, 0.716) and the model-free decode of the same release is ahead of them
-(section 11). The 9 October version reported an equivalence result at n = 300 under one generator
-and a finance dataset; the finance dataset is not in the 28 October paper, and the comparison
-against AIM and MST that accompanied it is withdrawn (section 11). Do not assume parity.
+(section 11). A development measurement found an equivalence result at n = 300 under one generator
+and a finance dataset; the finance dataset is not in the paper, and the comparison against the
+library-default AIM and MST that accompanied it is not reported, because of the sampler defect
+(section 11). Do not assume parity.
 Measure it on your own data against a real sample of matched size, and read the conditional
 measures beside the aggregate ones.
 
@@ -51,7 +53,7 @@ measures beside the aggregate ones.
 The release used to carry one pooled feature histogram per cohort plus the target rate inside the
 conditional hierarchy's cells, and nothing about how any other feature relates to the target. The
 generator filled that in from its prior, and on the finance benchmark the filled-in columns
-measurably degraded the downstream model (the 9 October version). The release now carries one histogram block per
+measurably degraded the downstream model (development measurement). The release carries one histogram block per
 (cohort, outcome) wherever both outcomes clear `n_min`.
 
 - **Same ε.** The two outcome blocks of a cohort are disjoint, so they compose in parallel at the
@@ -66,13 +68,13 @@ measurably degraded the downstream model (the 9 October version). The release no
 - **Measured.** Decoded by a naive independent sampler with no model at all, the class-conditional
   release reaches the real-sample floor on two of three downstream students on both finance and
   Adult, where the pooled release trails it by 0.03–0.06 AUC, and held-out conditional error
-  improves by 31–39% (the 9 October version). Through the generator on the finance benchmark, three draws per
+  improves by 31–39% (development measurement). Through the generator on the finance benchmark, three draws per
   release, TSTR is 0.680 / 0.712 / 0.704 (LR / RF / GBM) from the class-conditional release against
   0.651 / 0.662 / 0.662 from the pooled one with Gemini 3.5 Flash (Welch p = 0.007 / 0.017 /
   0.029), and 0.670 / 0.723 / 0.716 against 0.652 / 0.673 / 0.664 with Claude Fable 5, where the
   tree students reach the real-sample floor of 0.695 / 0.727 / 0.717 and held-out conditional error
   rises 0.008. On Adult two Fable 5 draws score 0.846 / 0.885 / 0.873 against a real sample's
-  0.830 / 0.870 / 0.840 (the 9 October version).
+  0.830 / 0.870 / 0.840 (development measurement).
 - `release_statistics(..., class_conditional=False)` restores the pooled release.
 
 ## 4. Exact counts and selection: how the output reaches the release's own fidelity
@@ -87,7 +89,7 @@ Two steps, both post-processing of the release, both on by default.
   them. In a cohort with class blocks the counts are stated per outcome (the positives' rows per
   bin from the positive block, the negatives' from the negative block), so each class's marginals
   are enforced rather than read from the blocks; `Generator(quota_by_class=False)` states the
-  totals only, as versions before 1.1.0 did. `Generator(quota=False)` turns the counts off.
+  totals only. `Generator(quota=False)` turns the counts off.
 - **Selection from a pool.** `generate_selected(release, n_rows, pool_factor=3)` asks for three
   times the rows and keeps the `n_rows` whose cell counts match the release: inclusion weights by
   iterative proportional fitting over every released cell, systematic sampling, then a greedy
@@ -114,26 +116,26 @@ Two steps, both post-processing of the release, both on by default.
   uniformly inside its released bin, never crossing the row's stratification band, so the output's
   structure below bin resolution is the release's rather than the generator's. In cohorts with only
   a pooled block the generator's values are kept, because there they are the only carrier of the
-  class signal. Measured on every stored arm of the 9 October version, this lifted NHANES's logistic-regression
+  class signal. Measured on every stored development arm, this lifted NHANES's logistic-regression
   student from 0.729 to 0.752 against a real sample's 0.773 and changed no binned measure anywhere.
   `sub_bin="generator"` disables it.
 
 The `mock` backend honours the exact-count block, so the whole generate-and-select loop runs end to
 end with no API and no cost; the offline test in `tests/test_selection.py` does exactly that.
 
-- **Integer columns stay integer (1.1.1).** Whether a numerical column is integer-valued is decided
+- **Integer columns stay integer.** Whether a numerical column is integer-valued is decided
   from the public bin edges and bounds (all integral) together with the majority of the pool's
-  values, not from every value. Until 1.1.1 a single model-written `45.0` or `37.5` re-typed the
+  values, not from every value. Under an all-values rule a single model-written `45.0` or `37.5` re-typed the
   whole column, so the redraw inside the bin produced real numbers and delivered rows carried
   fractional ages, hours and capital values, which an evaluator that compares exact values treats
   as far from the data. The fix delivers every value of such a column as an integer, including the
   kept values of pooled-only cohorts. The test `tests/test_selection.py` plants three fractions in
   a pool of 3,000 rows and checks that none is delivered.
 
-Measured for the 9 October version on Adult and finance with Gemini 3.5 Flash: 1-way marginal error
+Measured during development on Adult and finance with Gemini 3.5 Flash: 1-way marginal error
 below a real sample of the same size, conditional error about a quarter of a real sample's, and
 downstream utility at the real-sample level; the comparison with the library-default AIM and MST
-that accompanied it is withdrawn (section 11). The ceiling is
+that accompanied it is not reported, because of the sampler defect (section 11). The ceiling is
 the release's own distance from the truth, which is why the conditional table's share of the budget
 defaults to a fifth (`conditional_fraction=0.2`): the histograms take the rest, and the release's
 marginal error halves for no measurable loss elsewhere. The cost is `pool_factor` times the
@@ -236,12 +238,12 @@ different transports, and one of them reports no count at all. A count that was 
 not a count of zero, which is why `gen.stats` keeps `calls_without_reasoning` and
 `calls_reasoning_unmeasured` apart.
 
-## 8. The sweep-only tier, and a withdrawn claim
+## 8. The sweep-only tier, and a claim that did not hold
 
 The capability table in the setup guide is scored on a transmission sweep, which asks whether a model
 reproduces a released rate: one large, salient signal in a short prompt. Two self-hosted 70B models
-pass it inside the frontier band, and on that basis the first version of the table called them
-validated and recommended them. Re-measured on full-dataset generation at three draws,
+pass it inside the frontier band, and on that basis alone a capability table would call them
+validated and recommend them. Re-measured on full-dataset generation at three draws,
 `llama3.3:70b-instruct` closes 12% of the conditional-error gap to an unconditioned prompt, closes
 nothing at all on 2-way total variation (0.238 against the control's identical 0.238), and is worse
 than that control on 1-way total variation. On the metrics this method exists to improve, its
@@ -260,9 +262,9 @@ are not interchangeable: a model can track a forced rate in three cohorts while 
 a full multi-level table, and nothing in the output says which is happening. So they are still
 gated, and the refusal message reports exactly what we do and do not know.
 
-**A withdrawn claim.** The first version of the setup guide stated that 70B-class models are "validated
+**A claim that did not hold.** The transmission sweep alone had suggested that 70B-class models are "validated
 and self-hostable, so a regulated deployment needs no external API and no data leaves the
-institution." The first half is withdrawn. That validation was measured on the transmission sweep.
+institution." The first half does not hold: that validation was measured on the transmission sweep only.
 On full-dataset generation the same class of model closes only 12% of the gap between an
 unconditioned prompt and a frontier model on conditional-seen error, 20% on held-out, nothing at all
 on 2-way total variation, and is worse than an unconditioned prompt on 1-way. The failure is silent
@@ -308,10 +310,9 @@ Which cohorts, class blocks and cells appear is decided by a noisy threshold: ev
 gates a release is itself a charged, noised count, and the comparison with the public floor
 `n_min` is post-processing of it. The release queries every cohort and every cell of the public
 domains, present in the data or not, so the set of queried groups is a function of the schema
-alone. Versions before 1.0.1 charged a separate `suppression` entry while the decision still read
-the exact count; a deterministic function of private data is not made private by paying for it,
-and that entry's share now strengthens the count queries instead (about 10% of the available
-budget at the defaults, against 5% before). The price is that a group near the floor can fall on
+alone. A separate `suppression` entry charged while the decision still reads the exact count would
+not make a deterministic function of private data private; that budget share strengthens the
+count queries instead (about 10% of the available budget at the defaults, against 5% without it). The price is that a group near the floor can fall on
 either side of it: a group of true size `n >= n_min` is dropped with probability
 `0.5 * exp(-(n - n_min) / b)`, where `b` is the count's Laplace scale, and a group below the floor
 is released with the mirror-image probability. Pass `charge_suppression=False` to read the exact
@@ -322,9 +323,9 @@ on the hospital dataset of the setup guide's privacy-unit example it chose `numb
 correlation 0.733 with encounter count. That does not change ε, but it means the release is
 stratified by contribution count.
 
-## 11. The 28 October 2026 measurements: the release on its own, and what the backbone adds
+## 11. The paper's measurements: the release on its own, and what the backbone adds
 
-The paper of 28 October 2026 re-measured the mechanism with the controls a reviewer asks for, and
+The paper measured the mechanism with the controls a reviewer asks for, and
 three of its findings bear on this package's defaults.
 
 **The release carries the result.** The same release decoded with no language model at all, by the
@@ -353,7 +354,7 @@ any release the same backbone recites: asked for rows from the column names alon
 public Adult file's first 25 rows into about 70 % of its output. The package therefore reads the column names as
 part of the prompt on purpose, and the setup guide says what to expect when they carry no meaning.
 
-**The package decodes without a model (since 28 October 2026).** `decode_release` and `cortec decode`
+**The package decodes without a model.** `decode_release` and `cortec decode`
 fit the maximum-entropy table to the released counts (Private-PGM's mirror descent on the junction
 tree, each count at the noise scale its budget implies, a corrected sequential sampler), sample a
 pool of `pool_factor × n_rows` records and pass it through `select_to_release`. It is the paper's
@@ -390,8 +391,8 @@ The same Qwen3-14B fine-tuned on the private rows under DP-SGD at the same ε re
 on single columns and pairs at n = 1,000 against 0.036 and 0.108 as a frozen decoder of the
 release: where the budget is spent decides more than the backbone does.
 
-**The reference baselines, and a withdrawn comparison.** The 9 October version compared the package
-against AIM and MST at the smartnoise-synth defaults and reported a utility margin of 0.15 AUC. An
+**The reference baselines, and a comparison that is not reported.** During development the package was
+compared against AIM and MST at the smartnoise-synth defaults, which gave a utility margin of 0.15 AUC. An
 audit found that the library's sampler (mbi 1.1, used by the wrapper and by the authors' reference
 code) read conditional tables against the wrong axes when its column order differed from the
 table's, so single-column counts survived and the joint structure of some columns was scrambled.
@@ -399,7 +400,7 @@ The paper's rows are the authors' private-pgm mechanisms at their defaults with 
 and the stable fitting routine; the reference AIM is at the real sample's floor on Adult utility at
 n = 300, ahead of the package on pairs at every seed and, against the fixed cohort rule, on utility at
 n = 1,000 (level with or behind the auto-configured release decoded with no model and the selection step, section 11), level on
-single columns, and behind on the seen conditionals (0.055 against 0.027). That margin is withdrawn. Seen from AIM's side, the release is a fixed workload (class-conditional 1-way marginals inside cohorts and the conditional cells) decoded by the estimator AIM uses; AIM's adaptive selection gives the pairs, the fixed workload gives the named conditionals, an inspectable artefact and a release that takes seconds.
+single columns, and behind on the seen conditionals (0.055 against 0.027). That margin was the sampler's and is not reported anywhere. Seen from AIM's side, the release is a fixed workload (class-conditional 1-way marginals inside cohorts and the conditional cells) decoded by the estimator AIM uses; AIM's adaptive selection gives the pairs, the fixed workload gives the named conditionals, an inspectable artefact and a release that takes seconds.
 
 **Privacy of the draws, measured.** Four membership attacks on 3,000 candidates, validated on a
 positive control: the strongest advantage is 0.022 on Qwen3-14B and 0.035 on Qwen3-32B on Adult, and 0.049 on

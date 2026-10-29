@@ -40,7 +40,7 @@ def _create_synth(Synthesizer, method, epsilon, aim_max_model_size=None):
 
     These library baselines are NOT the paper's reference AIM and MST, which `controls/pgm_baselines.py`
     produces from the authors' private-pgm mechanisms with the corrected sampler; the path is kept for
-    the 9 October 2026 version's comparison (Zenodo record 23258254), which the paper withdraws.
+    the development comparison at library defaults, which the paper does not report (its Appendix D).
 
     PATE-GAN's __init__ does not accept `verbose`, and passing it raises a TypeError at
     construction that is easy to misread as "this method is unavailable" rather than a signature
@@ -306,7 +306,7 @@ def main():
                     help="control = CoRTeC's prompt with the released arrays deleted (§7.1.2)")
     ap.add_argument("--no-class-conditional", dest="class_conditional", action="store_false",
                     default=True,
-                    help="release POOLED cohort histograms only (the pooled release of versions before 1.1.0); the "
+                    help="release POOLED cohort histograms only (one block per cohort, no class blocks); the "
                          "default releases one histogram block per (cohort, class) where both "
                          "classes clear n_min, at the same epsilon per query")
     ap.add_argument("--by-cell", dest="by_cell", action="store_true", default=True,
@@ -319,7 +319,7 @@ def main():
                     help="seed of the exact-count apportionment (default: --seed); pin it when draws run as separate "
                          "processes so every process, and every model, is asked for the same cohort targets")
     ap.add_argument("--no-quota-by-class", action="store_true",
-                    help="with --quota: state the exact counts as totals only (the prompts before version 1.1.0). By "
+                    help="with --quota: state the exact counts as totals only (the totals-only prompt). By "
                          "default, in cohorts that carry class blocks, the counts are also stated per outcome "
                          "(the positives' rows per bin from the positive block, the negatives' from the negative "
                          "block), so the class-specific marginals are enforced, not only read")
@@ -334,7 +334,7 @@ def main():
     ap.add_argument("--no-by-cell", dest="by_cell", action="store_false",
                     help="use the original per-cohort rate-based path")
     ap.add_argument("--methods", nargs="+", default=["mst", "aim", "patectgan"],
-                    help="smartnoise-synth baselines of the 9 October 2026 version; the paper's reference AIM and MST "
+                    help="smartnoise-synth baselines (a development comparison at library defaults, not reported in the paper); the paper's reference AIM and MST "
                          "come from controls/pgm_baselines.py")
     ap.add_argument("--aim-max-model-size", type=int, default=None,
                     help="AIM junction-tree cap in MB (smartnoise default 80). Lower "

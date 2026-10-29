@@ -12,7 +12,7 @@ table. Every feature column comes out identical to what you put in; the tool rep
 marginal shift, which is zero, and the test suite asserts that the columns are equal.
 
 If you are not already running a marginal synthesiser, you do not need this tool: `cortec decode`
-(in the `cortec` package, since the 28 October 2026 version) decodes a CoRTeC release with no language
+(in the `cortec` package) decodes a CoRTeC release with no language
 model through the same estimator AIM and MST use, with every column carried by the release and one
 budget spent once; the hybrid is for an institution that keeps AIM or MST and wants the named
 conditionals added to its output.
@@ -164,16 +164,16 @@ on UCI Adult at ε = 2 and n = 300 the reference AIM's seen-conditional error is
 reference MST's 0.140 against a real sample's 0.062 (the paper's Table 3), while the reference
 AIM's downstream utility is at the real sample's level and ahead of the fixed-rule CoRTeC release's
 at n = 1,000, and level with or behind the auto-configured release decoded with no model and the selection step (`cortec decode`). The
-9 October 2026 version of this work (Zenodo record 10.5281/zenodo.23258254) measured both at a
-library's defaults with a defective sampler and reported a large utility gap; the 28 October paper
-withdraws it, and the measurements in this section were made against those rows. This tool spends a small, separately accounted slice of budget on the one thing
+measurements in this section were made during development against AIM and MST at a library's
+defaults, whose sampler was later found defective (the paper's Appendix D); the large utility gap
+those rows showed was the sampler's, and the paper reports the reference implementations instead. This tool spends a small, separately accounted slice of budget on the one thing
 those mechanisms do not target, a conditional target table `P(y | cell)` over a disjoint partition,
 and relabels the output to match it. Because the cells partition the data, the whole table costs one
 query's worth of ε however many cells it holds: accuracy is set by cell support, not cell count,
 which is what makes a rich table affordable. It is not "CoRTeC without the LLM", and it is not a
 general improvement over its inputs. A coarse 12-cell table, the obvious implementation, fixes
 calibration and adds little utility in our runs (+0.025 AUC on AIM and +0.037 on MST, on Adult);
-the large gain arrived only with a richer table, against the 9 October version's rows. Use it in one specific situation: your
+the large gain arrived only with a richer table, against the library-default rows. Use it in one specific situation: your
 marginal synthesiser's output has weak conditional target structure and you need a calibrated rate.
 
 ## 5. Before you run: the feasibility check
@@ -237,8 +237,8 @@ number.
 
 ## 7. Why rate matching alone
 
-The first version of this tool held that rank-preserving assignment, ordering the rows within a cell by a model of
-the synthetic data's own target, was necessary for this correction to pay for itself. Testing this
+Rank-preserving assignment, ordering the rows within a cell by a model of the synthetic data's own
+target, was assumed necessary for this correction to pay for itself. Testing this
 package disproved that in one regime, and the code changed as a result: `preserve_ranking=False` is
 the default of `relabel()`.
 

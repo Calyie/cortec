@@ -31,9 +31,9 @@ class Tier(str, Enum):
     """Capability tiers.
 
     A tier records what a model was measured to do ON FULL-DATASET GENERATION, which is what a
-    caller actually runs. The first version of this table assigned tiers from the *transmission
-    sweep* alone -- a narrow test of whether a model reproduces a released rate -- and two
-    self-hosted 70B-class models scored inside the frontier band on it. Measured on full-dataset
+    caller actually runs. Assigning tiers from the *transmission sweep* alone -- a narrow test of
+    whether a model reproduces a released rate -- would put two self-hosted 70B-class models inside
+    the frontier band. Measured on full-dataset
     generation the same models closed 12% of the conditional-error gap to an UNCONDITIONED prompt
     and nothing at all on 2-way total variation. The sweep is a necessary condition, not a
     sufficient one, and calling a model "validated" on the strength of it vouched for a
@@ -179,7 +179,7 @@ def check_model(model: str, *, allow_unvalidated: bool = False,
         raise ModelCapabilityError(
             f"{model!r} passes the transmission sweep but FAILS full-dataset generation.\n"
             f"  sweep: magnitude error {p.magnitude_error}, slope {p.slope} — inside the frontier "
-            f"band, which is why the first version of this table listed this model as validated.\n"
+            f"band, the sweep-only reading this table does not accept as validation.\n"
             f"  full-dataset generation, 3 draws: it closes 12% of the conditional-error gap to an "
             f"UNCONDITIONED prompt, closes nothing at all on 2-way total variation, and is worse "
             f"than that control on 1-way total variation.\n"

@@ -7,8 +7,8 @@ else changes, so a comparison against the hand-tuned run isolates the configurat
 
 The derivation spends privacy budget (`epsilon_selection`) on a query over the private data, so it
 CANNOT be re-run casually and it cannot be seeded: a DP mechanism with a fixed public seed is
-deterministic, its output distribution is a point mass, and the budget buys nothing. The first version of this
-module derived with a hardcoded `AUTO_SEED = 0`, which is exactly that failure.
+deterministic, its output distribution is a point mass, and the budget buys nothing. Deriving with a
+hardcoded seed (`AUTO_SEED = 0`) is exactly that failure.
 
 The configuration is therefore treated the same way as the DP release itself — **derived once and
 persisted as an artefact**. `get_spec("<name>_auto")` loads the stored configuration when one
@@ -48,7 +48,7 @@ AUTO_N_RECORDS = 1000
 #  condHeld are threshold-free and are unchanged -- which is the tell that only the thresholded
 #  metrics moved. The conclusion is the same either way: A leads B on acc, F1 and AUC.)
 # Coverage is not the objective; transmitted conditional structure is. Set CORTEC_AUTO_NMIN=150 to
-# get the coarser rule for the ablation. See the auto-configuration ablation of the 9 October 2026 version of this work (Zenodo record 10.5281/zenodo.23258254).
+# get the coarser rule for the ablation (a development measurement; the conclusion above).
 AUTO_N_MIN = 0
 
 

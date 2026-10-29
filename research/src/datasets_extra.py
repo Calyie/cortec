@@ -2,9 +2,8 @@
 datasets_extra.py — healthcare and financial datasets, as proxies for the regulated-industry
 settings CoRTeC is actually aimed at.
 
-Every CoRTeC result so far is on UCI Adult, a public census dataset where the LLM's prior
-happens to align with the truth — which is precisely NOT the target use case
-(the 9 October 2026 version of this work (Zenodo record 10.5281/zenodo.23258254)). These two datasets are the closest publicly available stand-ins:
+UCI Adult, a public census dataset where the LLM's prior happens to align with the truth, is
+precisely NOT the target use case. These two datasets are the closest publicly available stand-ins:
 
   diabetes   Diabetes 130-US Hospitals, 1999-2008 (UCI 296). 101,766 real hospital encounters
              across 130 US hospitals: admission source, length of stay, lab and procedure
@@ -246,7 +245,7 @@ def credit_spec() -> DatasetSpec:
 #   * AIM's `target` workload on titanic uses `Survived` — the same label-centred workload
 #     shape our conditional machinery targets;
 #   * its total domain is ~9e7, tiny, so **AIM actually fits on it in seconds**, where AIM has
-#     failed to complete in 2-3 h on diabetes and credit (the 9 October version). This is the
+#     failed to complete in 2-3 h on diabetes and credit (development runs). This is the
 #     dataset that can finally give us a real CoRTeC-vs-AIM head-to-head on a second dataset;
 #   * at 1,309 records it is a genuine SMALL-DATA DP regime, which is realistic for the
 #     regulated settings CoRTeC targets (rare-disease cohorts, small institutions).

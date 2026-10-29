@@ -114,8 +114,7 @@ def evaluate(schema: Schema, tables: dict[str, pd.DataFrame], *, train: pd.DataF
     record gains a second table, `reference spread`: for each measure the mean, the lowest and
     the highest value over the real samples and over their permuted copies. That range is what
     real data of this size spans on this holdout, and the results panel reads every synthetic
-    number against it instead of against a threshold. `reference_draws=1` scores one sample,
-    as versions before 1.1.0 did."""
+    number against it instead of against a threshold. `reference_draws=1` scores one sample."""
     if not tables:
         raise ValueError("evaluate() needs at least one table to score")
     if reference_draws < 1:

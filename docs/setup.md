@@ -328,7 +328,7 @@ synthetic = gen.generate_selected(release, n_rows=5000, pool_factor=3)
 | `reasoning` | `"on"` | `"suppressed"` is measured to be 3.8× worse on conditional error; the tool warns if you choose it |
 | `rows_per_call` | `25` | rows requested per model call |
 | `quota` | `True` | give every batch the exact per-bin, per-category and per-outcome counts it owes |
-| `quota_by_class` | `True` | state those counts per outcome, so each class's marginals are enforced rather than read from the class blocks; `False` states the totals only, as versions before 1.1.0 did |
+| `quota_by_class` | `True` | state those counts per outcome, so each class's marginals are enforced rather than read from the class blocks; `False` states the totals only |
 | `budget_usd` | `None` | a spend cap from the vendor's reported token counts at list prices; the run stops when it is reached and keeps what it has |
 | `request_timeout`, `max_retries` | `120.0`, `3` | the per-call timeout in seconds, and the retries per batch |
 | `allow_unvalidated` | `False` | run a model not in the measured set; verify transmission on your own data first |
@@ -542,7 +542,7 @@ with guard():            # the same, for one block (works in notebooks too)
 ```
 
 ```
-── CoRTeC 1.2.3 · Refused · Data Validation ────────────────────────────────────────────
+── CoRTeC 1.2.4 · Refused · Data Validation ────────────────────────────────────────────
   refused by  DataValidationError
   reason
     column 'income' is missing from the data. NO privacy budget was spent.

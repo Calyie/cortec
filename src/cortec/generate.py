@@ -592,7 +592,7 @@ class Generator:
         self.quota = bool(quota)
         # per-outcome exact counts in cohorts with class blocks (see batch_quotas): on by default,
         # so the class-specific marginals are enforced whichever model generates; `quota_by_class=
-        # False` (the CLI's --no-quota-by-class) states the totals only, as versions before 1.1.0 did
+        # False` (the CLI's --no-quota-by-class) states the totals only
         self.quota_by_class = bool(quota_by_class)
         self._quota_rng = np.random.default_rng(quota_seed)
         self.max_retries = max_retries
@@ -1225,7 +1225,7 @@ class Generator:
         """Generate `pool_factor * n_rows` records cohort-wise, then return the `n_rows` of them
         whose cell counts match the release (see `cortec.select`). The pool is post-processing of
         the release, so the selection costs no privacy budget; it costs `pool_factor` times the
-        generation spend. Measured for the 9 October 2026 version (design notes, section 4; Adult, three pools): a random 300
+        generation spend. Measured during development (design notes, section 4; Adult, three pools): a random 300
         of the pool carries 1-way marginal error 0.050 against real data; the selected 300 carry
         0.026, below a 300-record real sample's 0.043 and at MST's level, with the three
         downstream students unchanged or up by at most 0.017 AUC.

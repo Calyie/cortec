@@ -84,7 +84,7 @@ def parser(prog: str = "cortec run") -> argparse.ArgumentParser:
                     help="output budget per call, reasoning included (default 8192); a reasoning model that "
                          "spends its budget before writing any CSV needs more")
     ap.add_argument("--no-quota-by-class", action="store_true",
-                    help="state the exact counts as totals only, not per outcome (versions before 1.1.0: "
+                    help="state the exact counts as totals only, not per outcome (the totals-only "
                          "prompt); by default each outcome's rows per bin are stated as well, so the "
                          "class-specific marginals are enforced whichever model generates")
     ap.add_argument("--allow-unvalidated", action="store_true",
@@ -109,7 +109,7 @@ def parser(prog: str = "cortec run") -> argparse.ArgumentParser:
     ap.add_argument("--reference-draws", type=int, default=5,
                     help="real samples (each with a permuted copy) the evaluation scores as references; "
                          "their range is what the results panel reads each synthetic number against "
-                         "(default 5; 1 scores one sample, as versions before 1.1.0 did)")
+                         "(default 5; 1 scores one sample)")
     ap.add_argument("--exports", choices=("json", "all"), default="json",
                     help="json (default): one record per stage, complete; all: also the Markdown, "
                          "CSV and figure renderings of each record")
