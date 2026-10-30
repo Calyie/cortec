@@ -22,24 +22,24 @@ through an interface the institution does not control.
 
 ## What the paper finds
 
-- **The release carries the result.** Decoded with no language model at all, by the maximum-entropy
-  table that fits its counts, the release trains models as well as CoRTeC does: on UCI Adult at
-  ε = 2 and n = 1,000, 1-way total variation 0.041 and downstream AUC of 0.83 to 0.87 against
-  CoRTeC's 0.036 and 0.83 to 0.86, an ordering that holds on three seeds.
+- **The release trains models close to a real sample of its size, with no language model.** At ε = 2,
+  on draws of 300 and 1,000 rows, the release decoded by the maximum-entropy model and the selection step
+  (`cortec decode`) trains every student to within 0.02 AUC of a real sample of the same size on UCI Adult
+  over three splits; on NHANES and bank marketing the gap is larger, up to 0.07 AUC on the medical dataset
+  at n = 300. Across the three datasets the model-free release is level with or ahead of the reference AIM
+  on utility in five of six dataset-size cells, ahead on single columns on Adult and bank marketing, ahead on
+  the conditionals it names on Adult, and behind on pairs at the larger size on Adult and NHANES.
 - **The language model adds plausibility driven by the column names.** It repairs the logical pairs
   it recognises, invents dependences between near-independent columns, and loses its edge on pairs
-  and on utility when every name is replaced by a neutral token. The selection step applied to the
-  decoder's own pool brings single-column and seen-conditional error below a real sample's with no
-  model, over three splits, and without the release the same backbone recites the public file into
-  most of its one-shot output.
-- **The reference AIM is ahead on pairwise fidelity at every seed and, against the fixed-rule release, on utility at n = 1,000.**
-  The release is level with it on single columns and ahead on the conditionals it budgets for (0.035
-  against 0.061 at n = 300), and with the selection step its single-column error is below a real
-  sample's (0.027 on Gemini and 0.033 with no model, against 0.043). The release the auto-configurator
-  derives on Adult, decoded with no model and the selection step (`cortec decode`), is level with or ahead
-  of AIM on utility at both sizes over three splits and ahead on single columns; AIM keeps pairs at n = 1,000.
+  and on utility when every name is replaced by a neutral token; without the release the same backbone
+  recites the public file into most of its one-shot output. The selection step, not the model, accounts
+  for most of the model-free margin over the plain decoder.
+- **What the release trades.** It spends the budget on the conditionals a deployment names, at a cost on
+  pairs the reference AIM does not pay: AIM is ahead on pairs at n = 1,000 on Adult and NHANES, on utility
+  on NHANES at n = 300 and against the fixed-rule release on Adult at n = 1,000, and on the seen conditionals
+  on NHANES at n = 300 and on bank marketing. Draws are at most 1,000 rows.
 - **What survives every control is the privacy architecture.** One release serves unlimited draws;
-  the backbone can be replaced at no privacy cost; the strongest membership attack on any arm reaches
+  the backbone can be replaced at no privacy cost; the strongest membership attack on any CoRTeC arm reaches
   an advantage of 0.02 to 0.05 against a permitted 0.762; no synthetic row copies a training row;
   and the served backbone's memorised head of the Adult file never reaches a draw.
 

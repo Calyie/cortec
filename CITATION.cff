@@ -8,19 +8,29 @@ date-released: "2026-10-30"
 doi: "10.5281/zenodo.22945315"
 repository-code: "https://github.com/Calyie/cortec"
 abstract: >-
-  CoRTeC spends a differential privacy budget once, on a small release of class-conditional
-  histograms and a conditional outcome table inside publicly defined cohorts, and lets Private-PGM
-  or a frozen language model decode that release, the model under exact per-bin counts and a
-  selection step that returns the generated rows to the released cells. The model never sees a private record, so every draw is
-  post-processing of the release. The paper measures what each part of the design contributes: the
-  same release decoded by a maximum-entropy model with no language model, the schema with every
-  name replaced by a neutral token, the reference implementations of AIM and MST, and three recent
-  methods under their own protocols. The release carries the fidelity and the
-  utility; the language model adds plausibility driven by the column names; the reference AIM is
-  ahead on pairwise fidelity and, for the fixed-rule release at larger sample sizes, on utility, and
-  level with or behind the auto-configured release decoded with no model; what survives every control
-  is the privacy architecture. This repository holds the Apache-2.0 reference implementation with its
-  tests, the research pipeline, the papers and the frozen auto-configurations.
+  An institution that holds sensitive tabular data wants to train models, share samples and
+  support research without exposing a record, under differential privacy. Today's methods spend
+  the budget inside a fitted model or a training run on a workload chosen on the private rows, so
+  what leaves cannot be reviewed or reused. We propose CoRTeC, a differentially private release
+  built for a downstream classifier: inside cohorts formed by a public rule or a charged
+  procedure, the cohort size, the class balance, one histogram per attribute per outcome class and
+  a table of outcome rates over disjoint cells, every count noised, the budget spent once, shipped
+  for a reviewer to check. Everything after the release is post-processing: a maximum-entropy
+  decoder reconstructs rows at no cost, a frozen generative model (four backbones) decodes the
+  same release under exact per-bin counts without seeing a record, and a selection step rakes any
+  decoder's pool to the released cells, so one release serves unlimited draws. At ε = 2, on draws
+  of 300 and 1,000 rows, the release decoded with no model trains models within 0.02 AUC of a real
+  sample of its size on Adult over three splits; on NHANES and bank marketing the gap is larger,
+  up to 0.07 AUC on the medical dataset at n = 300, and the release is level with or ahead of the
+  reference AIM on utility in five of six dataset-size cells, ahead on single columns on Adult and
+  bank, level on NHANES, ahead on the conditionals it names on Adult, and behind on pairs at the
+  larger size on Adult and NHANES. Four controls attribute the rest: the language model adds
+  plausibility from the column names, repairs the pairs it recognises, invents those it expects,
+  and without the release recites the public file. No private row reaches any decoder, the
+  strongest membership attack reaches a small fraction of the permitted advantage, and no
+  synthetic row copies a training row. This repository holds the Apache-2.0 reference
+  implementation with its tests, the research pipeline, the papers and the frozen auto-
+  configurations.
 authors:
   - family-names: "Nnona"
     given-names: "Calister"
