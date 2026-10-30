@@ -1,7 +1,6 @@
 # cortec
 
-A differentially private release for synthetic tabular data, decodable with or without a language
-model: a frozen model, or the maximum-entropy decoder with no model, reads only DP statistics.
+A differentially private release for synthetic tabular data, decodable by any generator: a frozen model, or the maximum-entropy decoder with no model, reads only DP statistics.
 
 The privacy budget is spent once, on a statistics release (Stage A). A frozen model, or the
 maximum-entropy decoder with no model (`cortec decode`), then generates records from that release
@@ -542,7 +541,7 @@ with guard():            # the same, for one block (works in notebooks too)
 ```
 
 ```
-── CoRTeC 1.2.4 · Refused · Data Validation ────────────────────────────────────────────
+── CoRTeC 1.2.5 · Refused · Data Validation ────────────────────────────────────────────
   refused by  DataValidationError
   reason
     column 'income' is missing from the data. NO privacy budget was spent.

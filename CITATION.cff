@@ -1,10 +1,10 @@
 cff-version: 1.2.0
-title: "CoRTeC: A Differentially Private Release for Synthetic Tabular Data, Decodable With or Without a Language Model"
+title: "CoRTeC: A Differentially Private Release for Synthetic Tabular Data, Decodable by Any Generator"
 message: "If you use this software or the accompanying paper, please cite it."
 type: software
 license: Apache-2.0
-version: "1.2.4"
-date-released: "2026-10-28"
+version: "1.2.5"
+date-released: "2026-10-30"
 doi: "10.5281/zenodo.22945315"
 repository-code: "https://github.com/Calyie/cortec"
 abstract: >-

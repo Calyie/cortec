@@ -1,6 +1,6 @@
 # CoRTeC
 
-**A differentially private release for synthetic tabular data, decodable with or without a language model.**
+**A differentially private release for synthetic tabular data, decodable by any generator.**
 
 ![The pipeline](paper/figures/fig01_pipeline.png)
 

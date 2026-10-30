@@ -5,8 +5,8 @@ build-backend = "setuptools.build_meta"
 [project]
 authors = [{name = "Calister Nnona", email = "calisternnona@gmail.com"}]
 name = "cortec"
-version = "1.2.4"
-description = "A differentially private release for synthetic tabular data, decodable with or without a language model"
+version = "1.2.5"
+description = "A differentially private release for synthetic tabular data, decodable by any generator"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "Apache-2.0"}

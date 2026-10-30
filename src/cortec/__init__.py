@@ -1,4 +1,4 @@
-"""CoRTeC — a differentially private release for synthetic tabular data, decodable with or without a language model.
+"""CoRTeC — a differentially private release for synthetic tabular data, decodable by any generator.
 
 The privacy budget is spent once, on a statistics release. Generation reads only that release, so
 it is post-processing: it adds no privacy cost, and unlimited datasets may be drawn from one
@@ -23,7 +23,7 @@ register_refusal(PrivacyAccountingError, SchemaError, DataValidationError, Relea
                  GenerationError, RateLimitedError, ModelCapabilityError, BoundError,
                  PromptIntegrityError, DecodeError)
 
-__version__ = "1.2.4"
+__version__ = "1.2.5"
 __all__ = ["transmission_bound", "bound_with_controls", "BoundReport", "BoundResult", "BoundError",
            "PrivacyLedger", "PrivacyAccountingError", "Schema", "Band", "SchemaError",
            "DataValidationError", "Release", "release_statistics", "ReleaseError",
