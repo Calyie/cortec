@@ -28,19 +28,17 @@ as needed and on any model, including one behind an interface the institution do
 - **The release on its own is enough to train useful models, with no language model.** At ε = 2, with 300 and 1,000
   rows, we decode the auto-configured release with the maximum-entropy model and the selection step (`cortec decode`).
   Over three splits, it trains every student classifier to within 0.02 AUC of a real sample of the same size on UCI
-  Adult. On NHANES and bank marketing the gap is larger, reaching 0.07 AUC on the medical dataset at 300 rows. Across
-  the three datasets, the release decoded without a model reaches the utility of the reference AIM in five of six
-  settings.
+  Adult. After the selection step, the decoded rows carry the conditional rates the release names more closely than
+  such a sample does. On NHANES and bank marketing the gap to a real sample is larger, reaching 0.07 AUC on the
+  medical dataset at 300 rows.
 - **The language model's contribution comes from the column names.** It repairs pairs of columns it recognises and
   invents links between columns that are nearly independent. When every name is replaced by a neutral token, it loses
   that advantage, and without the release it recites the public file. Most of the gain over the plain decoder comes
   from the selection step, not from the model.
-- **What the release trades.** It spends the budget on the conditional rates a deployment names, and this costs
-  accuracy on pairs of columns. The reference AIM's adaptive workload fits pairs more closely at 1,000 rows on Adult
-  and at both sizes on NHANES. Its students score higher on NHANES at 300 rows, and higher than those of the
-  fixed-rule release on Adult at 1,000 rows. With the fixed rule, the release carries the conditional rates it names
-  on Adult more closely than AIM's draws do. Our draws are at most 1,000 rows. CoRTeC is meant to sit beside the
-  marginal methods, so choose whichever fits your deployment.
+- **What the fixed workload costs.** The release spends its budget on the conditional rates a deployment names, and
+  this costs accuracy on pairs of columns, which an adaptive workload such as AIM's fits more closely. On utility, the
+  release reaches the reference AIM in five of six settings. Our draws are at most 1,000 rows. CoRTeC is meant to sit
+  beside the marginal methods, so choose whichever fits your deployment.
 - **The privacy architecture holds in every test.** One release serves any number of draws, and the backbone can be
   replaced at no privacy cost. The strongest membership attack on any CoRTeC configuration reaches an advantage of
   0.02 to 0.05, against the 0.762 the budget permits. No synthetic row copies a training row, and the part of the
