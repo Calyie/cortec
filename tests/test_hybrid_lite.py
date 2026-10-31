@@ -548,3 +548,16 @@ def test_published_support_is_never_below_n_min():
         tbl = release_conditional_table(sch, df, cols, epsilon=0.05, n_min=150, seed=seed)
         supports += list(tbl.support.values())
     assert supports and min(supports) >= 150 and max(supports) > 150
+
+
+def test_correct_passes_the_declared_privacy_unit_to_the_release():
+    """`cortec-hybrid run --max-rows-per-person` reaches the release through correct(): a declared
+    unit is recorded in the audit, and one whose epsilon per person is meaningless is refused."""
+    s, priv, syn = schema(), frame(), marginal_synth_output()
+    _, table, _ = correct(s, priv, syn, columns=("edu",), epsilon=0.5, seed=0, max_rows_per_person=3)
+    assert table.audit["max_rows_per_person"] == 3
+    assert table.audit["epsilon_per_person"] == pytest.approx(1.5)
+    _, undeclared, _ = correct(s, priv, syn, columns=("edu",), epsilon=0.5, seed=0)
+    assert undeclared.audit["max_rows_per_person"] == "UNDECLARED"
+    with pytest.raises(Exception, match="REFUSED"):
+        correct(s, priv, syn, columns=("edu",), epsilon=0.5, seed=0, max_rows_per_person=40)

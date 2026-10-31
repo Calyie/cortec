@@ -30,7 +30,7 @@ your AIM/MST output ────────────────────
 | 4. Read the result | What `worth_it` measures, and what it does not |
 | 5. Before you run: feasibility | Why `check_feasible()` refuses some schemas |
 | 6. Privacy | The ledger, `n_min` and the privacy unit |
-| 7. Why rate matching alone | The measurement that turned rank preservation off |
+| 7. Why rate matching alone | The measurement behind the i.i.d. default |
 
 ## 1. Install
 
@@ -91,7 +91,7 @@ corrected, table, gain = correct(
 )
 print(gain["verdict"])
 # -> "the correction materially improved conditional calibration"
-#    or "the correction changed little; ... consider keeping the budget instead"
+#    or "the correction changed little. ... consider keeping the budget instead"
 ```
 
 | Parameter of `correct()` | Default | What it does |
@@ -126,7 +126,7 @@ exits with status 2 instead of showing a traceback (see section 10 of the setup 
 
 | Key | Meaning |
 |---|---|
-| `conditional_error_before`, `conditional_error_after`, `conditional_error_reduction` | mean absolute gap between each cell's rate in the data and the released rate, before and after |
+| `conditional_error_before`, `conditional_error_after`, `conditional_error_reduction` | mean absolute gap between each cell's rate in the synthetic table and the released rate, before and after |
 | `feature_marginal_shift` | mean total-variation change of the categorical marginals between input and output (it should be zero, since features are untouched) |
 | `n_cells_corrected` | how many released cells were matched |
 | `worth_it`, `verdict` | true when conditional error fell by more than 0.02, with a sentence saying so |
@@ -151,22 +151,22 @@ rec.save("results", "correction")
 **Read `worth_it` for what it is.** It is a calibration criterion. It means that conditional error
 against the released table fell by more than 0.02. It does not predict downstream utility, and we
 measured the two coming apart. Across 11 datasets, the correction improved calibration in nearly
-every case, while downstream AUC moved in both directions. Of 9 runs flagged `worth_it`, downstream
-AUC fell on 6 in one run and on 3 of 10 in a repeat. Three datasets were reliably negative (a renal
-registry, hospital readmission and cervical cancer): calibration improved and downstream AUC dropped
-every time. `worth_it_does_not_predict` says exactly this. Check the correction on your own held-out
-data before adopting it. Keep your budget if the gain is small.
+every case, while downstream AUC moved in both directions. In one run, downstream AUC fell on 6 of
+the 9 datasets flagged `worth_it`. In a repeat, it fell on 3 of 10. Three datasets were reliably
+negative (a renal registry, hospital readmission and cervical cancer): calibration improved and
+downstream AUC dropped every time. `worth_it_does_not_predict` says exactly this. Check the
+correction on your own held-out data before adopting it. Keep your budget if the gain is small.
 
 **What to expect.** Marginal DP synthesisers are excellent at the statistic they optimise, and their
 own papers evaluate them on it. They do not release a conditional target table. On UCI Adult at ε =
 2 and n = 300, the reference AIM's seen-conditional error is 0.055 and the reference MST's is 0.140
 against 0.062 for a real sample (the paper's Table 3). The reference AIM's downstream utility is at
-the real sample's level. At n = 1,000, it scores higher than the fixed-rule CoRTeC release. It is
-level with or below the auto-configured release decoded with no model and the selection step
-(`cortec decode`). The measurements in this section were made during development against AIM and MST
-at a library's defaults. That library's sampler was later found to be defective (the paper's
-Appendix D). The large utility gap those rows showed came from the sampler, and the paper reports
-the reference implementations instead.
+the real sample's level. At n = 1,000, it scores higher than the fixed-rule CoRTeC release. It
+matches or scores lower than the auto-configured release decoded by the maximum-entropy decoder
+(`cortec decode`). The figures in the next paragraph were measured during development against AIM
+and MST at a library's defaults. That library's sampler is defective (the paper's Appendix D). The
+large utility gap those runs showed came from the sampler, and the paper reports the reference
+implementations instead.
 
 This tool spends a small, separately accounted part of the budget on the one thing those mechanisms
 do not target. That is a conditional target table, `P(y | cell)`, over a partition of the data. It
@@ -187,18 +187,18 @@ factors it uses. Pass `raise_on_fail=False` to receive the report and proceed an
 
 It does not gate on domain size, because our own ablation showed that this would be wrong. UCI Adult
 has the largest domain of every schema we measured (4.4 × 10¹³, which is 6.5 million times larger
-than a healthcare prefix that times out), and yet Adult is the one that fits. Within a single
-dataset, the run with the larger domain fit 425 seconds faster than the run with the smaller one.
-Domain volume does not predict convergence, so gating on it refuses the wrong schemas. Three factors
-did predict it, each demonstrated by a controlled flip:
+than the first ten columns of the diabetes data, which time out at 81,410 rows), and yet Adult is
+the one that fits. Within a single dataset, the run with the larger domain fit 425 seconds faster
+than the run with the smaller one. Domain volume does not predict convergence, so gating on it
+refuses the wrong schemas. Three factors did predict it, each demonstrated by a controlled flip:
 
 - **Attribute count.** A 19-attribute schema times out at a row count where a 15-attribute one fits.
 - **Row count.** The same schema at the same domain moves from a 26-minute fit to a timeout purely
   by going from 26,048 to 81,410 rows.
 - **High-cardinality correlated numeric columns.** One dataset has Adult's width, fewer rows and a
-  30× smaller domain, yet it still fails. Dropping any three columns does not help, but dropping
-  three amount columns does. A width-matched control that drops three demographic columns instead
-  still times out. That is the only way to separate the two causes.
+  30× smaller domain, yet it still fails. Dropping three arbitrary columns does not help, but
+  dropping three amount columns does. A width-matched control that drops three demographic columns
+  instead still times out. That control is what separates the two causes.
 
 The report includes the full observation table it is derived from. It also gives the estimated
 domain size for reference, which is explicitly not used to decide. This is a heuristic from ten fits
@@ -240,8 +240,8 @@ number.
 ## 7. Why rate matching alone
 
 Rank-preserving assignment orders the rows within a cell by a model of the synthetic data's own
-target. We assumed it was necessary for this correction to be worth its cost. Testing this package
-disproved that in one regime, so `preserve_ranking=False` is the default of `relabel()`.
+target. Rank preservation looks necessary for this correction to be worth its cost. Testing showed
+that it is not, in one regime, so `preserve_ranking=False` is the default of `relabel()`.
 
 Rank preservation helps only when the input synthetic data already carries structure within each
 cell. When its target is close to noise (exactly the case this tool targets), a ranking model fitted
@@ -249,13 +249,13 @@ on that target learns the noise. Ordering by it then adds false structure that a
 mistakes for signal. On the renal registry, that cost 0.068 AUC against plain random assignment
 (0.546 against 0.614 in the table below).
 
-A guard based on how predictable the synthetic target is does not work, and the reason is worth
-knowing. `_rank_scores` gated on whether the synthetic target is predictable from the synthetic
-features (cross-validated AUC against `RANK_INFORMATIVENESS_FLOOR = 0.55`). But a synthesiser
-generates its target as a function of those features, so that score is almost always near-perfect:
-0.981 on one dataset whose real downstream AUC is 0.631. It measures self-consistency, not validity.
-It is highest exactly when the synthesiser has confidently learned a wrong relationship. It
-therefore selected for the failure mode it was built to prevent.
+A guard based on how predictable the synthetic target is does not work. `_rank_scores` gated on
+whether the synthetic target is predictable from the synthetic features (cross-validated AUC against
+`RANK_INFORMATIVENESS_FLOOR = 0.55`). But a synthesiser generates its target as a function of those
+features, so that score is almost always near-perfect: 0.981 on one dataset whose real downstream
+AUC is 0.631. It measures self-consistency, not validity. It is highest exactly when the synthesiser
+has confidently learned a wrong relationship. It therefore selected for the failure mode it was
+built to prevent.
 
 Over three datasets at three synthesiser seeds each, i.i.d. assignment scored higher than rank
 preservation in 9 of 9 runs:
@@ -267,10 +267,9 @@ preservation in 9 of 9 runs:
 | adult | 0.705 | 0.788 (+0.083) | **0.821 (+0.116)** |
 
 Preserving the within-cell ordering requires evidence that the ordering is real, and nothing
-available to a post-processing tool provides that. The transferable lesson is not specific to this
-tool. A check fitted on a system's own output measures self-consistency. It cannot detect that the
-system is confidently wrong. When confidence and wrongness go together, it will actively recommend
-the wrong action.
+available to a post-processing tool provides that. The lesson goes beyond this tool. A check fitted
+on a system's own output measures self-consistency. It cannot detect that the system is confidently
+wrong. When confidence and wrongness go together, it will actively recommend the wrong action.
 
 ## Licence
 

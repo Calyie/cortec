@@ -107,15 +107,15 @@ panel. It also holds `release.json`. Later runs into the same folder reuse it, b
 made only once. `--exports all` also writes each record's Markdown, CSV and figure.
 `RunRecord.from_json` can produce these later from the JSON. The sections below explain each stage
 and every setting. The same calls are available from Python for your own scripts. `cortec-hybrid
-run` runs the correction. In a clone whose scripts directory is not on PATH, `python3 run_cortec.py`
-in this directory is the same command.
+run` runs the correction. In a clone whose scripts directory is not on PATH, `python3 -m cortec run`
+is the same command.
 
 For a full tour of the three stages with no API key and no data, run the bundled example. It builds
 a small synthetic table in code and uses the offline `mock` backend. The release and the bound are
 real, and only the generated numbers are placeholders:
 
 ```bash
-python3 example.py
+python3 examples/example.py
 ```
 
 To list everything the package can run, print the help page. It shows the commands, the run order
@@ -300,7 +300,7 @@ rows before Stage A. Otherwise, report `ε_person` rather than the per-row numbe
 
 **Check the release before generating.**
 
-- `release.audit["epsilon_accounted"]` equals what you declared and `within_budget` is true. The
+- `release.audit["epsilon_accounted"]` equals what you declared, and `within_budget` is true. The
   audit lists every query with its epsilon, sensitivity, composition rule and partition key. A
   privacy engineer can therefore recompute the total by hand. `PrivacyLedger.spend()` is the only
   function in the package that returns a noise scale, so nothing is released without appearing
@@ -310,7 +310,7 @@ rows before Stage A. Otherwise, report `ε_person` rather than the per-row numbe
   at release time rather than recorded. One is an under-spent conditional budget, where some
   declared levels released no cell. The other is a noise-dominated conditional table, where the
   noise on a level's rates is at least as large as their spread. Read the console.
-- `release.conditional_levels` is non-empty and its finest level has cells. An empty table is
+- `release.conditional_levels` is non-empty, and its finest level has cells. An empty table is
   refused, because the output would be unconditioned.
 - Store `release.json` and hash it. Generation reads only this file, so every later draw and every
   comparison must reuse it. A release cannot be regenerated identically, because its noise is
@@ -368,6 +368,8 @@ structure, and no output check will reveal that.
 |---|---|---|
 | Claude Fable 5 / Opus / Sonnet | validated | transmission sweep, magnitude error 0.009 |
 | Gemini Flash (the `gemini.*flash` pattern, where `gemini-3.5-flash` is served by 3.6 Flash) | validated | the sweep (0.008) and full-dataset generation (1-way total variation 0.027 on Adult at n = 300) |
+| GPT-5, at its default reasoning | validated | full-dataset generation, conditional error 0.045 in a development measurement, against 0.173 at minimal reasoning |
+| Gemini 3.1 Pro | validated | full-dataset generation, conditional error 0.041 in a development measurement |
 | Qwen3-14B, Qwen3-32B (4-bit AWQ), served through vLLM | validated | full-dataset generation (1-way 0.046 and 0.049, seen-conditional error 0.027 and 0.031 on Adult at n = 300) |
 | Qwen3-8B | adequate | full-dataset generation (1-way 0.068), though it sometimes writes range labels into numerical columns |
 | llama3.3:70b-instruct | **sweep-only, refused** | the sweep (0.020), but fails full-dataset generation |
@@ -449,28 +451,29 @@ report.to_json("bound.json")       # readable by a third party without the priva
 
 - `holdout_df` is real data that was not used to build the release. It supplies the ceiling (a real
   sample, which should clear the tolerance) and the floor (the same sample with its target permuted,
-  which must not). If the ceiling fails or the floor clears, the test did not discriminate.
-  `report.verdict` is then `None`, and that run is not reported.
+  which must not). If the ceiling fails or the floor clears, the test did not discriminate. Both
+  scores read the hold-out sample without noise, so they sit outside the guarantee and should stay
+  inside the institution. `report.verdict` is then `None`, and that run is not reported.
 - `epsilon_cert` is spent once through the ledger. The deployment total is `epsilon_release +
   epsilon_cert`, stated per row and per person. Each cell's rate is taken over `max(|c|, n_min)`,
   and the Laplace scale uses the public floor `n_min`. The sensitivity bound therefore holds for
   every cell whatever its true size, and the bound is pure ε-DP.
 - A released cell that the synthetic data never covers scores the trivial bound of 1.0. A bound
   therefore cannot be obtained by covering only a convenient subset of cells. Cells with fewer than
-  20 synthetic rows are reported as thin. The noise cannot be seeded. The report's `_what_this_is`
-  and `_standards_not_claimed` blocks say what it is and which privacy frameworks it must not be
-  mapped to.
+  20 synthetic rows are reported as thin, and no verdict is issued while any released cell is thin.
+  The noise cannot be seeded. The report's `_what_this_is` and `_standards_not_claimed` blocks say
+  what it is and which privacy frameworks it must not be mapped to.
 
 ## 8. Evaluate the output
 
-Never against a bare threshold. Score the synthetic data beside two references built from real data
-of the same size. The first is a real sample: the ceiling a synthetic method can reach at that size.
-The second is the same sample with its target column shuffled. It is a floor that carries no usable
-information. Report fidelity and utility together, because a method can score well on one and poorly
-on the other. Read the conditional measures beside the aggregate ones. Also compare each declared
-categorical column's full set of categories with the release. A category that is present in the
-release but missing from the output is a representativeness failure, and no aggregate metric reports
-it.
+Never score the synthetic data against a bare threshold. Score it beside two references built from
+real data of the same size. The first is a real sample: the reference a synthetic table of that size
+is not expected to exceed. The second is the same sample with its target column shuffled. It is a
+floor that carries no usable information. Report fidelity and utility together, because a method can
+score well on one and poorly on the other. Read the conditional measures beside the aggregate ones.
+Also compare each declared categorical column's full set of categories with the release. A category
+that is present in the release but missing from the output is a representativeness failure, and no
+aggregate metric reports it.
 
 The package ships this comparison. `evaluate()` scores every table you give it beside a real sample
 of the same size drawn from `train` and beside that sample with its target shuffled. It uses the
@@ -504,19 +507,19 @@ Nothing in the package compares a number with a threshold.
 output is within 0.025 AUC of the same student trained on a real sample of the same size. That holds
 on an open model (Qwen3-14B: 0.807, 0.862 and 0.833 against the sample's 0.830, 0.870 and 0.840) and
 on a served one (Gemini: 0.805, 0.863 and 0.838). The seen-conditional error is a fifth of the
-sample's on Gemini and under half of it on Qwen3-14B. Two things are worth knowing before you read
-your own panel. First, most of that result comes from the release. Decoded with no language model
-and no selection step, using the maximum-entropy table that fits its counts, the release trains
-students within 0.012 AUC of the language-model output. What the language model adds comes from the
-column names. When every name is replaced by a neutral token, its advantage on pairs and on utility
+sample's on Gemini and under half of it on Qwen3-14B. Two points matter before you read your own
+panel. First, most of that result comes from the release. Decoded with no language model and no
+selection step, using the maximum-entropy table that fits its counts, the release trains students
+within 0.012 AUC of the language-model output. What the language model adds comes from the column
+names. When every name is replaced by a neutral token, its advantage on pairs and on utility
 disappears. On a schema the model does not know, expect the release's own result. Second, the
 reference AIM (fitted the way its authors fit it) fits pairs of columns more closely than the
-language-model output. At n = 1,000, it also scores higher on utility. At n = 300, the
-language-model output is level with it on single columns, and on Adult it carries the conditional
-rates the release names more closely. On a clinical survey (NHANES), the language-model students
-were 0.07 to 0.10 AUC below a real sample's. The model-free decoding of the same release scored
-higher than they did. Do not assume parity. Measure it on your own data against a real sample of the
-same size. Read the conditional measures beside the aggregate ones. The design notes carry the full
+Qwen3-14B output. At n = 1,000, it also scores higher on utility. At n = 300, the Qwen3-14B output
+matches it on single columns, and on Adult it carries the conditional rates the release names more
+closely. On a clinical survey (NHANES), the language-model students were 0.07 to 0.10 AUC below a
+real sample's on the seed-42 split. The model-free decoding of the same release scored higher than
+they did. Do not assume parity. Measure it on your own data against a real sample of the same size.
+Read the conditional measures beside the aggregate ones. The design notes carry the full
 measurements.
 
 ## 9. Where the trust boundary sits
@@ -568,20 +571,20 @@ exception is a fault and keeps its traceback.
 |---|---|---|
 | `DataValidationError` before any query | a column is missing, the target has an undeclared label or one class only, or a numeric column has no usable values | fix the data or the schema. No budget was spent |
 | `SchemaError: stratify bands ... must tile its declared domain` | a gap or an overlap between bands | make the bands contiguous from `lo` to `hi` |
-| `ReleaseError: n_min=... is below the safe floor of 50` | a rate over fewer records is dominated by its noise | raise `n_min`, or coarsen the conditional levels |
-| `ReleaseError: no cohort reached n_min` or `the conditional target table is empty` | too few records per cohort or cell | coarsen the stratification or the levels, lower `n_min`, or supply more records |
-| `ReleaseError: REFUSED: max_rows_per_person=...` | the per-person ε would exceed 10 | cap or aggregate rows per person, lower `epsilon_total`, or acknowledge a row-level guarantee |
-| a printed warning that part of the conditional budget was not spent | some declared levels released no cell | use fewer levels, lower `n_min`, or supply more records |
-| a printed warning that a level's noise is at or above the spread of its rates | the table is noise-dominated | raise ε, coarsen to fewer cells, or accept that conditioning will not help on this data |
+| `ReleaseError: n_min=... is below the safe floor of 50` | a rate over fewer records is dominated by its noise | raise `n_min` or coarsen the conditional levels |
+| `ReleaseError: no cohort reached n_min` or `the conditional target table is empty` | too few records per cohort or cell | coarsen the stratification or the levels, lower `n_min` or supply more records |
+| `ReleaseError: REFUSED: max_rows_per_person=...` | the per-person ε would exceed 10 | cap or aggregate rows per person, lower `epsilon_total` or acknowledge a row-level guarantee |
+| a printed warning that part of the conditional budget was not spent | some declared levels released no cell | use fewer levels, lower `n_min` or supply more records |
+| a printed warning that a level's noise is at or above the spread of its rates | the table is noise-dominated | raise ε, coarsen to fewer cells or accept that conditioning will not help on this data |
 | `ModelCapabilityError` | the model is unmeasured, sweep-only or insufficient | use a recommended model, or opt in with the flag the message names and verify on your own data |
 | `PromptIntegrityError` | a prompt template was modified in memory, or the conditional table is empty | do not edit the templates. Register a variant under a new name if you must |
 | `ContextTruncationError` | the prompt plus the output budget exceeds a local model's context | raise `num_ctx` or lower `rows_per_call` |
-| `EmptyContentError` | a reasoning model spent its output budget before writing any CSV | raise the output budget. `ModelRefusalError` is the different case of a refusal, which needs a coarser cell or a different generator |
-| `FatalAPIError` | billing, quota, credentials, or a model the surface does not serve | fix the account or the model name. Nothing was retried, and the release is unchanged |
+| `EmptyContentError` | a reasoning model spent its output budget before writing any CSV | raise the output budget. `ModelRefusalError` is a different case, a model refusal, which needs a coarser cell or a different generator |
+| `FatalAPIError` | billing, quota, credentials or a model the surface does not serve | fix the account or the model name. Nothing was retried, and the release is unchanged |
 | the run waits and `rate_limit_waits` rises | the vendor asked it to wait | nothing: the waits back off from 15 s to 4 min before an error surfaces |
 | a "budget cap reached" warning and fewer rows than requested | the spend cap was reached | not an error: the output holds the rows completed within the budget. Raise `budget_usd` or use a cheaper validated model for the full request |
-| `GenerationError` naming a yield or parse rate | most returned rows were dropped, or too few calls parsed | a genuine fault, so the run stops before spending more. Check the schema against the rows being dropped |
-| `select_to_release` refuses the pool | a run that stopped early without a budget cap (a lost connection) left cohorts short of the rows they owe | a budget cap is handled automatically, returning the partial pool with a warning. For other truncations pass `allow_short_pool=True` |
+| `GenerationError` naming a yield or parse rate | most returned rows were dropped, or too few calls parsed | a real problem with the output, so the run stops before spending more. Check the schema against the rows being dropped |
+| `select_to_release` refuses the pool | a run that stopped early without a budget cap (a lost connection) left cohorts short of the rows they owe | a budget cap is handled automatically, returning the partial pool with a warning. For other truncations, pass `allow_short_pool=True` |
 | `generate_by_cell` refuses the release | a conditioning column has under 90% of its mass in released bands | lower `n_min` or use a coarser level, or generate cohort-wise |
 
 ## 11. Output and exports
@@ -606,7 +609,7 @@ files = rec.save("results/run-01", "stage_c")          # {name: path}
 
 `show()` prints and returns a `RunRecord`, and `record()` builds one without printing. `save()`
 writes the record as `<stem>.json` (format `cortec-result/1`) and the same content as Markdown in
-`<stem>.md`. It also writes the named values to `<stem>.csv`, one CSV per table, and `<stem>.png`
+`<stem>.md`. It also writes the named values to `<stem>.csv`, one CSV per table and `<stem>.png`
 when matplotlib is installed. `RunRecord.from_json()` reads a record back. Tables follow the paper's
 conventions: a label column on the left, numbers to three decimal places and reference rows marked.
 Figures use the paper's own plotting parameters: serif type, results in blue and references in grey.
@@ -621,7 +624,7 @@ meets in Stage C and the evaluation:
 | Term | Meaning |
 |---|---|
 | tolerance | the largest per-cell gap you accept. By default derived from the release (the noise half-width plus half the largest gap between a released cell rate and the released base rate, so the permuted floor cannot pass at any sample size), or a number you pass. A table is within tolerance when its worst bound is at or below it |
-| ceiling | a real sample of the synthetic table's size, scored the same way: the best any method can do at that size |
+| ceiling | a real sample of the synthetic table's size, scored the same way: the reference a synthetic table of that size is not expected to exceed |
 | floor | the same real sample with its target permuted: data with no conditional signal |
 | discriminating | the test had power: the ceiling is within tolerance and the floor is not. Otherwise the verdict on the synthetic table is not reported |
 | covered, thin | a released cell with synthetic rows in it, and thin when it has fewer than 20. An uncovered cell scores the trivial bound 1.0 |
@@ -631,7 +634,7 @@ meets in Stage C and the evaluation:
 | yield | rows kept divided by rows requested from the model. Rows outside the schema are dropped and counted |
 | support | the number of private records in a cell or cohort, with noise added |
 | reference spread | the lowest and highest value of each measure over the real samples drawn as references: the range real data of this size spans on this holdout |
-| reading | where a synthetic number lies against that range: within it, beyond every real sample, or outside it by how much |
+| reading | where a synthetic number lies against that range: within it, beyond every real sample or outside it by how much |
 | share of real-sample utility | (synthetic − permuted) / (real sample − permuted) for one student: the part of a real sample's utility above the no-information floor that the synthetic table reaches |
 
 ## Licence

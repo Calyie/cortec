@@ -34,13 +34,13 @@ Colour is used only on a terminal. `NO_COLOR` or `CORTEC_COLOR=0` turns it off, 
 | `tool` | string | `cortec` or `cortec-hybrid` |
 | `version` | string | the package version that wrote the record |
 | `stage` | string | `Stage A`, `Stage B`, `Stage C`, `Evaluation`, `Results` or `Correction` |
-| `title` | string | the stage's name in words: `Release`, `Generate`, `Utility transmission bound`, `Fidelity and utility beside real references`, `Relabel the target column`. `marginal fidelity and downstream utility against real references` for `Results` |
+| `title` | string | the stage's name in words: `Release`, `Generate`, `Utility transmission bound`, `Fidelity and utility beside real references`, `Relabel the target column`, and `marginal fidelity and downstream utility against real references` for `Results` |
 | `schema` | string | the schema's `name` |
 | `created` | string | UTC time, ISO 8601, to the second |
 | `values` | object | the named values of the run, `name: value`. Numbers are numbers, booleans are booleans, text is text |
 | `value_order` | array | the names in `values` in display order |
-| `epsilon` | object | the budget the stage spent or inherited: `declared`, `accounted`, `per_row`, `per_person` for Stage A. `per_row: 0` for Stage B. `release`, `bound`, `per_row`, `per_person` for Stage C. `table`, `accounted`, `per_row` for the correction |
-| `tables` | array | one object per table: `name`, `columns`, `rows` (arrays in column order), `reference_rows` (indices of rows that are references, such as a real sample or a permuted floor), `note`, `decimals`. `subtitle` (optional: the question the table answers) |
+| `epsilon` | object | the budget the stage spent or inherited: `declared`, `accounted`, `per_row` and `per_person` for Stage A, `per_row: 0` for Stage B, `release`, `bound`, `per_row` and `per_person` for Stage C, and `table`, `accounted` and `per_row` for the correction |
+| `tables` | array | one object per table: `name`, `columns`, `rows` (arrays in column order), `reference_rows` (indices of rows that are references, such as a real sample or a permuted floor), `note`, `decimals` and, optionally, `subtitle` (the question the table answers) |
 | `warnings` | array | the run's warnings, each a sentence. Empty when there were none |
 | `notes` | array | standing statements that travel with the stage, such as "This bounds utility. It is not a privacy audit." |
 | `verdict` | string or null | the stage's one-sentence verdict, or null when the stage has none |
@@ -59,7 +59,7 @@ convention: three decimal places, and integers with a thousands separator.
 | Stage A | `privacy accounting` | group, queries, partitions, epsilon |
 | Stage B | `reasoning evidence` | measure, count |
 | Stage C | `bound per condition` | condition, cells, covered, uncovered, thin, mean bound, worst bound, within tolerance. Rows 1 and 2 are the real-sample ceiling and the permuted-target floor |
-| Stage C | the verdict line | `within bound`, `outside tolerance`, or `no verdict` with its reason: a released cell below 20 synthetic rows, or controls that did not discriminate. The record's values carry the tolerance and `tolerance rule` (derived from the release, or explicit) |
+| Stage C | the verdict line | `within bound`, `outside tolerance` or `no verdict` with its reason: a released cell below 20 synthetic rows, or controls that did not discriminate. The record's values carry the tolerance and `tolerance rule` (derived from the release, or explicit) |
 | Evaluation | `fidelity and utility` | table, rows, 1-way TV, TSTR-LR, TSTR-RF, TSTR-GBM, absent categories. The last two rows are the real sample and the permuted floor |
 | Evaluation | `reference spread` (when `reference_draws` > 1) | measure, real sample mean, real min, real max, permuted mean, permuted min, permuted max. One row per measure, over the real samples drawn as references and their permuted copies |
 | Results | `marginal fidelity result` | measure, synthetic, real sample, permuted, gap. The note carries the reading |

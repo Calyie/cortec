@@ -1,6 +1,6 @@
 """`cortec-hybrid run`: the correction on your own tables, from any directory once the package is
 installed. Releases a DP conditional target table from the private data and relabels ONLY the target
-column of synthetic data you already generated (with AIM, MST, PrivBayes, or cortec) so each cell
+column of synthetic data you already generated (with AIM, MST or PrivBayes) so each cell
 matches the table. Prints the correction in the standard layout and writes corrected.csv and the
 record. When a holdout is given, it also scores the table before and after beside real references.
 
@@ -58,7 +58,8 @@ def main(argv: list[str] | None = None, prog: str = "cortec-hybrid run") -> int:
     feasibility = check_feasible(schema, n_rows=len(private), raise_on_fail=False)
     emit(kv_block([("feasibility: " + k, v) for k, v in feasibility.items()
                    if not isinstance(v, (list, dict))]))
-    triple = correct(schema, private, synthetic, columns=cells, epsilon=a.epsilon, n_min=a.n_min)
+    triple = correct(schema, private, synthetic, columns=cells, epsilon=a.epsilon, n_min=a.n_min,
+                     max_rows_per_person=a.max_rows_per_person)
     corrected = triple[0]
     before = float((synthetic[schema.target].astype(str) == str(schema.positive)).mean())
     after = float((corrected[schema.target].astype(str) == str(schema.positive)).mean())

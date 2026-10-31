@@ -2,7 +2,7 @@
 
 Every run prints the same layout: a stage header, a block of named values, one or more tables, the
 warnings and a verdict. Every run can export the same record: one JSON file with a declared format
-version, a Markdown rendering of the same content, one CSV per table, and a figure when matplotlib
+version, a Markdown rendering of the same content, one CSV per table and a figure when matplotlib
 is installed (`cortec.plots`). The palette, the type scale and the table conventions are the
 paper's, so a table printed here reads like the paper's tables and a figure saved here looks like
 the paper's figures. `docs/result-format.md` documents the record.
@@ -14,7 +14,7 @@ that returns text returns plain text with colour off, and the tests run with col
 Colour roles, fixed across the two tools:
 
     result     blue    a number this run produced
-    reference  grey    a ceiling or floor row, a note, or a value copied from the input
+    reference  grey    a ceiling or floor row, a note or a value copied from the input
     ok         green   a verdict in the output's favour, or a check that passed
     warning    amber   a condition to read before proceeding
     refusal    orange  a verdict against the output, or the tool declining to proceed
@@ -196,7 +196,7 @@ def note(text: str, *, enabled: bool | None = None) -> str:
 
 
 def warn(text: str, *, enabled: bool | None = None) -> str:
-    """The `!!` prefix is the one the package has always printed. Colour is added, text is not changed."""
+    """The `!!` prefix is the package's warning marker. Colour is added. The text is not changed."""
     return paint(f"  !! {text}", "warning", enabled=enabled)
 
 
@@ -238,7 +238,7 @@ def emit_progress(text: str) -> None:
 
     It exists so a long Stage B (dozens of sequential model calls) does not look frozen. It is
     shown only when stderr is a terminal, so it never enters a piped stdout record, a log file or
-    an exported record: the `cortec-result/1` contract on stdout is left exactly as before. Pair
+    an exported record: the `cortec-result/1` contract on stdout is left unchanged. Pair
     with `emit_progress_done()` to clear the line before the next stdout block."""
     try:
         if not sys.stderr.isatty():
@@ -740,7 +740,7 @@ def record_results(*, evaluation: RunRecord | None = None, bound: RunRecord | No
             "downstream utility result",
             ["student", "synthetic AUC", "real sample", "permuted", "gap", "share of real-sample utility"],
             rows,
-            subtitle="Does a model trained on the synthetic table perform as one trained on real data of "
+            subtitle="Does a model trained on the synthetic table perform like one trained on real data of "
                      "the same size? Train on the table, test on the real holdout and read the AUC of logistic "
                      "regression (LR), a random forest (RF) and gradient boosting (GBM). Higher is better.",
             note=f"reading: {reading}. Share = (synthetic - permuted) / (real sample - permuted). It is the "
@@ -757,7 +757,7 @@ def record_results(*, evaluation: RunRecord | None = None, bound: RunRecord | No
         g2 = [(m.split("(")[1][:-1], c, t, d) for m, c, t, d in classes if m.startswith("downstream utility")]
         if "gap" in kinds:
             worst = max(g2, key=lambda x: abs(x[3] or 0)) if g2 else None
-            verdict = (f"In this draw the gap to a real sample of the same size is {g1[2]:+.3f} on marginal fidelity "
+            verdict = (f"In this draw, the gap to a real sample of the same size is {g1[2]:+.3f} on marginal fidelity "
                        f"(1-way TV)" + (f" and at most {abs(worst[3]):.3f} AUC on downstream utility ({worst[0]})" if worst else "")
                        + ". Read each gap against the permuted floor in the tables below.")
             values.append(("marginal fidelity", g1[1]))
@@ -772,25 +772,27 @@ def record_results(*, evaluation: RunRecord | None = None, bound: RunRecord | No
             if g2_worse:
                 parts.append("downstream utility (" + ", ".join(f"{st} below the range by {d:.3f}" for st, d in g2_worse) + ")")
             if parts:
-                verdict = ("In this draw the synthetic table reads outside the range of real samples of the same "
-                           "size on " + " and on ".join(parts) + ", and the other measures read within or beyond it.")
+                _all_out = bool(g1_worse) and len(g2_worse) == len(g2)
+                verdict = ("In this draw, the synthetic table reads outside the range of real samples of the same "
+                           "size on " + " and on ".join(parts)
+                           + ("." if _all_out else ", and the other measures read within or beyond it."))
                 role = "warning"
             else:
-                verdict = ("In this draw the synthetic table reads within or beyond the range of real samples "
-                           "of the same size on marginal fidelity and on every student of downstream utility.")
+                verdict = ("In this draw, the synthetic table reads within or beyond the range of real samples "
+                           "of the same size on marginal fidelity and on downstream utility for every student.")
             values.append(("marginal fidelity", g1[1]))
             if g2_worse:
                 values.append(("downstream utility",
                                ", ".join(st for st, _ in g2_worse) + " below the real-sample range (by "
                                + ", ".join(f"{d:.3f}" for _, d in g2_worse) + ")"
-                               + (", and the other students are within it" if len(g2_worse) < len(g2) else "")))
+                               + (", and the other students are within or beyond it" if len(g2_worse) < len(g2) else "")))
             else:
                 values.append(("downstream utility", "every student within or beyond the real-sample range"))
     else:
         values += [("marginal fidelity", "not scored in this run"),
                    ("downstream utility", "not scored in this run")]
         notes.append("Marginal fidelity and downstream utility are scored by the evaluation, which did not run. Drop "
-                     "--no-evaluate and install scikit-learn (pip install 'cortec[dev]').")
+                     "--no-evaluate and install scikit-learn (pip install '.[dev]' in a clone of the repository).")
     # Stage C
     if bound is not None and bound.verdict:
         head = bound.verdict.split(":")[0]
@@ -977,7 +979,7 @@ def record_bound(report, *, schema: str = "") -> RunRecord:
         _why = getattr(report, "verdict_reason", None) or "the test did not discriminate"
         verdict = f"no verdict: {_why}"
         role = "warning"
-        notes.insert(0, "A no verdict means the test could not decide. It is neither a pass nor a fail for "
+        notes.insert(0, "No verdict means the test could not decide. It is neither a pass nor a fail for "
                         "the synthetic table. The bound is informative only when every released cell holds "
                         "at least 20 synthetic rows, the real-sample ceiling clears the tolerance and the "
                         "permuted floor does not.")

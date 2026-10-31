@@ -43,7 +43,7 @@ def main(argv=None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     return _help.main(cortec, argv, tool="cortec", module="cortec", command="cortec",
                       run_order=RUN_ORDER, groups=GROUPS, readme="docs/setup.md",
-                      example="example.py", subcommands={"run": run, "decode": decode}, terms=_help.TERMS_CORTEC)
+                      example="examples/example.py", subcommands={"run": run, "decode": decode}, terms=_help.TERMS_CORTEC)
 
 
 if __name__ == "__main__":

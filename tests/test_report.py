@@ -312,7 +312,7 @@ def test_results_panel_reads_each_goal_against_the_real_sample_range():
     v = dict(r.values)
     assert v["marginal fidelity"].startswith("within the real-sample range")
     assert v["downstream utility"].startswith("LR below the real-sample range (by 0.029)")
-    assert "the other students are within it" in v["downstream utility"]
+    assert "the other students are within or beyond it" in v["downstream utility"]
     # a panel inside the range on every measure reads ok, and says so once
     ev = _evaluation([0.040, 0.750, 0.700, 0.700, 0], [0.042, 0.758, 0.718, 0.713, 0],
                      [0.042, 0.498, 0.538, 0.495, 0], SPREAD)
@@ -386,4 +386,4 @@ def test_bound_verdicts_say_what_was_bounded(toy_bound_report=None):
     bad = _Rep(); bad.verdict, bad.verdict_reason = None, "the controls did not discriminate: the permuted-target floor's worst bound 0.0500 lies within the tolerance 0.0879; no verdict is issued"
     rec = record_bound(bad)
     assert rec.verdict_role == "warning" and rec.verdict.startswith("no verdict: the controls did not discriminate")
-    assert rec.notes[0].startswith("A no verdict means the test could not decide")
+    assert rec.notes[0].startswith("No verdict means the test could not decide")

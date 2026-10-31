@@ -26,4 +26,4 @@ if a.uci:
     readmitted = real['readmitted'].astype(str).str.strip() == '<30'
     in_group = real['number_inpatient'] >= 2
     print(f'public file, {len(real):,} encounters: {readmitted[in_group].mean():.1%} in the group, '
-          f'{readmitted.mean():.1%} for all patients')
+          f'{readmitted.mean():.1%} for all encounters')

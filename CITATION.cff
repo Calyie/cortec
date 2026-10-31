@@ -10,8 +10,8 @@ repository-code: "https://github.com/Calyie/cortec"
 abstract: >-
   The records that could train the most useful models, such as a hospital's patient files, are
   often the ones an institution cannot share. We propose CoRTeC, a method that releases synthetic
-  versions of such records under differential privacy. The synthetic data exposes no personally
-  identifiable information (PII), and differential privacy places a proven limit on membership
+  versions of such records under differential privacy. Differential privacy places a proven limit
+  on what the synthetic data can reveal about any person, and in particular on membership
   inference. CoRTeC spends the privacy budget once, on a small file of noisy counts designed for
   training a classifier. For each group of records, the file gives the group's size, its balance
   of outcomes, a histogram of every column for each outcome and the outcome rate in each of
@@ -21,15 +21,15 @@ abstract: >-
   so can each of the five frozen language models we tested. None of them ever sees a real record.
   A selection step then matches the rows to the released counts. Decoded without a language model,
   the automatically configured release at ε = 2 trains classifiers to within 0.02 AUC of a real
-  sample of the same size on the Adult dataset, across three data splits. The gap is larger on
-  NHANES and bank marketing, reaching 0.07 AUC on the medical data. Because the counts are fixed
-  in advance, the release reproduces the outcome rates a deployment asks for, at some cost in
-  accuracy on pairs of columns. Four controls show that most of the utility comes from the release
-  and the selection step, and that a language model adds what it knows from the column names. No
-  private row ever reaches a model, and no synthetic row copies a real one. The strongest
-  membership attack stays far below the bound the budget allows. This repository holds the
-  Apache-2.0 reference implementation with its tests, the research pipeline, the paper, the
-  deployment guide and the frozen auto-configurations.
+  sample of the same size on the Adult dataset, across three data splits. On NHANES and bank
+  marketing, without the selection step, it stays within 0.05 AUC. On Adult, with a fixed cohort
+  rule, the release carries the outcome rates a deployment names more closely than a real sample
+  does, at some cost in accuracy on pairs of columns. Four controls show that most of the utility
+  comes from the release and the selection step, and that a language model adds what it knows from
+  the column names. No private row ever reaches a model, and no row CoRTeC generates copies a real
+  one. The strongest membership attack stays far below the bound the budget allows. This
+  repository holds the Apache-2.0 reference implementation with its tests, the research pipeline,
+  the paper, the deployment guide and the frozen auto-configurations.
 authors:
   - family-names: "Nnona"
     given-names: "Calister"

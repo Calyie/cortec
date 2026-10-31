@@ -3,13 +3,13 @@
 The release fixes a set of counts. Among every table that agrees with those counts, the
 maximum-entropy one assumes nothing the release did not say. Private-PGM (the estimator AIM and MST
 use) finds it from the released counts and their noise scales alone. This module fits that table,
-samples a pool of `pool_factor * n_rows` records from it, and returns the `n_rows` of them that the
+samples a pool of `pool_factor * n_rows` records from it and returns the `n_rows` of them that the
 selection step (`cortec.select.select_to_release`) rakes to the released cells. It reads the release
 and the public schema only: post-processing, no privacy cost, no model, CPU only. In the paper it is
 the configuration labelled "CoRTeC, maximum-entropy decoder" (Table 3). There it came close to the
 best language-model configuration on single columns and on the conditionals the release names.
 
-Needs the optional dependency: `pip install 'cortec[pgm]'` (private-pgm's `mbi` 1.1, with JAX).
+Needs the optional dependency: `pip install '.[pgm]'` in a clone of the repository (private-pgm's `mbi` 1.1, with JAX).
 """
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ def _require_pgm():
     except ImportError as e:  # pragma: no cover - exercised only without the extra installed
         raise DecodeError(
             "decoding without a language model needs private-pgm (mbi 1.1) and JAX: "
-            "pip install 'cortec[pgm]'") from e
+            "pip install '.[pgm]' in a clone of the repository") from e
 
 
 def _epsilons(schema: Schema, release: Release) -> tuple[float, float | None, dict[int, float]]:

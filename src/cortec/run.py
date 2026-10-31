@@ -75,7 +75,7 @@ def parser(prog: str = "cortec run") -> argparse.ArgumentParser:
     ap.add_argument("--schema", required=True, help="a Python file that defines SCHEMA = Schema(...)")
     ap.add_argument("--holdout", help="real rows not used for the release (CSV). Default: one fifth of --data")
     ap.add_argument("--backend", default="mock", help="mock (offline, the default), anthropic, openai, gemini or ollama")
-    ap.add_argument("--model", default="claude-fable-5", help="the model name. Must pass the capability gate")
+    ap.add_argument("--model", default="claude-fable-5", help="the model name, which must pass the capability gate")
     ap.add_argument("--surface", default="public", help="public (the default), bedrock, azure or vertex (docs/setup.md, step 2)")
     ap.add_argument("--surface-model", default=None, help="the identifier the enterprise surface expects")
     ap.add_argument("--effort", default=None, choices=("low", "medium", "high"),
@@ -235,7 +235,7 @@ def main(argv: list[str] | None = None, prog: str = "cortec run") -> int:
         try:
             import sklearn  # noqa: F401
         except ImportError:
-            emit(warn("evaluation skipped: scikit-learn is not installed (pip install 'cortec[dev]')"))
+            emit(warn("evaluation skipped: scikit-learn is not installed (pip install '.[dev]' in a clone of the repository)"))
         else:
             from cortec import evaluate
             rec_e = evaluate(schema, {"synthetic": synthetic}, train=train, holdout=holdout,

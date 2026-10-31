@@ -3,10 +3,10 @@
 This document records the measurements behind the package's defaults and guardrails. The setup guide
 (`setup.md`) says how to run the package. This document gives the evidence. The numbers in sections
 2 and 11 are those of the paper (`paper/CoRTeC_arxiv.pdf`). Sections 3 to 10 report development
-measurements, made before the paper's experiments. They used Adult, NHANES and a finance benchmark
-with Gemini 3.5 Flash and Claude Fable 5, and they compared against AIM and MST at a library's
-defaults. We keep them because each one explains a default or a guard. They are marked "development
-measurement" below. Where the paper replaces one, the section says so.
+measurements, made before the paper's experiments. Most used Adult, NHANES and a finance benchmark
+with Gemini 3.5 Flash and Claude Fable 5, and they compared against AIM and MST at the
+smartnoise-synth defaults. We keep them because each one explains a default or a guard. They are
+marked "development measurement" below. Where the paper replaces one, the section says so.
 
 ## 1. When to use the package, and when not
 
@@ -20,19 +20,19 @@ differs from what a general-purpose model would assume. Institution-specific cod
 mix or a proprietary product structure are typical examples.
 
 **Do not use it** for a published marginal table when a marginal synthesiser will do. Fitted the way
-its authors fit it, the reference AIM fits pairs of columns more closely than this package's
-language-model output at every seed. It also scores higher on downstream utility at n = 1,000
-(section 11). The marginal synthesisers pay once and then sample for free. What this package adds is
-its architecture. The budget is spent once, on a small release. The model never sees a row, every
-draw is post-processing and the model can be changed at no privacy cost.
+its authors fit it, the reference AIM fits pairs of columns more closely than this package's output
+with Qwen3-14B at every seed. It also scores higher on downstream utility at n = 1,000 (section 11).
+The marginal synthesisers pay once and then sample for free. What this package adds is its
+architecture. The budget is spent once, on a small release. The model never sees a row, every draw
+is post-processing and the model can be changed at no privacy cost.
 
 **Do not use an unconditioned language model** for any regulated quantity. In one development
 measurement, we asked Claude Fable 5 for 300 synthetic diabetic hospital encounters from the column
 names alone, with no release and no private data. Of the 66 generated patients with two or more
 inpatient stays in the year before the encounter, 65 were readmitted within 30 days, a rate of
 98.5%. In the public Diabetes 130-US Hospitals file (101,766 real encounters), the rate for that
-group is 21.4%, against 11.2% for all patients. Because the model never saw the data, its 98.5%
-cannot change whatever the private table says. No rank-based utility metric reveals that, because
+group is 21.4%, against 11.2% for all encounters. Because the model never saw the data, its 98.5%
+stays the same whatever the private table says. No rank-based utility metric reveals that, because
 the ordering is right and only the size is wrong. The draw and a script that recomputes both rates
 are in `research/results/development/diabetes_header_only/`.
 
@@ -52,13 +52,13 @@ At n = 1,000, the Qwen3-14B students are 0.02 to 0.03 AUC below the real sample'
 0.859 against 0.855, 0.892 and 0.883). Decoded with the maximum-entropy decoder, the auto-configured
 release is within 0.015 (0.841, 0.884 and 0.884). A fixed release does not get richer when you ask
 for more records. On the clinical survey NHANES, the Qwen3-14B students are 0.07 to 0.10 AUC below a
-real sample's at n = 300 (0.678, 0.657 and 0.645 against 0.773, 0.728 and 0.716). There, the
-model-free decoding of the same release scores higher than they do (section 11). A development
-measurement found an equivalence result at n = 300 with one generator on a finance dataset. The
-finance dataset is not in the paper. The comparison against the library-default AIM and MST that
-came with it is not reported, because of the sampler defect (section 11). Do not assume parity.
-Measure it on your own data against a real sample of the same size. Read the conditional measures
-beside the aggregate ones.
+real sample's at n = 300 on the seed-42 split (0.678, 0.657 and 0.645 against 0.773, 0.728 and
+0.716). There, the plain decoder of the same release scores higher than they do (section 11). A
+development measurement found an equivalence result at n = 300 with one generator on a finance
+dataset. The finance dataset is not in the paper. The comparison against the library-default AIM and
+MST that came with it is not reported, because of the sampler defect (section 11). Do not assume
+parity. Measure it on your own data against a real sample of the same size. Read the conditional
+measures beside the aggregate ones.
 
 ## 3. The release: class-conditional histograms
 
@@ -84,9 +84,9 @@ outcome) wherever both outcomes clear `n_min`.
   with three draws per release and Gemini 3.5 Flash, TSTR is 0.680, 0.712 and 0.704 (LR, RF and GBM)
   from the class-conditional release. The pooled release gives 0.651, 0.662 and 0.662 (Welch p =
   0.007, 0.017 and 0.029). With Claude Fable 5, it is 0.670, 0.723 and 0.716 against 0.652, 0.673
-  and 0.664. There, the tree students reach the real sample's 0.695, 0.727 and 0.717. Held-out
-  conditional error rises by 0.008. On Adult, two Fable 5 draws score 0.846, 0.885 and 0.873 against
-  a real sample's 0.830, 0.870 and 0.840 (development measurement).
+  and 0.664. There, the tree students reach the real sample's level (0.695, 0.727 and 0.717 for LR,
+  RF and GBM). Held-out conditional error rises by 0.008. On Adult, two Fable 5 draws score 0.846,
+  0.885 and 0.873 against a real sample's 0.830, 0.870 and 0.840 (development measurement).
 - `release_statistics(..., class_conditional=False)` restores the pooled release.
 
 ## 4. Exact counts and selection: how the output reaches the release's own fidelity
@@ -143,9 +143,9 @@ exactly that.
   pool's values. It is not decided from every value. Under an every-value rule, a single
   model-written `45.0` or `37.5` turned the whole column into real numbers. The redraw inside the
   bin then produced fractional ages, hours and capital values. An evaluator comparing exact values
-  treats those as far from the data. The rule now delivers every value of such a column as an
-  integer, including the kept values of pooled-only cohorts. The test in `tests/test_selection.py`
-  plants three fractions in a pool of 3,000 rows and checks that none is delivered.
+  treats those as far from the data. The rule delivers every value of such a column as an integer,
+  including the kept values of pooled-only cohorts. The test in `tests/test_selection.py` plants
+  three fractions in a pool of 3,000 rows and checks that none is delivered.
 
 In development measurements on Adult and finance with Gemini 3.5 Flash, the 1-way marginal error was
 below that of a real sample of the same size. The conditional error was about a quarter of a real
@@ -153,7 +153,7 @@ sample's, and downstream utility was at the real-sample level. The comparison wi
 library-default AIM and MST that came with it is not reported, because of the sampler defect
 (section 11). The limit is the release's own distance from the truth. That is why the conditional
 table's share of the budget defaults to a fifth (`conditional_fraction=0.2`). The histograms take
-the rest. The release's marginal error halves with no measurable loss elsewhere. The cost is
+the rest, which lowers the release's marginal error with no measurable loss elsewhere. The cost is
 `pool_factor` times the generation spend, plus about twice the reasoning per call on models that
 reason over the counts.
 
@@ -173,8 +173,8 @@ research behind this tool.
 | Declared-category check | One batch wrote an integer-coded category as `2.0`. Concatenation re-typed the whole pool, and the selection step and the evaluator then saw a category the data does not have (conditional error 0.22 against 0.01 from a pool whose generation was fine). |
 | Pool-coverage guard | A run that stopped at its spend cap left two cohorts with 7 rows each. Selection cannot fill a cohort from rows that do not exist, and the output's cohort shares were wrong while every per-row check passed. |
 | Bands tile the domain | Half-open autoconfig bands left the records at the domain maximum in an `oob` cohort that was released like any other and that no generated row could ever join. |
-| Published cohort size floored at `n_min` | At ε = 0.3 a 469-record cohort's noised size clipped to zero and the generator gave it 1 of 600 rows: a whole age band missing from the output while every per-row check passed. A cohort is released only because it holds `n_min` records, so the published size is clamped there (post-processing). |
-| Published cell support floored at `n_min` | The same rule, for the conditional table. A stored NHANES release carried a level-1 cell with rate 0.078 and support 0, and cell-wise generation allocates rows in proportion to support, so that cell would have received none. A cell is released only because it holds `n_min` records, so its published support is clamped there (post-processing of the noised count). `cortec-hybrid`'s table has the same clamp. |
+| Published cohort size floored at `n_min` | At ε = 0.3, a 469-record cohort's noised size clipped to zero, and the generator gave it 1 of 600 rows: a whole age band missing from the output while every per-row check passed. A cohort is released only when its noised count clears `n_min`, so the published size is clamped there (post-processing). |
+| Published cell support floored at `n_min` | The same rule, for the conditional table. A stored NHANES release carried a level-1 cell with rate 0.078 and support 0, and cell-wise generation allocates rows in proportion to support, so that cell would have received none. A cell is released only when its noised count clears `n_min`, so its published support is clamped there (post-processing of the noised count). `cortec-hybrid`'s table has the same clamp. |
 | Proportional row allocation | Uniform allocation over-represented a 2%-of-population cohort by 12×, so every marginal measured afterwards described a deliberately wrong mixture. |
 | Validation before spending | Privacy budget cannot be refunded, so schema conflicts are raised before the first query. |
 | `n_min` floor | A conditional rate over too few records is dominated by its own Laplace noise. |
@@ -228,26 +228,26 @@ cover? It does not answer the question next to it: what is inside a band they co
 high-cardinality categorical column, those questions differ. A column with 100% coverage was still
 badly distorted. Its cells were keyed on an opaque group label. The generator was told which values
 were allowed but not how often each occurs, so it spread them almost evenly. A discharge code that
-made up 59.2% of real records came out at 14.3%: one seventh, for a group of seven. The tool now
-expands every grouped label into its members with their shares within the group. That is a
-renormalisation of proportions already in the release, so it costs no budget. It fixed the problem
-on both vendors' models we tested. A fix for one named failure is not a guarantee about the mapping
-in general. That is why the setup guide calls the guard a heuristic mitigation and the general
-question an open problem.
+made up 59.2% of real records came out at 14.3%: one seventh, for a group of seven. The tool expands
+every grouped label into its members with their shares within the group. That is a renormalisation
+of proportions already in the release, so it costs no budget. It fixed the problem on both vendors'
+models we tested. A fix for one named failure is not a guarantee about the mapping in general. That
+is why the setup guide calls the guard a heuristic mitigation and the general question an open
+problem.
 
 ## 7. Reasoning: the largest single effect, and the trap in its economics
 
-We tested one model against itself, changing only this setting. The release and the prompts stayed
-the same, with three draws each. The conditional error moved from 0.173 ± 0.032 to 0.045 ± 0.007, a
-3.8-fold improvement (Cohen's d = 5.48). That takes the model from worse than a no-information
-control (0.152) to among the best generators we measured. `Generator(..., reasoning="on")` is the
-default.
+In a development measurement, we tested one model against itself, changing only this setting. The
+release and the prompts stayed the same, with three draws each. The conditional error moved from
+0.173 ± 0.032 to 0.045 ± 0.007, a 3.8-fold improvement (Cohen's d = 5.48). That takes the model from
+worse than a no-information control (0.152) to among the best generators we measured.
+`Generator(..., reasoning="on")` is the default.
 
 The trap is the cost. The suppressed setting is 14.5 times cheaper. Over the same three draws per
 setting, downstream utility does not separate at all. TSTR-LR reads 0.786 ± 0.050 with reasoning
 suppressed against 0.802 ± 0.025 with it enabled, well inside one standard deviation. A team that
 optimises cost against a standard TSTR check therefore does not see a small difference and accept
-it. It sees no measurable difference, draws the correct conclusion from that evidence and ships a
+it. It sees no measurable difference, draws the natural conclusion from that evidence and ships a
 pipeline that carries none of its data's conditional structure. Only a conditional measure reveals
 this. At one draw, reasoning appeared to improve downstream utility too. That did not survive
 replication, and we make no such claim.
@@ -260,39 +260,36 @@ count that was never reported is not a count of zero. This is why `gen.stats` ke
 
 ## 8. The sweep-only tier, and a claim that did not hold
 
-The capability table in the setup guide is scored on a transmission sweep. The sweep asks whether a
-model reproduces a released rate, which is one large, obvious signal in a short prompt. Two
-self-hosted 70B models pass it inside the frontier band. On that basis alone, a capability table
-would call them validated and recommend them. We measured them again on full-dataset generation with
-three draws. `llama3.3:70b-instruct` closes only 12% of the conditional-error gap to an
-unconditioned prompt. It closes nothing at all on 2-way total variation (0.238, identical to the
-control's 0.238), and it is worse than that control on 1-way total variation. On the metrics this
-method exists to improve, its output is close to indistinguishable from asking a model for plausible
-records with no conditioning. No output check reveals it. Passing the sweep is necessary but not
-sufficient. These models are refused by default and run only with `acknowledge_insufficient=True`.
+Part of the capability table in the setup guide is scored on a transmission sweep. The sweep asks
+whether a model reproduces a released rate, which is one large, obvious signal in a short prompt.
+Two self-hosted 70B models pass it inside the frontier band. On that basis alone, a capability table
+would call them validated and recommend them. In a development measurement, we also ran them on
+full-dataset generation with three draws. `llama3.3:70b-instruct` closes only 12% of the
+conditional-error gap to an unconditioned prompt. It closes nothing at all on 2-way total variation
+(0.238, identical to the control's 0.238), and it is worse than that control on 1-way total
+variation. On the metrics this method exists to improve, its output is close to indistinguishable
+from asking a model for plausible records with no conditioning. No output check reveals it. Passing
+the sweep is necessary but not sufficient. These models are refused by default and run only with
+`acknowledge_insufficient=True`.
 
 Capability depends on the model family, not just its size. At comparable scale, a 24B model recorded
 lower error than a 32B one, so a size threshold alone would be wrong.
 
-Some models are measured but not listed, and the gate tells you so. GPT-5 and Gemini 3.1 Pro were
-measured on full-dataset generation, with conditional errors of 0.045 and 0.041. Both are inside the
-band of the validated frontier models and below what a real 300-record sample achieves. They were
-not measured on the transmission sweep the tiers are scored against. Those are different
-experiments, and their numbers are not interchangeable. A model can track a forced rate in three
-cohorts while paying little attention to a full multi-level table. Nothing in the output says which
-is happening. These models are therefore still gated, and the refusal message reports exactly what
-we do and do not know.
+GPT-5 and Gemini 3.1 Pro were measured on full-dataset generation, with conditional errors of 0.045
+and 0.041 (development measurements). Both are inside the band of the other validated frontier
+models and below what a real 300-record sample achieves, so the gate accepts them. They were not
+measured on the transmission sweep, and their profiles say so. The two experiments are different,
+and their numbers are not interchangeable: a model can track a forced rate in three cohorts while
+paying little attention to a full multi-level table.
 
-**A claim that did not hold.** The transmission sweep alone had suggested that 70B-class models are
-"validated and self-hostable, so a regulated deployment needs no external API and no data leaves the
-institution". The first half does not hold, because that validation came from the transmission sweep
-only. On full-dataset generation, the same class of model closes only 12% of the gap between an
-unconditioned prompt and a frontier model on seen-conditional error, and 20% on held-out. It closes
-nothing on 2-way total variation and is worse than an unconditioned prompt on 1-way. The failure is
-silent, and the marginal metrics do not reveal it. The second half was never the important part.
-Because the prompt carries a DP release and never a record, an enterprise endpoint under your own
-tenancy is available to you. The choice of generator is then a quality decision. If you do run local
-weights, check conditional fidelity on your own data first.
+**What the sweep alone suggests.** On the transmission sweep alone, 70B-class models look validated
+and self-hostable, so that a regulated deployment would need no external API and no data would leave
+the institution. The first half does not hold: on full-dataset generation, the same class of model
+closes only 12% of the gap between an unconditioned prompt and a frontier model on seen-conditional
+error, and 20% on held-out. The second half was never the important part. Because the prompt carries
+a DP release and never a record, an enterprise endpoint under your own tenancy is available to you.
+The choice of generator is then a quality decision. If you do run local weights, check conditional
+fidelity on your own data first.
 
 ## 9. The trust boundary, in full
 
@@ -304,20 +301,21 @@ discloses. The ε guarantee does not depend on where that computation happens.
 The usual objection to a method built on a language model is that data is being sent to a third
 party. That objection does not apply here. That is not because the endpoint is trustworthy. It is
 because there is no private data in the request. The decoder may be a tenant-isolated enterprise
-endpoint under a BAA (Bedrock in your own VPC, Azure OpenAI or Vertex AI). It may also be an
-air-gapped model on your own hardware with no network egress. The argument is the same in both
-cases. What differs between them is capability, not trust. That is why the deployment recommendation
-names enterprise platforms even though the privacy argument allows local weights.
+endpoint under a business associate agreement (Bedrock in your own virtual private cloud, Azure
+OpenAI or Vertex AI). It may also be an air-gapped model on your own hardware with no network
+egress. The argument is the same in both cases. What differs between them is capability, not trust.
+That is why the deployment recommendation names enterprise platforms even though the privacy
+argument allows local weights.
 
 The guarantee says nothing about the model's pretraining corpus. If a private record was in it, that
 happened before this tool ran. A sharper form of the concern is that conditioning on released
 marginals for a narrow group resembles a prompt-based extraction attack. It tells the model which
 region to sample from, so a memorised record there becomes easier to reach. DP does not rule this
-out, because such a record is not a function of your release. In the research behind this tool, we
-ran four membership-inference attacks: nearest neighbour, exact match, a shadow model and a
-per-record likelihood-ratio test. Each was validated on a positive control. The strongest reached an
-advantage of 0.02 to 0.05, far below the 0.762 that ε = 2 permits, and none found an exact match on
-any dataset. That is evidence about the published output, not a proof about the corpus. It is the
+out, because such a record is not a function of your release. In the paper, we ran four
+membership-inference attacks: nearest neighbour, exact match, a shadow model and a per-record
+likelihood-ratio test. Each was validated on a positive control. The strongest reached an advantage
+of 0.02 to 0.05, far below the 0.762 that ε = 2 permits, and none found an exact match on any
+dataset. That is evidence about the published output, not a proof about the corpus. It is the
 strongest statement available.
 
 ## 10. The ledger and the suppression charge
@@ -331,15 +329,15 @@ is written to be read end to end by someone auditing it, independently of the re
 Which cohorts, class blocks and cells appear in a release is decided by a noisy threshold. Every
 count that decides a release is itself a charged, noised count. Comparing it with the public floor
 `n_min` is post-processing. The release queries every cohort and every cell of the public domains,
-whether or not they hold data. The set of queried groups therefore depends on the schema alone. When
+whether or not they hold data. The set of queried groups therefore depends on the schema alone. If
 the decision read the exact count, a separate `suppression` charge could not make that deterministic
-function of private data private. That share of the budget now strengthens the count queries
-instead, giving them about 10% of the available budget at the defaults, against 5% without it. The
-price is that a group near the floor can fall on either side of it. A group of true size `n >=
-n_min` is dropped with probability `0.5 * exp(-(n - n_min) / b)`, where `b` is the count's Laplace
-scale. A group below the floor is released with the mirror-image probability. Pass
-`charge_suppression=False` to read the exact counts, as the marginal-synthesis literature does. The
-stated guarantee then does not cover those decisions, and the audit records the choice.
+function of private data private. The package spends that share on the count queries instead, giving
+them about 10% of the available budget at the defaults, against 5% without it. The price is that a
+group near the floor can fall on either side of it. A group of true size `n >= n_min` is dropped
+with probability `0.5 * exp(-(n - n_min) / b)`, where `b` is the count's Laplace scale. A group
+below the floor is released with the mirror-image probability. Pass `charge_suppression=False` to
+read the exact counts, as the marginal-synthesis literature does. The stated guarantee then does not
+cover those decisions, and the audit records the choice.
 
 Auto-configuration ranks the conditioning columns by mutual information and has no concept of a
 person. It can therefore select a column that stands in for how many rows someone contributes. On
@@ -349,39 +347,40 @@ stratified by contribution count.
 
 ## 11. The paper's measurements: the release on its own, and what the backbone adds
 
-The paper measured the mechanism with the controls a reviewer asks for, and
-three of its findings bear on this package's defaults.
+The paper measured the mechanism with the controls a reviewer asks for, and its findings bear on
+this package's defaults.
 
 **Most of the result comes from the release.** Decode the same release with no language model and no
-selection step, using the maximum-entropy table that fits every released count (Private-PGM given
-exactly the release, with no further noise and no further query). On Adult, the students it trains
-are within 0.012 AUC of the language-model output at n = 300 and within 0.005 at n = 1,000 over
-three seeds. On NHANES, it fits pairs more closely than the language-model output and scores higher
-on every student at n = 1,000. On bank marketing, it matches a real sample on single columns. The
-language model's one consistent gain over that decoding is on the conditional rates the release
-names. On Adult at n = 300, its seen-conditional error is 0.027 against the decoding's 0.082, and it
-is lower at 3 of 3 seeds. That gain comes from the selection step. Passed through
-`select_to_release`, the decoding's own pool reads 0.017 on the seen conditionals and 0.035 on
-single columns at n = 300 over three splits (0.007 and 0.027 at n = 1,000). Its students score at or
-above those of every language-model configuration of CoRTeC. Pair by pair, the model's error is
-below the decoding's on the pairs it recognises as logically linked (education with education
-number, marital status with relationship). It is above the decoding's on pairs it expects to be
-linked when the data says they are not (four nearly independent pairs on bank marketing). The
-decoding is free. It is the first thing to compare your output with.
+selection step (the plain decoder), using the maximum-entropy table that fits every released count
+(Private-PGM given exactly the release, with no further noise and no further query). On Adult, the
+students it trains are within 0.012 AUC of the language-model output at n = 300 and within 0.005 at
+n = 1,000 over three seeds. On NHANES, it fits pairs more closely than the language-model output and
+scores higher on every student at n = 1,000. On bank marketing, it matches a real sample on single
+columns. The language model's one consistent gain over the plain decoder is on the conditional rates
+the release names. On Adult at n = 300, its seen-conditional error is 0.027 against the plain
+decoder's 0.082, and it is lower at 3 of 3 seeds. That gain comes from the selection step. Passed
+through `select_to_release`, the same decoder's pool reads 0.017 on the seen conditionals and 0.035
+on single columns at n = 300 over three splits (0.007 and 0.027 at n = 1,000). Its students score at
+or above those of every language-model configuration of CoRTeC. Pair by pair, the model's error is
+below the plain decoder's on the pairs it recognises as logically linked (education with education
+number, marital status with relationship). It is above the plain decoder's on pairs it expects to be
+linked when the data says they are not (four nearly independent pairs on bank marketing). The plain
+decoder is free. It is the first thing to compare your output with.
 
 **The model's advantage comes from the column names.** We renamed every column, category and label
 to a neutral token and ran the same releases and prompts on Gemini. The pair error rose to 0.148
-against 0.110 with the real names, which is the decoding's level of 0.146. The students fell to
+against 0.110 with the real names, which is the plain decoder's level of 0.146. The students fell to
 0.745, 0.840 and 0.798 against 0.805, 0.863 and 0.838. The single-column error stayed at 0.030 and
-the seen-conditional error at 0.014, against the decoding's 0.058 and 0.082. Those advantages come
-from the selection step, which matches the pool to the released counts whatever the columns are
+the seen-conditional error at 0.014, against the plain decoder's 0.058 and 0.082. Those advantages
+come from the selection step, which matches the pool to the released counts whatever the columns are
 called. On Qwen3-14B, six of the seven measures are worse without names, and only the linear student
-is slightly higher. On Qwen3-32B, all seven are worse. An institution whose schema the model does not
-know should expect the decoding's result. It can still have the selection step's precision on single
-columns and seen conditionals by passing the decoding's pool through `select_to_release`. Without
-any release, the same model recites. Asked for rows from the column names alone, it copied the public
-Adult file's first 25 rows into about 70 % of its output. The package reads the column names as part
-of the prompt on purpose. The setup guide says what to expect when they carry no meaning.
+is slightly higher. On Qwen3-32B, all seven are worse. An institution whose schema the model does
+not know should expect the result of the maximum-entropy decoder. It can still have the selection
+step's precision on single columns and seen conditionals by passing that decoder's pool through
+`select_to_release`. Without any release, the same model recites the public file. Asked for rows
+from the column names alone, it copied the public Adult file's first 25 rows into about 70 % of its
+output. The package reads the column names as part of the prompt on purpose. The setup guide says
+what to expect when they carry no meaning.
 
 **The package decodes without a model.** `decode_release` and `cortec decode` fit the
 maximum-entropy table to the released counts. They use Private-PGM's mirror descent on the junction
@@ -402,41 +401,42 @@ Over the three splits of the paper's replication (seeds 42, 43 and 44, each with
 the mean errors at n = 300 are 0.020 on single columns and 0.109 on pairs, and the students score
 0.830, 0.870 and 0.859. At n = 1,000, they are 0.016 and 0.082, and the students score 0.840, 0.879
 and 0.881. On seed 43, the auto-configurator chose education-number cohorts and a
-relationship-by-native-country hierarchy instead. The reference AIM reads 0.052 and 0.120 at n =
-300, with students at 0.832, 0.866 and 0.839. At n = 1,000, it reads 0.031 and 0.074, with students
-at 0.847, 0.882 and 0.876. The release's single columns are therefore closer to the private table
-than AIM's at both sizes, and its students reach AIM's. AIM fits pairs more closely at the larger
-size only. Its conditional cells are not compared. The evaluator's seen bands are the fixed rule's
-cohorts, and two of its three held-out families are columns this release conditions on. One held-out
-family shares no column with its conditioning: the income rate by workclass and race. On that family,
-its conditional total variation, averaged over the three splits, is 0.043 against AIM's 0.061 at n =
-300 and 0.020 against 0.036 at n = 1,000 (paper, Appendix E.2). These are the "auto-configured" rows
-of the paper's Table 3 and Appendix E.2, beside the rows of the schema's own cohort rule. The path
-spends no budget and needs no key. The `pgm` extra installs Private-PGM and JAX.
+relationship-by-native-country hierarchy instead. Over the same three splits, the reference AIM
+reads 0.052 and 0.120 at n = 300, with students at 0.832, 0.866 and 0.839. At n = 1,000, it reads
+0.031 and 0.074, with students at 0.847, 0.882 and 0.876. The release's single columns are therefore
+closer to the private table than AIM's at both sizes, and its students reach AIM's. AIM fits pairs
+more closely at the larger size only. Its conditional cells are not compared. The evaluator's seen
+bands are the fixed rule's cohorts, and two of its three held-out families are columns this release
+conditions on. One held-out family shares no column with its conditioning: the income rate by
+workclass and race. On that family, its conditional total variation, averaged over the three splits,
+is 0.043 against AIM's 0.061 at n = 300 and 0.020 against 0.036 at n = 1,000 (paper, Appendix E.2).
+These are the "auto-configured" rows of the paper's Table 3 and Appendix E.2, beside the rows of the
+schema's own cohort rule. The path spends no budget and needs no key. The `pgm` extra installs
+Private-PGM and JAX.
 
 **Capability improves single columns and formatting, not utility.** We decoded one Adult release
 through Qwen2.5-7B, Qwen3-8B, Qwen3-14B, Qwen3-32B (4-bit AWQ) and Gemini with the same prompts and
 settings. The 1-way total variation was 0.110, 0.068, 0.046, 0.049 and 0.027 at n = 300, and it
 levelled off at 14 billion parameters. Downstream AUC was 0.80 to 0.82, 0.85 to 0.86 and 0.82 to
-0.84 on every model. The model-free decoding reads 0.818, 0.856 and 0.847, within or above that
-band. The 7B model wrote its own prior for marital status and education instead of the released
-distributions. The 8B model sometimes writes range labels into numerical columns. The capability
-table's Qwen3 rows (section 8 of the setup guide) come from this ladder. We also fine-tuned the same
-Qwen3-14B on the private rows with DP-SGD at the same ε. At n = 1,000, it reads 0.100 on single
-columns and 0.172 on pairs, against 0.036 and 0.108 when it decodes the release frozen. Where the
-budget is spent matters more than which model is used.
+0.84 on every model. The plain decoder reads 0.818, 0.856 and 0.847, within or above that band. The
+7B model wrote its own prior for marital status and education instead of the released distributions.
+The 8B model sometimes writes range labels into numerical columns. The capability table's Qwen3 rows
+(section 6 of the setup guide) come from this ladder. We also fine-tuned the same Qwen3-14B on the
+private rows with DP-SGD at the same ε. At n = 1,000, it reads 0.100 on single columns and 0.172 on
+pairs, against 0.036 and 0.108 when it decodes the release frozen. Where the budget is spent matters
+more than which model is used.
 
 **The reference baselines, and a comparison that is not reported.** During development, we compared
 the package with AIM and MST at the smartnoise-synth defaults. That comparison gave a utility margin
 of 0.15 AUC. An audit then found a defect in the library's sampler (mbi 1.1, used both by the
 wrapper and by the authors' reference code). It read conditional tables against the wrong axes when
 its column order differed from the table's. Single-column counts survived, while the joint structure
-of some columns was scrambled. That margin came from the sampler, and it is not reported anywhere.
+of some columns was scrambled. That margin came from the sampler, and the paper does not report it.
 The paper's rows use the authors' private-pgm mechanisms at their defaults, with a corrected sampler
 and the stable fitting routine. The reference AIM is at the real sample's level on Adult utility at
-n = 300. It fits pairs more closely than the language-model output at every seed. At n = 1,000, it
-also scores higher on utility than the fixed cohort rule. It is level with or below the
-auto-configured release decoded with no model and the selection step (section 11). It is level with
+n = 300. It fits pairs more closely than the Qwen3-14B output at every seed. At n = 1,000, it also
+scores higher on utility than the fixed-rule release. It matches or scores lower than the
+auto-configured release decoded by the maximum-entropy decoder with the selection step. It matches
 the language-model output on single columns, and its seen-conditional error is higher (0.055 against
 0.027). Seen from AIM's side, the release is a fixed workload, and its maximum-entropy decoder is
 the estimator AIM uses. The workload is the class-conditional 1-way marginals inside cohorts plus
@@ -444,14 +444,14 @@ the conditional cells. AIM's adaptive selection gives it the pairs. The fixed wo
 named conditional rates, a file that can be inspected and a release computed in seconds.
 
 **Privacy of the draws, measured.** We ran four membership attacks on 3,000 candidates, each
-validated on a positive control. The strongest advantage is 0.022 on Qwen3-14B and 0.035 on
-Qwen3-32B on Adult and 0.049 on the 32B on NHANES, against the 0.762 that ε = 2 permits. No
-configuration has an exact match, and no synthetic row copies a training row. No configuration is
+validated on a positive control. On Adult, the strongest advantage is 0.022 on Qwen3-14B and 0.035
+on Qwen3-32B. On NHANES, it is 0.049 on the 32B, against the 0.762 that ε = 2 permits. No CoRTeC
+configuration has an exact match, and none of its rows copies a training row. No configuration is
 closer to training rows than to held-out rows either (a share of 0.47 to 0.54, against the 0.50
-expected). The served Gemini model reproduces the first 25 rows of the public Adult file from its
-header. None of them appears in any draw.
+expected). The served Gemini model reproduces rows 2 to 25 of the public Adult file from its header.
+None of them appears in any draw.
 
-**Cost.** A 300-row Gemini draw with a threefold pool takes 41 calls and costs 1.56 dollars at list
-price. On 28 October 2026, that price was 0.75 dollars per million input tokens and 3.75 dollars per
-million output tokens. The same draw on Qwen3-14B takes 42 calls and about 50 minutes on one rented
-A40.
+**Cost.** A 300-row Gemini draw with a threefold pool takes 41 to 46 calls and costs 1.56 dollars at
+list price. On 28 October 2026, that price was 0.75 dollars per million input tokens and 3.75
+dollars per million output tokens. The same draw on Qwen3-14B takes 42 calls and about 50 minutes on
+one rented A40.

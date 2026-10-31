@@ -6,10 +6,10 @@
 
 The records that could train the most useful models, such as a hospital's patient files, are often the ones an
 institution cannot share. We propose CoRTeC, a method that releases synthetic versions of such records under
-differential privacy. The synthetic data exposes no personally identifiable information (PII), and differential
-privacy places a proven limit on membership inference. CoRTeC spends the privacy budget once, on a small release of
-noisy counts designed for training a classifier. For each cohort of the data, the release gives the cohort's size, its
-class balance, a histogram of every attribute for each outcome class and the outcome rate in each of a set of
+differential privacy. Differential privacy places a proven limit on what the synthetic data can reveal about any
+person, and in particular on membership inference. CoRTeC spends the privacy budget once, on a small release of noisy
+counts designed for training a classifier. For each cohort of the data, the release gives the cohort's size, its class
+balance, a histogram of every attribute for each outcome class and the outcome rate in each of a set of
 non-overlapping cells. A reviewer can check every one of these numbers before the release leaves the institution.
 
 Everything after the release is post-processing, so it costs no further privacy. A maximum-entropy decoder can turn
@@ -28,11 +28,11 @@ model, even one behind an interface the institution does not control.
 ## What the paper finds
 
 - **The release on its own is enough to train useful models, with no language model.** At ε = 2 with 300 and 1,000
-  rows, we decode the auto-configured release with the maximum-entropy decoder and the selection step
-  (`cortec decode`). Over three splits, it trains every student classifier to within 0.02 AUC of a real sample of the same size
+  rows, we decode the auto-configured release with the maximum-entropy decoder and the selection step (`cortec
+  decode`). Over three splits, it trains every student classifier to within 0.02 AUC of a real sample of the same size
   on UCI Adult. With the fixed cohort rule and the selection step, the decoded rows carry the conditional rates the
-  release names more closely than such a sample does. On NHANES and bank marketing, the gap to a real sample is
-  larger, reaching 0.07 AUC on the medical dataset at 300 rows.
+  release names more closely than such a sample does. On NHANES and bank marketing, where the maximum-entropy decoder
+  ran without the selection step, the gap to a real sample stays within 0.05 AUC.
 - **The language model's contribution comes from the column names.** It repairs pairs of columns it recognises and
   invents links between columns that are nearly independent. When every name is replaced by a neutral token, it loses
   that advantage. Without the release, it recites the public file. Most of the gain over the maximum-entropy decoder
@@ -40,9 +40,9 @@ model, even one behind an interface the institution does not control.
 - **What the fixed workload costs.** The release spends its budget on the conditional rates a deployment names. This
   costs accuracy on pairs of columns, which an adaptive workload such as AIM's fits more closely. On utility, the
   release reaches the reference AIM in five of six dataset-size settings. Under the protocols of three recent DP
-  generators (DP-LLMTGen, DP-2Stage and Tab-PE), its utility is within one percentage point of each method's published
-  result or above it. Our draws are at most 1,000 rows. CoRTeC is meant to sit beside the marginal methods, so choose
-  whichever fits your deployment.
+  generators (DP-LLMTGen, DP-2Stage and Tab-PE), its utility is within 1.4 percentage points of each method's
+  published result or above it. Our draws are at most 1,000 rows. CoRTeC is meant to sit beside the marginal methods,
+  so choose whichever fits your deployment.
 - **The privacy architecture holds in every test.** One release serves any number of draws, and the backbone can be
   replaced at no privacy cost. The strongest membership attack on any CoRTeC configuration reaches an advantage of
   0.02 to 0.05 against the 0.762 the budget permits. No synthetic row copies a training row. The part of the Adult
@@ -58,10 +58,10 @@ synthesiser's output without a language model.
 git clone https://github.com/Calyie/cortec
 cd cortec
 pip install '.[gemini]'        # Gemini (also the `vertex` extra for Google Vertex AI)
-pip install '.[openai]'        # GPT, Azure OpenAI, and any server with an OpenAI-compatible interface (vLLM)
+pip install '.[openai]'        # GPT, Azure OpenAI and any server with an OpenAI-compatible interface (vLLM)
 pip install '.[anthropic]'     # Claude (also the `bedrock` extra for AWS Bedrock)
 pip install '.[pgm]'           # decode a release with no language model (Private-PGM and JAX)
-pip install '.[dev]'           # pytest and scikit-learn, for the tests and the evaluator
+pip install '.[dev]'           # pytest, for the tests
 python3 -m pytest tests -q     # offline, and every test is named after the defect it prevents
 ```
 
@@ -134,20 +134,20 @@ configuration are deposited with the paper's Zenodo record (DOI 10.5281/zenodo.2
 | `examples/example.py` | A runnable tour of the three stages with no API key |
 | `paper/` | The paper and the deployment guide as PDFs, with the pipeline figure shown above |
 | `research/` | The pipeline driver, the evaluator, the Stage C script, the membership-inference script, the dataset specifications and the frozen auto-configurations |
-| `research/controls/` | The paper's controls: the reference AIM and MST wrapper with its corrected sampler, the maximum-entropy decoder of a release alone and with the selection step, the one-shot control, the anonymisation of a release and its draws, the per-pair scorer and the three paper-protocol scorers |
+| `research/controls/` | The paper's controls: the reference AIM and MST wrapper with its corrected sampler, the maximum-entropy decoder of a release alone and with the selection step, the one-shot control, the anonymisation of a release and its draws, the per-pair scorer and two of the three paper-protocol scorers |
 | `research/results/development/` | The data behind one development measurement quoted in the design notes: an unconditioned model's readmission rate (98.5%) against the real rate (21.4%), with a script that recomputes both |
 
 ## Where the guarantee does not hold
 
 - **ε protects one row, not one person.** A person who contributes `k` rows receives `k · ε`. Cap each person's rows
-  before Stage A. The library requires the number of rows per person and refuses a value that makes the guarantee
-  meaningless.
+  before Stage A. The release records an undeclared privacy unit when the number of rows per person is missing, and
+  the bound will not run without it. A value that makes the guarantee meaningless is refused.
 - **Floating-point Laplace.** The library's noise is vulnerable to the Mironov (2012) attack on the low bits of the
   sampled noise.
 - **Pretraining provenance.** The guarantee says nothing about the model's training corpus. The paper's memorisation
   tests and membership attacks are the measured evidence.
-- **Endpoint.** The paper's measurements used the public developer APIs and self-hosted models, not the enterprise
-  surfaces recommended above.
+- **Endpoint.** The guarantee does not depend on the endpoint, but the paper's measurements used the public developer
+  APIs and self-hosted models, not the enterprise surfaces recommended above.
 
 ## AI use
 

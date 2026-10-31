@@ -253,14 +253,14 @@ def release_statistics(schema: Schema, df: pd.DataFrame, *, epsilon_total: float
     parallel at the SAME epsilon per query the pooled block spent. The pooled histogram is their
     noisy mixture, which is free post-processing. The generator then receives what positives and
     negatives each look like for every column, instead of inventing the feature-to-target structure
-    the conditional hierarchy does not name. On finance, those invented columns measurably degraded
-    the downstream model. Charged as one chain per record (class balance + one block) through nested
+    the conditional hierarchy does not name. On a finance dataset, those invented columns measurably
+    degraded the downstream model. They are charged as one chain per record (class balance + one block) through nested
     ledger partitions (`cohort/class`).
     """
     if n_min < 50:
         raise ReleaseError(
             f"n_min={n_min} is below the safe floor of 50. A conditional rate over fewer than "
-            f"~50 records is dominated by its own noise. At epsilon_level=1.0 the Laplace scale "
+            f"~50 records is dominated by its own noise. At epsilon_level=1.0, the Laplace scale "
             f"is 1/(n*eps), so a 30-record cell carries roughly +/-0.033 of noise on a rate in "
             f"[0,1] before any sampling error. Raise n_min, or coarsen the conditional levels so "
             f"that cells have support."
@@ -475,7 +475,7 @@ def release_statistics(schema: Schema, df: pd.DataFrame, *, epsilon_total: float
     if not cohorts:
         raise ReleaseError(
             f"no cohort reached n_min={n_min} (dataset has {len(data)} rows across "
-            f"{keys.nunique()} cohorts). Nothing was released and the budget was not spent on "
+            f"{keys.nunique()} cohorts). Nothing was released, and the budget was not spent on "
             f"anything usable. Coarsen the stratification or lower n_min."
         )
 
@@ -556,8 +556,8 @@ def release_statistics(schema: Schema, df: pd.DataFrame, *, epsilon_total: float
         if k.startswith("conditional_L"))
     if _unspent > 0.02 * epsilon_total:
         report.emit(report.warn(f"{_unspent:.3f} of the {eps_cond:.3f} conditional budget was NOT spent. "
-              f"{len(schema.conditional)} levels were budgeted for, but only {len(levels)} released "
-              f"cells at n_min={n_min}. The release is noisier than epsilon={epsilon_total} allows. "
+              f"{len(schema.conditional)} levels were budgeted for, but only {len(levels)} of them released "
+              f"any cell at n_min={n_min}. The release is noisier than epsilon={epsilon_total} allows. "
               f"Use fewer conditional levels, lower n_min or supply more records."))
 
     # Is the conditional table SIGNAL or NOISE? The Laplace sd on a cell's rate is

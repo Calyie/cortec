@@ -74,10 +74,9 @@ PROFILES: list[ModelProfile] = [
     # error this table exists to prevent. Measure pro before adding it.
     ModelProfile(r"gemini.*flash", Tier.VALIDATED, 0.008, 1.009,
                  "frontier API model. Measured on the same sweep as the rest of this table"),
-    # These two were deliberately absent while tiers were assigned from the transmission sweep:
-    # they were never scored on it. That ordering is now inverted -- full-dataset generation is
-    # the axis this tool runs and the axis the recommendation is built on -- so a model measured
-    # THERE is validated, with magnitude_error left None because the sweep number does not exist.
+    # These two were never scored on the transmission sweep. Full-dataset generation is the axis
+    # this tool runs and the axis the recommendation is built on, so a model measured there is
+    # validated, with magnitude_error left None because the sweep number does not exist.
     ModelProfile(r"gemini.*3\.1.*pro", Tier.VALIDATED, None, None,
                  "validated on full-dataset generation with conditional error 0.041, the lowest of "
                  "any generator we measured. Not scored on the transmission sweep."),
@@ -85,9 +84,9 @@ PROFILES: list[ModelProfile] = [
                  "validated on full-dataset generation at DEFAULT reasoning, with conditional error "
                  "0.045. At reasoning_effort='minimal' the same model scores 0.173, past the "
                  "no-information floor. Not scored on the transmission sweep."),
-    # DEMOTED from VALIDATED. On the transmission sweep these reach 0.020 and 0.030, inside the
-    # frontier band -- which is why they were listed as validated, and why that listing was wrong.
-    # Re-measured on full-dataset generation at three draws, llama3.3:70b records conditional-seen
+    # Sweep-only. On the transmission sweep these reach 0.020 and 0.030, inside the frontier band,
+    # so the sweep alone would call them validated, and that would be wrong.
+    # Measured on full-dataset generation at three draws, llama3.3:70b records conditional-seen
     # error 0.133 against an UNCONDITIONED control's 0.145 and a frontier model's 0.030: it closes
     # 12% of the gap to no conditioning at all, closes nothing on 2-way TV (0.238 against the
     # control's identical 0.238), and is worse than the control on 1-way TV. None of these models

@@ -98,8 +98,8 @@ TERMS_CORTEC = [
     ("epsilon", "the differential-privacy budget. Smaller is stronger. `epsilon declared` is what "
                 "you asked for and `epsilon accounted` what the ledger charged. The two are equal "
                 "when the run is within budget"),
-    ("privacy unit", "what one epsilon protects: one row, or one person when `max_rows_per_person` "
-                     "is declared. A person who contributes k rows receives k times epsilon"),
+    ("privacy unit", "what one epsilon protects: one row, which is one person only when each person "
+                     "contributes one row. A person who contributes k rows receives k times epsilon"),
     ("n_min", "the smallest cohort or cell that is released. Smaller ones are suppressed, because "
               "a rate over fewer records is mostly its own noise"),
     ("cohort", "a group of records formed by a public rule over one column (a band of age, say). "
@@ -124,7 +124,7 @@ TERMS_CORTEC = [
                            "reported is not a count of zero"),
     ("pool factor", "generate pool_factor times n rows, then keep the n whose cell counts match "
                     "the release. A factor of 1 generates exactly n"),
-    ("utility transmission bound", "Stage C. For each released cell it gives a differentially "
+    ("utility transmission bound", "Stage C. For each released cell, it gives a differentially "
                                    "private estimate of the private target rate and a bound on the "
                                    "gap between it and the synthetic rate. The bounds hold over every "
                                    "cell at once with probability 1 - alpha. It bounds utility. It "
@@ -137,7 +137,7 @@ TERMS_CORTEC = [
     ("alpha", "the bound holds over every cell with probability at least 1 - alpha. A value of "
               "0.05 gives 95% simultaneous confidence"),
     ("ceiling", "a real sample of the same size as the synthetic table, scored the same way: the "
-                "best any synthetic method can do at that size"),
+                "reference a synthetic table of that size is not expected to exceed"),
     ("floor", "the same real sample with its target column permuted: data with no conditional "
               "signal at all"),
     ("discriminating", "the test had power in this run: the ceiling is within tolerance and the "
@@ -274,7 +274,7 @@ def overview(package, *, tool: str, module: str, command: str, run_order, groups
             (f"{command} terms", "what each word in the output means (tolerance, ceiling ...)"),
             (f"{command} --help", f"this page (or: python -m {module})")]
     if example:
-        more.append((f"python {example}", "a runnable tour. No key and no data needed"))
+        more.append((f"python {example}", "a runnable tour, with no key and no data needed"))
     more.append((readme, "the manual: each step, troubleshooting"))
     lines += ["", paint("  more", "key"), kv_block(more, indent=4)]
     return "\n".join(lines)

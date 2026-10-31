@@ -11,7 +11,7 @@ RUN_ORDER = [                      # the value column fits the page width after 
     ("2  correct", "release the table, relabel, measure gain (docs/hybrid.md, section 3)"),
     ("   release_conditional_table", "the release step alone: DP P(target | cell) (docs/hybrid.md, section 3)"),
     ("   relabel", "the relabel step alone: only the target column changes"),
-    ("   estimate_gain", "measure step alone, from released values (docs/hybrid.md, section 4)"),
+    ("   estimate_gain", "the measure step alone, from released values (docs/hybrid.md, section 4)"),
     ("   cortec.show", "print and export the result in one layout (docs/hybrid.md, section 4)"),
     ("   cortec.install_guard", "print a refusal in that layout, not a traceback"),
 ]
@@ -32,14 +32,14 @@ TERMS = [
                                                   "are not released. Their rows are left as "
                                                   "they were"),
     ("conditional error (before, after)", "the mean absolute gap between each cell's target rate "
-                                          "in the table and the released rate, before and after "
+                                          "in the synthetic table and the released rate, before and after "
                                           "relabelling. `reduction` is the difference"),
     ("feature marginal shift", "the mean total-variation change of the categorical marginals "
                                "between input and output. It is zero, because only the target column "
                                "is rewritten"),
     ("cells corrected", "released cells whose rows were relabelled"),
-    ("worth it (calibration only)", "true when conditional error fell by more than 0.02. A "
-                                    "calibration criterion. It does not predict downstream "
+    ("worth it (calibration only)", "true when conditional error fell by more than 0.02: a "
+                                    "calibration criterion that does not predict downstream "
                                     "utility, so read the evaluation table beside it"),
 ] + [t for t in _help.TERMS_CORTEC
      if t[0] in ("epsilon", "privacy unit", "n_min", "1-way TV", "TSTR-LR, TSTR-RF, TSTR-GBM",
