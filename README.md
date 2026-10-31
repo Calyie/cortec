@@ -130,6 +130,7 @@ configuration are deposited with the paper's Zenodo record (DOI 10.5281/zenodo.2
 | `paper/` | The paper and the deployment guide as PDFs, with the figures |
 | `research/` | The pipeline driver, the evaluator, the Stage C script, the membership-inference script, the dataset specifications and the frozen auto-configurations |
 | `research/controls/` | The paper's controls: the reference AIM and MST wrapper with its corrected sampler, the maximum-entropy decoder of a release alone and with the selection step, the one-shot control, the anonymisation of a release and its draws, the per-pair scorer and the three paper-protocol scorers |
+| `research/results/development/` | The files behind the one development measurement the design notes quote with its own data: an unconditioned model's readmission rate (98.5%) against the real rate (21.4%), with a script that recomputes both |
 
 ## Where the guarantee does not hold
 

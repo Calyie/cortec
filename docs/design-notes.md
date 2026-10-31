@@ -33,7 +33,8 @@ earlier inpatient stays, 65 were readmitted within 30 days, a rate of 98.5%. In 
 130-US Hospitals file (101,766 real encounters), the rate for that group is 21.4%, against 11.2% for
 all patients. Because the model never saw the data, its 98.5% cannot change whatever the private
 table says. No rank-based utility metric reveals that, because the ordering is right and only the
-size is wrong.
+size is wrong. The draw and a script that recomputes both rates are in
+`research/results/development/diabetes_header_only/`.
 
 ## 2. How close to real data it gets
 
