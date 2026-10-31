@@ -3,9 +3,9 @@
 A differentially private release for synthetic tabular data, decodable by any generator. Whether the
 decoder is a frozen model or the maximum-entropy decoder with no model, it reads only DP statistics.
 
-The privacy budget is spent once on a release of statistics (Stage A). A frozen model, or the
+The privacy budget is spent once, on a release of statistics (Stage A). A frozen model, or the
 maximum-entropy decoder with no model at all (`cortec decode`), then generates records from that
-release (Stage B). It never sees a private record, so generation is post-processing. It adds no
+release (Stage B). Neither ever sees a private record, so generation is post-processing. It adds no
 privacy cost, and you can draw as many datasets as you like from one release. An optional Stage C
 attaches a utility bound to the output at a budget of its own.
 
@@ -118,10 +118,10 @@ real, and only the generated numbers are placeholders:
 python3 example.py
 ```
 
-To list everything the package can run, print the help page. It shows each function in order, with
-its arguments and defaults read from the code. Give it a function's name for that function's full
-documentation. The `cortec` command does nothing else. The package is a library, and the runs are
-Python calls.
+To list everything the package can run, print the help page. It shows the commands, the run order
+and each function, with its arguments and defaults read from the code. Give it a function's name for
+that function's full documentation. Every command is also available as a Python call, so the package
+can be used as a library.
 
 ```bash
 cortec --help                        # the commands, the run order, functions, classes, refusals
@@ -139,9 +139,9 @@ both. The surface changes only the client and the credentials.
 | Backend | Surface | Set before running | `Generator(...)` arguments |
 |---|---|---|---|
 | `anthropic` | public API | `ANTHROPIC_API_KEY` | `backend="anthropic", model="claude-fable-5"` |
-| `anthropic` | Claude on AWS Bedrock (recommended) | AWS credentials from the standard chain (environment, profile or instance role) and `AWS_REGION`. The `bedrock` extra | `surface="bedrock", surface_model="<Bedrock model id or inference-profile ARN>"` |
+| `anthropic` | Claude on AWS Bedrock (recommended) | AWS credentials from the standard chain (environment, profile or instance role) and `AWS_REGION`, with the `bedrock` extra installed | `surface="bedrock", surface_model="<Bedrock model id or inference-profile ARN>"` |
 | `openai` | public API | `OPENAI_API_KEY` | `backend="openai", model="gpt-5"` |
-| `openai` | a self-hosted server with an OpenAI-compatible interface (vLLM) | `OPENAI_BASE_URL` (for example `http://127.0.0.1:8000/v1`) and any value in `OPENAI_API_KEY` | `backend="openai", model="Qwen/Qwen3-14B"`. The paper's Qwen3 arms ran this way on one rented graphics card. `spend_usd` reads 0 for such a model (the card is paid by the hour), so the budget cap does not apply, and `describe_surface()` reports the surface as `public` because the package cannot tell a local server from the vendor's |
+| `openai` | a self-hosted server with an OpenAI-compatible interface (vLLM) | `OPENAI_BASE_URL` (for example `http://127.0.0.1:8000/v1`) and any value in `OPENAI_API_KEY` | `backend="openai", model="Qwen/Qwen3-14B"`. The paper's Qwen3 configurations ran this way on one rented graphics card. `spend_usd` reads 0 for such a model (the card is paid by the hour), so the budget cap does not apply, and `describe_surface()` reports the surface as `public` because the package cannot tell a local server from the vendor's |
 | `openai` | GPT on Azure OpenAI (recommended) | `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, optionally `AZURE_OPENAI_API_VERSION` | `surface="azure", surface_model="<your deployment name>"` |
 | `gemini` | public API | `GEMINI_API_KEY` | `backend="gemini", model="gemini-3.5-flash"` |
 | `gemini` | Gemini on Google Vertex AI (recommended) | Application Default Credentials, `GOOGLE_CLOUD_PROJECT`, optionally `GOOGLE_CLOUD_LOCATION` (default `global`) | `surface="vertex"` |
@@ -159,8 +159,8 @@ that model, so `--allow-unvalidated` is required and the output says so.
 surface in your own cloud account (Bedrock, Azure OpenAI or Vertex AI). It should have private
 networking, data residency, a contract that excludes training on your inputs and a BAA where HIPAA
 applies. The vendors' public developer APIs are supported but are not recommended for regulated
-deployment. The weights are the same but the contract and the network path are not, and those are
-what a compliance review assesses. The privacy argument does not depend on the endpoint because the
+deployment. The weights are the same, but the contract and the network path are not. Those are what
+a compliance review assesses. The privacy argument does not depend on the endpoint, because the
 request carries only the DP release (step 9). The compliance argument does. The paper's own
 measurements were made on the public APIs and on self-hosted open models. The deployment guide says
 which results that affects.
@@ -170,7 +170,7 @@ transport. An SDK change therefore fails in CI rather than at your first call.
 **Vertex AI is verified live.** We ran the `gemini-3.5-flash` model name (served by Gemini 3.6 Flash
 since 8
 October 2026) through a service account that holds only `roles/aiplatform.user`. Both generation
-paths worked and reasoning was reported on every call. The newest Gemini models are served from the
+paths worked, and reasoning was reported on every call. The newest Gemini models are served from the
 `global` location and return 404 in every regional one. A model 404 is treated as fatal and is not
 retried. **What is not verified:** a live round trip on Bedrock or Azure OpenAI, because no account
 was available to us. Treat your first run there as that test: generate a small batch, check
@@ -188,7 +188,7 @@ Stage A reads one pandas DataFrame with exactly the columns the schema declares.
 - Categorical columns hold strings. Integer codes are fine as strings (`"1"`, `"2"`). If a real
   category is spelled `None`, `NA` or `nan`, read the file with `keep_default_na=False`. Otherwise
   pandas turns it into a missing value.
-- Numeric columns hold numbers inside the declared bounds. Values outside are clipped and the
+- Numeric columns hold numbers inside the declared bounds. Values outside are clipped, and the
   validation report says how many. If that number surprises you, the declared bounds are wrong.
 - The target column holds exactly two labels: the ones declared as `positive` and `negative`.
 - **One row per person.** ε protects one row. If a person contributes `k` rows, that person's
@@ -228,18 +228,18 @@ schema = Schema(
 | `categorical` | `{column: [allowed values]}` | every declared value stays in the release, even when rare |
 | `target`, `positive`, `negative` | the binary target and its two labels | the target is not listed as a feature |
 | `bins` | `{column: [edges]}`, public histogram edges | default: 10 equal-width bins over the bounds |
-| `stratify` | `[(column, [Band(name, lo, hi), ...])]`, the public rule that forms cohorts | the bands must tile the declared domain with no gap. The top band is closed at its upper edge |
+| `stratify` | `[(column, [Band(name, lo, hi), ...])]`, the public rule that forms cohorts | the bands must tile the declared domain with no gap, and the top band is closed at its upper edge |
 | `conditional` | the levels of the conditional target table, coarse to fine, as column tuples | leave it out to have it derived (below) |
-| `coarsen` | `{column: {declared value: group}}`, grouping a wide categorical for conditioning | derived by auto-configuration. May also be supplied |
+| `coarsen` | `{column: {declared value: group}}`, grouping a wide categorical for conditioning | derived by auto-configuration, or supplied by you |
 
-**Leave `conditional` empty and the hierarchy is derived for you.** Auto-configuration ranks the
+**Leave `conditional` empty, and the hierarchy is derived for you.** Auto-configuration ranks the
 columns by their mutual information with the target, using one DP-noised contingency table per
 column. From the public cardinalities and the number of records you will request, it chooses how
 many columns to condition on. It groups wide categorical columns into a few bands. It forms cohorts
 on the highest-ranked numeric column when the data can support them. The selection spends a declared
 share of `epsilon_total` (between 5% and 30%, depending on the schema size and the row count). It is
 charged to the same ledger. If you declare `conditional` yourself, it is used unchanged.
-Auto-configuration has no concept of a person. On data with several rows per person it can select a
+Auto-configuration has no concept of a person. On data with several rows per person, it can select a
 column that stands in for how many rows someone contributes. Declare the columns yourself if that
 matters.
 
@@ -261,9 +261,9 @@ conditional target table. Every query is recorded in a ledger.
 
 | Parameter | Default | What it does |
 |---|---|---|
-| `epsilon_total` | `2.0` | the whole row-level budget. Every query is charged to it |
+| `epsilon_total` | `2.0` | the whole row-level budget, to which every query is charged |
 | `n_min` | `150` | cohorts and cells with fewer records are suppressed. The floor is 50, below which a rate is dominated by its own noise |
-| `conditional_fraction` | `0.2` | the share of the budget for the conditional table. The histograms take the rest |
+| `conditional_fraction` | `0.2` | the share of the budget for the conditional table, with the rest going to the histograms |
 | `max_rows_per_person` | `None` | the privacy unit: the most rows one person contributes. If it is left out, the audit records `UNDECLARED` |
 | `acknowledge_vacuous_privacy_unit` | `False` | required to proceed when `max_rows_per_person × epsilon_total` exceeds 10 |
 | `class_conditional` | `True` | one histogram block per (cohort, outcome) where both outcomes clear `n_min`. `False` restores a pooled block |
@@ -273,7 +273,7 @@ conditional target table. Every query is recorded in a ledger.
 | `seed` | `None` | tests only: a seeded release is reproducible, so its noise can be subtracted and it carries no guarantee. The audit says so |
 
 **The privacy unit.** ε protects one ROW, and on some data that is not one person. Under group
-privacy a person who contributes `k` rows receives `k · ε`. On encounter-level hospital data, with
+privacy, a person who contributes `k` rows receives `k · ε`. On encounter-level hospital data, with
 one admission per row and several admissions per patient, this matters a great deal. In a real
 dataset of 101,766 encounters from 71,518 patients, the heaviest patient contributes 40 encounters.
 A declared ε of 2.0 is then an ε of 80 for that patient, far outside any range normally considered
@@ -311,9 +311,9 @@ rows before Stage A. Otherwise, report `ε_person` rather than the per-row numbe
   declared levels released no cell. The other is a noise-dominated conditional table, where the
   noise on a level's rates is at least as large as their spread. Read the console.
 - `release.conditional_levels` is non-empty and its finest level has cells. An empty table is
-  refused because the output would be unconditioned.
+  refused, because the output would be unconditioned.
 - Store `release.json` and hash it. Generation reads only this file, so every later draw and every
-  comparison must reuse it. A release cannot be regenerated identically because its noise is
+  comparison must reuse it. A release cannot be regenerated identically, because its noise is
   unseeded. Re-running Stage A also spends the budget again.
 
 ## 6. Stage B: generate
@@ -352,7 +352,7 @@ There are three generation methods:
 - **`generate_by_cell(release, n_rows, level=0)`** makes one call per released conditional cell with
   an integer positive count. Use it when absolute conditional rates matter, such as a readmission
   probability or a default rate. It refuses when any conditioning column has less than 90% of its
-  released marginal mass inside released bands. Otherwise rows outside those bands would be missing
+  released marginal mass inside released bands. Otherwise, rows outside those bands would be missing
   from the output while every aggregate check still looked healthy. `allow_low_coverage=True`
   overrides the refusal for measurement, not for use. Treat the guard as a
 heuristic mitigation, not a solved problem. It checks which bands the released cells cover, but not
@@ -367,14 +367,14 @@ structure, and no output check will reveal that.
 | Model | Tier | Measured on |
 |---|---|---|
 | Claude Fable 5 / Opus / Sonnet | validated | transmission sweep, magnitude error 0.009 |
-| Gemini Flash (the `gemini.*flash` pattern. `gemini-3.5-flash` is served by 3.6 Flash) | validated | the sweep (0.008) and full-dataset generation (1-way total variation 0.027 on Adult at n = 300) |
+| Gemini Flash (the `gemini.*flash` pattern, where `gemini-3.5-flash` is served by 3.6 Flash) | validated | the sweep (0.008) and full-dataset generation (1-way total variation 0.027 on Adult at n = 300) |
 | Qwen3-14B, Qwen3-32B (4-bit AWQ), served through vLLM | validated | full-dataset generation (1-way 0.046 and 0.049, seen-conditional error 0.027 and 0.031 on Adult at n = 300) |
-| Qwen3-8B | adequate | full-dataset generation (1-way 0.068. Writes range labels into numerical columns at times) |
-| llama3.3:70b-instruct | **sweep-only, refused** | the sweep (0.020). Fails full-dataset generation |
-| qwen2.5:72b-instruct | **sweep-only, refused** | the sweep (0.030). Fails full-dataset generation |
+| Qwen3-8B | adequate | full-dataset generation (1-way 0.068), though it sometimes writes range labels into numerical columns |
+| llama3.3:70b-instruct | **sweep-only, refused** | the sweep (0.020), but fails full-dataset generation |
+| qwen2.5:72b-instruct | **sweep-only, refused** | the sweep (0.030), but fails full-dataset generation |
 | mistral-small:24b, gemma2:27b, gpt-oss:20b | adequate | the sweep (0.049–0.078) |
 | qwen2.5:32b, qwen2.5:14b | adequate | the sweep (0.098–0.105) |
-| qwen2.5:7b | **insufficient, refused** | the sweep (0.406). On full-dataset generation it wrote its own prior over the released distributions |
+| qwen2.5:7b | **insufficient, refused** | the sweep (0.406), and on full-dataset generation it wrote its own prior over the released distributions |
 
 `print(cortec.models.recommended_table())` lists the models we recommend, measured on full-dataset
 generation. A sweep-only model reproduces one forced rate in a short prompt. On full-dataset
@@ -384,7 +384,7 @@ improved with capability and stopped improving at 14 billion parameters. Downstr
 change with the model at all (design notes, section 11). An unlisted model is refused unless you
 pass `allow_unvalidated=True`.
 
-**Enable reasoning and verify that it fired.** Reasoning is the largest single effect measured. On
+**Enable reasoning and verify that it fired.** Reasoning is the largest single effect we measured. On
 one model tested against itself, changing that one flag moved the conditional error from 0.173 ±
 0.032 to 0.045 ± 0.007. Downstream utility did not separate (0.786 ± 0.050 against 0.802 ± 0.025). A
 cost comparison on utility alone would therefore choose the 14.5× cheaper setting and ship output
@@ -419,13 +419,13 @@ synthetic = decode_release(schema, release, n_rows=5000, pool_factor=3)   # no m
 ```
 
 or `cortec decode --schema my_schema.py --release results/<name>/release.json --n-rows 5000`. In the
-paper this path is the configuration labelled "CoRTeC, maximum-entropy decoder" (Table 3). On Adult
-at ε = 2 and n = 300 it reads 0.033 on single columns and 0.014 on the conditionals the release
-names. This is close to the best language-model configuration (Gemini: 0.027 and 0.013). Its students score 0.824, 0.866 and 0.862, above every language-model
-configuration (one split, three draws). Beyond this, a language model improves only the pairs it
-recognises from the column names and adds nothing to aggregate utility (design notes, section 11).
-Decode this way first. Add a model only where you need that improvement on pairs and only for a
-schema the model knows.
+paper, this path is the configuration labelled "CoRTeC, maximum-entropy decoder" (Table 3). On Adult
+at ε = 2 and n = 300, it reads 0.033 on single columns and 0.014 on the conditionals the release
+names. This is close to the best language-model configuration (Gemini: 0.027 and 0.013). Its
+students score 0.824, 0.866 and 0.862, above every language-model configuration (one split, three
+draws). Beyond this, a language model improves only the pairs it recognises from the column names
+and adds nothing to aggregate utility (design notes, section 11). Decode this way first. Add a model
+only where you need that improvement on pairs and only for a schema the model knows.
 
 **Dry run first.** `backend="mock"` needs no key and honours the exact-count block. The whole
 generate-and-select loop therefore runs offline from start to finish. `tests/test_selection.py` does
@@ -433,7 +433,7 @@ exactly that.
 
 ## 7. Stage C: attach a utility bound
 
-For each released cell Stage C releases a Laplace estimate of the private target rate at a declared
+For each released cell, Stage C releases a Laplace estimate of the private target rate at a declared
 budget, `epsilon_cert`. It then turns the noise into a one-sided bound on the gap between the
 private and synthetic rates. The bound holds for every cell at once with probability at least `1 −
 alpha`. It is a utility bound computed under DP. It is not a privacy audit.
@@ -450,7 +450,7 @@ report.to_json("bound.json")       # readable by a third party without the priva
 - `holdout_df` is real data that was not used to build the release. It supplies the ceiling (a real
   sample, which should clear the tolerance) and the floor (the same sample with its target permuted,
   which must not). If the ceiling fails or the floor clears, the test did not discriminate.
-  `report.verdict` is then `None` and that run is not reported.
+  `report.verdict` is then `None`, and that run is not reported.
 - `epsilon_cert` is spent once through the ledger. The deployment total is `epsilon_release +
   epsilon_cert`, stated per row and per person. Each cell's rate is taken over `max(|c|, n_min)`,
   and the Laplace scale uses the public floor `n_min`. The sensitivity bound therefore holds for
@@ -495,7 +495,7 @@ two reference rows are their means. A second table, `reference spread`, gives th
 value of each measure across them. That range is what real data of this size spans on this holdout.
 `record_results()` turns the stage records into the results panel that `cortec run` prints last. The
 panel shows the marginal fidelity and the downstream utility. It reads each synthetic number against
-that range: within it, beyond every real sample or outside it by a stated amount. For each student
+that range: within it, beyond every real sample or outside it by a stated amount. For each student,
 it also gives the share of real-sample utility beside its gap. That share is (synthetic − shuffled)
 / (real sample − shuffled). The panel's headline is a reading at one draw, not a pass or a fail.
 Nothing in the package compares a number with a threshold.
@@ -504,19 +504,20 @@ Nothing in the package compares a number with a threshold.
 output is within 0.025 AUC of the same student trained on a real sample of the same size. That holds
 on an open model (Qwen3-14B: 0.807, 0.862 and 0.833 against the sample's 0.830, 0.870 and 0.840) and
 on a served one (Gemini: 0.805, 0.863 and 0.838). The seen-conditional error is a fifth of the
-sample's on Gemini and under half of it on Qwen3-14B. Two things are worth knowing before you read your own panel. First, most of that result
-comes from the release. Decoded with no language model and no selection step, using the
-maximum-entropy table that fits its counts, the release trains students within 0.012 AUC of the
-language-model output. What the
-language model adds comes from the column names. When every name is replaced by a neutral token, its
-advantage on pairs and on utility disappears. On a schema the model does not know,
-expect the release's own result. Second, the reference AIM (fitted the way its authors fit it)
-fits pairs of columns more closely than the language-model output. At n = 1,000 it also scores
-higher on utility. At n = 300 the language-model output is level with it on single columns, and on Adult it carries the conditional rates the release names more closely. On a
-clinical survey (NHANES) the language-model students were 0.07 to 0.10 AUC below a real sample's. The
-model-free decoding of the same release scored higher than they did. Do not assume parity. Measure
-it on your own data against a real sample of the same size. Read the conditional measures beside the
-aggregate ones. The design notes carry the full measurements.
+sample's on Gemini and under half of it on Qwen3-14B. Two things are worth knowing before you read
+your own panel. First, most of that result comes from the release. Decoded with no language model
+and no selection step, using the maximum-entropy table that fits its counts, the release trains
+students within 0.012 AUC of the language-model output. What the language model adds comes from the
+column names. When every name is replaced by a neutral token, its advantage on pairs and on utility
+disappears. On a schema the model does not know, expect the release's own result. Second, the
+reference AIM (fitted the way its authors fit it) fits pairs of columns more closely than the
+language-model output. At n = 1,000, it also scores higher on utility. At n = 300, the
+language-model output is level with it on single columns, and on Adult it carries the conditional
+rates the release names more closely. On a clinical survey (NHANES), the language-model students
+were 0.07 to 0.10 AUC below a real sample's. The model-free decoding of the same release scored
+higher than they did. Do not assume parity. Measure it on your own data against a real sample of the
+same size. Read the conditional measures beside the aggregate ones. The design notes carry the full
+measurements.
 
 ## 9. Where the trust boundary sits
 
@@ -531,14 +532,14 @@ The guarantee says nothing about the model's pretraining corpus. If a private re
 happened before this tool ran. The sharper version of the concern is that conditioning on true
 marginals for a narrow stratum resembles a prompt-based extraction attack. It tells the model which
 region to sample from. DP does not exclude this. In the research behind this tool, four
-membership-inference attacks were each validated on a positive control. None found an advantage
-above chance, and there were zero exact matches on any dataset. That is evidence about the published
-output, not a proof about the corpus.
+membership-inference attacks were each validated on a positive control. The strongest reached an
+advantage of 0.02 to 0.05, far below the 0.762 that ε = 2 permits, and there were zero exact matches
+on any dataset. That is evidence about the published output, not a proof about the corpus.
 
 ## 10. Troubleshooting
 
 Each row below is a refusal. The tool stops on purpose, before spending budget or writing output it
-cannot stand behind. In a run script you can print refusals in the standard layout instead of a
+cannot stand behind. In a run script, you can print refusals in the standard layout instead of a
 traceback. Add one line at the top, or wrap the run:
 
 ```python
@@ -576,8 +577,8 @@ exception is a fault and keeps its traceback.
 | `PromptIntegrityError` | a prompt template was modified in memory, or the conditional table is empty | do not edit the templates. Register a variant under a new name if you must |
 | `ContextTruncationError` | the prompt plus the output budget exceeds a local model's context | raise `num_ctx` or lower `rows_per_call` |
 | `EmptyContentError` | a reasoning model spent its output budget before writing any CSV | raise the output budget. `ModelRefusalError` is the different case of a refusal, which needs a coarser cell or a different generator |
-| `FatalAPIError` | billing, quota, credentials, or a model the surface does not serve | fix the account or the model name. Nothing was retried and the release is unchanged |
-| the run waits and `rate_limit_waits` rises | the vendor asked it to wait | nothing. The waits back off from 15 s to 4 min before an error surfaces |
+| `FatalAPIError` | billing, quota, credentials, or a model the surface does not serve | fix the account or the model name. Nothing was retried, and the release is unchanged |
+| the run waits and `rate_limit_waits` rises | the vendor asked it to wait | nothing: the waits back off from 15 s to 4 min before an error surfaces |
 | a "budget cap reached" warning and fewer rows than requested | the spend cap was reached | not an error: the output holds the rows completed within the budget. Raise `budget_usd` or use a cheaper validated model for the full request |
 | `GenerationError` naming a yield or parse rate | most returned rows were dropped, or too few calls parsed | a genuine fault, so the run stops before spending more. Check the schema against the rows being dropped |
 | `select_to_release` refuses the pool | a run that stopped early without a budget cap (a lost connection) left cohorts short of the rows they owe | a budget cap is handled automatically, returning the partial pool with a warning. For other truncations pass `allow_short_pool=True` |
@@ -608,9 +609,10 @@ writes the record as `<stem>.json` (format `cortec-result/1`) and the same conte
 `<stem>.md`. It also writes the named values to `<stem>.csv`, one CSV per table, and `<stem>.png`
 when matplotlib is installed. `RunRecord.from_json()` reads a record back. Tables follow the paper's
 conventions: a label column on the left, numbers to three decimal places and reference rows marked.
-Figures use the paper's own plotting parameters and checked palette. Your own scripts can use them
-through `cortec.plots.paper_rcparams()`. [`result-format.md`](result-format.md) is the contract for
-the record and lists the tables each stage writes.
+Figures use the paper's own plotting parameters: serif type, results in blue and references in grey.
+Your own scripts can use them through `cortec.plots.paper_rcparams()`.
+[`result-format.md`](result-format.md) is the contract for the record and lists the tables each
+stage writes.
 
 **The words in the output.** `cortec terms` prints every term the records use, in the order a run
 prints them. `cortec <term>` (for example `cortec discriminating`) prints one. The ones a first run
@@ -622,7 +624,7 @@ meets in Stage C and the evaluation:
 | ceiling | a real sample of the synthetic table's size, scored the same way: the best any method can do at that size |
 | floor | the same real sample with its target permuted: data with no conditional signal |
 | discriminating | the test had power: the ceiling is within tolerance and the floor is not. Otherwise the verdict on the synthetic table is not reported |
-| covered, thin | a released cell with synthetic rows in it. Thin when fewer than 20. An uncovered cell scores the trivial bound 1.0 |
+| covered, thin | a released cell with synthetic rows in it, and thin when it has fewer than 20. An uncovered cell scores the trivial bound 1.0 |
 | mean bound, worst bound | the average and the largest per-cell bound. The verdict uses the worst |
 | 1-way TV | the total-variation distance between the table's and the holdout's histogram, per column on the public bins, averaged. Lower is better |
 | TSTR-LR, RF, GBM | train on synthetic, test on real: three classifiers trained on the table, scored by AUC on the holdout. Higher is better, read against the ceiling and floor rows |

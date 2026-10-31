@@ -45,7 +45,7 @@ Colour is used only on a terminal. `NO_COLOR` or `CORTEC_COLOR=0` turns it off, 
 | `notes` | array | standing statements that travel with the stage, such as "This bounds utility. It is not a privacy audit." |
 | `verdict` | string or null | the stage's one-sentence verdict, or null when the stage has none |
 | `verdict_role` | string | `ok`, `warning` or `refusal`: how the verdict is to be read, and the colour it is printed in |
-| `files` | object | the paths `save()` wrote, by name: `json`, `markdown`, `values_csv`, `table_csv:<table name>`, and `figure` (a path, or `not written: ...` when matplotlib is absent) |
+| `files` | object | the paths `save()` wrote, by name: `json`, `markdown`, `values_csv`, `table_csv:<table name>` and `figure` (a path, or `not written: ...` when matplotlib is absent) |
 
 Numbers are stored at full precision. The printed and Markdown forms follow the paper's
 convention: three decimal places, and integers with a thousands separator.
@@ -86,11 +86,11 @@ record has no figure.
 
 ## Figures
 
-`rec.save()` writes a figure, `<stem>.png`, for four kinds of record. For Stage A it shows the
-cohort rates and the finest conditional level. For Stage C it shows the bound for each condition
-against the tolerance. For the evaluation it shows fidelity and utility beside the references. For
-the correction it shows the conditional error before and after. Stage B has no figure. The style
-is the paper's. `cortec.plots.paper_rcparams()` returns the plotting parameters the paper's figure
-script uses. The palette is the paper's checked categorical palette, assigned in a fixed order.
-Reference rows are drawn in grey, results in blue and the tolerance in the paper's reference-line
-colour.
+`rec.save()` writes a figure, `<stem>.png`, for four kinds of record. For Stage A, it shows the
+cohort rates and the finest conditional level. For Stage C, it shows the bound for each condition
+against the tolerance. For the evaluation, it shows fidelity and utility beside the references. For
+the correction, it shows the conditional error before and after. Stage B has no figure. The style is
+the paper's. `cortec.plots.paper_rcparams()` returns the plotting parameters the paper's figure
+script uses. The type is the paper's serif. Results are drawn in blue, reference rows in grey and
+the tolerance as a dark dashed line, and any further series take the checked palette in a fixed
+order.

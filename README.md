@@ -5,44 +5,46 @@
 ![The pipeline](paper/figures/fig01_pipeline.png)
 
 The records that could train the most useful models, such as a hospital's patient files, are often the ones an
-institution cannot share. We propose CoRTeC, a method that lets others learn from such records without seeing anyone
-in them, by releasing synthetic data under differential privacy. CoRTeC spends the privacy budget once on a small
-release of noisy counts designed for training a classifier. For each cohort of the data the release gives the cohort's
-size, its class balance, a histogram of every attribute for each outcome class and the outcome rate in a set of
+institution cannot share. We propose CoRTeC, a method that releases synthetic versions of such records under
+differential privacy. The synthetic data exposes no personally identifiable information (PII), and differential
+privacy places a proven limit on membership inference. CoRTeC spends the privacy budget once, on a small release of
+noisy counts designed for training a classifier. For each cohort of the data, the release gives the cohort's size, its
+class balance, a histogram of every attribute for each outcome class and the outcome rate in each of a set of
 non-overlapping cells. A reviewer can check every one of these numbers before the release leaves the institution.
 
 Everything after the release is post-processing, so it costs no further privacy. A maximum-entropy decoder can turn
 the counts into rows with no language model at all. A frozen language model can do the same. It reads only the release
 and writes rows that carry exactly the counts it is asked for. A selection step then matches the decoded rows to the
-released counts. Because no model ever sees a private record, generation can be repeated as often as needed on any
+released counts. Because no model ever sees a private record, generation can be repeated as often as needed, on any
 model, even one behind an interface the institution does not control.
 
 ## Documents
 
 | Document | What it is |
 |---|---|
-| [The paper](paper/CoRTeC_arxiv.pdf) | The mechanism, its privacy analysis, and the measurements with their controls (12 pages of main text, appendices A to G) |
-| [The deployment guide](paper/CoRTeC_deployment_guide.pdf) | The architecture, the parameters, the full prompt, a checklist, the controls mapped to standards, the failure modes with their guards, and the cost (8 pages) |
+| [The paper](paper/CoRTeC_arxiv.pdf) | The mechanism, its privacy analysis and the measurements with their controls (12 pages of main text, appendices A to G) |
+| [The deployment guide](paper/CoRTeC_deployment_guide.pdf) | The architecture, the parameters, the full prompt, a checklist, the controls mapped to standards, the failure modes with their guards and the cost (9 pages) |
 
 ## What the paper finds
 
 - **The release on its own is enough to train useful models, with no language model.** At ε = 2 with 300 and 1,000
-  rows, we decode the auto-configured release with the maximum-entropy model and the selection step (`cortec decode`).
-  Over three splits it trains every student classifier to within 0.02 AUC of a real sample of the same size on UCI
-  Adult. With the fixed cohort rule, the decoded rows carry the conditional rates the release names more closely than
-  such a sample does, once they pass through the selection step. On NHANES and bank marketing the gap to a real sample
-  is larger, reaching 0.07 AUC on the medical dataset at 300 rows. - **The language model's contribution comes from
-  the column names.** It repairs pairs of columns it recognises and invents links between columns that are nearly
-  independent. When every name is replaced by a neutral token it loses that advantage. Without the release it recites
-  the public file. Most of the gain over the maximum-entropy decoder alone comes from the selection step, not from the
-  model. - **What the fixed workload costs.** The release spends its budget on the conditional rates a deployment
-  names. This costs accuracy on pairs of columns, which an adaptive workload such as AIM's fits more closely. On
-  utility the release reaches the reference AIM in five of six settings. Our draws are at most 1,000 rows. CoRTeC is
-  meant to sit beside the marginal methods, so choose whichever fits your deployment. - **The privacy architecture
-  holds in every test.** One release serves any number of draws, and the backbone can be replaced at no privacy cost.
-  The strongest membership attack on any CoRTeC configuration reaches an advantage of 0.02 to 0.05 against the 0.762
-  the budget permits. No synthetic row copies a training row. The part of the Adult file that the served model has
-  memorised never reaches a draw.
+  rows, we decode the auto-configured release with the maximum-entropy decoder and the selection step
+  (`cortec decode`). Over three splits, it trains every student classifier to within 0.02 AUC of a real sample of the same size
+  on UCI Adult. With the fixed cohort rule and the selection step, the decoded rows carry the conditional rates the
+  release names more closely than such a sample does. On NHANES and bank marketing, the gap to a real sample is
+  larger, reaching 0.07 AUC on the medical dataset at 300 rows.
+- **The language model's contribution comes from the column names.** It repairs pairs of columns it recognises and
+  invents links between columns that are nearly independent. When every name is replaced by a neutral token, it loses
+  that advantage. Without the release, it recites the public file. Most of the gain over the maximum-entropy decoder
+  alone comes from the selection step, not from the model.
+- **What the fixed workload costs.** The release spends its budget on the conditional rates a deployment names. This
+  costs accuracy on pairs of columns, which an adaptive workload such as AIM's fits more closely. On utility, the
+  release reaches the reference AIM in five of six dataset-size settings. Our draws are at most 1,000 rows. CoRTeC is
+  meant to sit beside the marginal methods, so choose whichever fits your deployment.
+- **The privacy architecture holds in every test.** One release serves any number of draws, and the backbone can be
+  replaced at no privacy cost. The strongest membership attack on any CoRTeC configuration reaches an advantage of
+  0.02 to 0.05 against the 0.762 the budget permits. No synthetic row copies a training row. The part of the Adult
+  file that the served model has memorised never reaches a draw.
 
 ## Install
 
@@ -95,8 +97,8 @@ vLLM.
 
 **Where this should run.** For regulated data, use the enterprise-hosted, tenant-isolated surface in your own cloud
 account (Vertex AI, Azure OpenAI or Bedrock) or a model on your own hardware. The vendors' public developer APIs are
-supported, but we do not recommend them for regulated data. The weights are the same but the contract and the network
-path are not. The privacy argument does not depend on the endpoint because the request carries only the release. The
+supported, but we do not recommend them for regulated data. The weights are the same, but the contract and the network
+path are not. The privacy argument does not depend on the endpoint, because the request carries only the release. The
 compliance argument does.
 
 ## Reproducing a CoRTeC result from the paper
@@ -114,7 +116,7 @@ python3 evaluate_generic.py --dataset adult --spec-json <configurations.json> --
 ```
 
 A release already in the output directory is reused rather than drawn again, so further draws cost no privacy budget.
-Released statistics cannot be regenerated bit for bit because the noise source ignores any seed. For the same reason
+Released statistics cannot be regenerated bit for bit, because the noise source ignores any seed. For the same reason,
 the frozen auto-configurations under `research/results/autoconfig/` are reused by file. The reference-AIM wrapper, the
 maximum-entropy decoder with and without the selection step, the one-shot control, the anonymisation of releases and
 the scorers are all under `research/controls/`. The synthetic draws, the score files and the stored releases of every
@@ -128,10 +130,10 @@ configuration are deposited with the paper's Zenodo record (DOI 10.5281/zenodo.2
 | `tests/` | Their tests, offline |
 | `docs/` | The setup guide, the hybrid's guide, the design notes (the measurements behind the defaults) and the result format |
 | `examples/example.py` | A runnable tour of the three stages with no API key |
-| `paper/` | The paper and the deployment guide as PDFs, with the figures |
+| `paper/` | The paper and the deployment guide as PDFs, with the pipeline figure shown above |
 | `research/` | The pipeline driver, the evaluator, the Stage C script, the membership-inference script, the dataset specifications and the frozen auto-configurations |
 | `research/controls/` | The paper's controls: the reference AIM and MST wrapper with its corrected sampler, the maximum-entropy decoder of a release alone and with the selection step, the one-shot control, the anonymisation of a release and its draws, the per-pair scorer and the three paper-protocol scorers |
-| `research/results/development/` | The files behind the one development measurement the design notes quote with its own data: an unconditioned model's readmission rate (98.5%) against the real rate (21.4%), with a script that recomputes both |
+| `research/results/development/` | The data behind one development measurement quoted in the design notes: an unconditioned model's readmission rate (98.5%) against the real rate (21.4%), with a script that recomputes both |
 
 ## Where the guarantee does not hold
 

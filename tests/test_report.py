@@ -271,8 +271,8 @@ def test_figures_use_the_paper_style_and_exist_for_the_stages_that_have_one(tmp_
     pytest.importorskip("matplotlib")
     from cortec import plots
     rc = plots.paper_rcparams()
-    assert rc["font.family"] == "DejaVu Sans" and rc["axes.spines.top"] is False
-    assert rc["axes.grid"] is True and rc["legend.frameon"] is False and rc["axes.titleweight"] == "bold"
+    assert rc["font.family"] == "serif" and rc["font.serif"][-1] == "DejaVu Serif" and rc["axes.spines.top"] is False
+    assert rc["axes.grid"] is True and rc["legend.frameon"] is False and rc["axes.titleweight"] == "normal"
     p = plots.figure_for(_record(), str(tmp_path / "e.png"))
     assert p and os.path.getsize(p) > 1000
     from cortec.generate import GenerationStats

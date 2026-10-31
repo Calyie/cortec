@@ -1,7 +1,8 @@
 """cortec.plots: figures in the paper's style, from a RunRecord.
 
-The rc parameters are those of the paper's figures: one type scale, constrained layout, no top or
-right spine, a light grid behind the marks, DejaVu Sans and the validated palette assigned in a
+The rc parameters are those of the paper's figures: serif type (TeX Gyre Termes, falling back to
+DejaVu Serif), one type scale, constrained layout, no top or right spine and a light grid behind
+the marks. Results are blue, references grey, and further series take the validated palette in a
 fixed order. `figure_for(record, path)` draws the figure a record's stage calls for and returns the
 path, or None when the stage has no figure. matplotlib is optional. The import happens inside the
 functions, and `RunRecord.save()` records a missing matplotlib instead of failing.
@@ -20,8 +21,9 @@ def paper_rcparams(base: float = BASE) -> dict:
         "figure.constrained_layout.use": True,
         "figure.constrained_layout.h_pad": 0.05, "figure.constrained_layout.w_pad": 0.05,
         "figure.constrained_layout.hspace": 0.04, "figure.constrained_layout.wspace": 0.04,
-        "font.family": "DejaVu Sans", "font.size": base,
-        "axes.titlesize": base, "axes.titleweight": "bold", "axes.titlepad": 6,
+        "font.family": "serif", "font.serif": ["TeX Gyre Termes", "Nimbus Roman", "DejaVu Serif"],
+        "mathtext.fontset": "stix", "font.size": base,
+        "axes.titlesize": base, "axes.titleweight": "normal", "axes.titlepad": 6,
         "axes.labelsize": base - 0.5, "axes.labelcolor": INK, "axes.labelpad": 4,
         "xtick.labelsize": base - 1.5, "ytick.labelsize": base - 1.5,
         "axes.edgecolor": MUTED, "axes.linewidth": 0.7, "axes.labelweight": "normal",
@@ -52,7 +54,7 @@ def _series_colour(i: int) -> str:
 
 def _title(fig, record: RunRecord) -> None:
     fig.suptitle(f"{record.stage}: {record.title} ({record.schema})", fontsize=BASE + 1.5,
-                 fontweight="bold", color=INK)
+                 fontweight="normal", color=INK)
 
 
 def _bar_labels(ax, bars, decimals=3):
@@ -154,10 +156,10 @@ def _fig_bound(plt, record: RunRecord):
     _bar_labels(ax, b1); _bar_labels(ax, b2)
     tol = record.value("tolerance")
     if tol is not None:
-        ax.axhline(tol, color=PALETTE["magenta"], lw=1.3, ls=(0, (5, 3)), zorder=2)
+        ax.axhline(tol, color=INK2, lw=1.1, ls=(0, (5, 3)), zorder=2)
         ax.annotate(f"tolerance {tol}", (1.0, tol), xycoords=("axes fraction", "data"),
                     xytext=(-2, 2), textcoords="offset points", ha="right", va="bottom",
-                    fontsize=BASE - 2.5, color=PALETTE["magenta"])
+                    fontsize=BASE - 2.5, color=INK2)
     ax.set_xticks(list(x)); ax.set_xticklabels(labels)
     ax.set_ylabel("one-sided bound on the conditional gap")
     ax.xaxis.grid(False)

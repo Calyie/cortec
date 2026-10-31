@@ -13,8 +13,8 @@ marginals, which is zero. The test suite checks that the columns are equal.
 
 If you do not already run a marginal synthesiser, you do not need this tool. `cortec decode` in the
 `cortec` package decodes a CoRTeC release with no language model, using the same estimator as AIM
-and MST. Every column is then carried by the release and the budget is spent once. The hybrid is for
-an institution that keeps AIM or MST and wants the named conditional rates added to its output.
+and MST. Every column is then carried by the release, and the budget is spent once. The hybrid is
+for an institution that keeps AIM or MST and wants the named conditional rates added to its output.
 
 ```
 your private data ──► DP conditional table ──┐
@@ -25,11 +25,11 @@ your AIM/MST output ────────────────────
 | Step | What you do |
 |---|---|
 | 1. Install | Install `cortec` first, then this package |
-| 2. What you need | Your private table, your synthesiser's output, and a public schema |
+| 2. What you need | Your private table, your synthesiser's output and a public schema |
 | 3. Run the correction | One call, or the four steps it is made of |
 | 4. Read the result | What `worth_it` measures, and what it does not |
 | 5. Before you run: feasibility | Why `check_feasible()` refuses some schemas |
-| 6. Privacy | The ledger, `n_min`, and the privacy unit |
+| 6. Privacy | The ledger, `n_min` and the privacy unit |
 | 7. Why rate matching alone | The measurement that turned rank preservation off |
 
 ## 1. Install
@@ -51,7 +51,7 @@ cortec-hybrid --help                         # the help page: what you can run, 
 **Run it.** Installing the package puts the `cortec-hybrid` command on your PATH. `cortec-hybrid
 run` runs the correction from any directory. It takes the private table, the synthetic table to
 correct, the schema file and the cell columns. The schema file holds `SCHEMA = Schema(...)`, as in
-step 4 of the setup guide (`docs/setup.md`). With `--holdout` it also scores the table before and
+step 4 of the setup guide (`docs/setup.md`). With `--holdout`, it also scores the table before and
 after beside a real sample and a shuffled floor. That is the number `worth_it` does not give.
 
 ```bash
@@ -150,7 +150,7 @@ rec.save("results", "correction")
 
 **Read `worth_it` for what it is.** It is a calibration criterion. It means that conditional error
 against the released table fell by more than 0.02. It does not predict downstream utility, and we
-measured the two coming apart. Across 11 datasets the correction improved calibration in nearly
+measured the two coming apart. Across 11 datasets, the correction improved calibration in nearly
 every case, while downstream AUC moved in both directions. Of 9 runs flagged `worth_it`, downstream
 AUC fell on 6 in one run and on 3 of 10 in a repeat. Three datasets were reliably negative (a renal
 registry, hospital readmission and cervical cancer): calibration improved and downstream AUC dropped
@@ -161,7 +161,7 @@ data before adopting it. Keep your budget if the gain is small.
 own papers evaluate them on it. They do not release a conditional target table. On UCI Adult at ε =
 2 and n = 300, the reference AIM's seen-conditional error is 0.055 and the reference MST's is 0.140
 against 0.062 for a real sample (the paper's Table 3). The reference AIM's downstream utility is at
-the real sample's level. At n = 1,000 it scores higher than the fixed-rule CoRTeC release. It is
+the real sample's level. At n = 1,000, it scores higher than the fixed-rule CoRTeC release. It is
 level with or below the auto-configured release decoded with no model and the selection step
 (`cortec decode`). The measurements in this section were made during development against AIM and MST
 at a library's defaults. That library's sampler was later found to be defective (the paper's
@@ -174,7 +174,7 @@ then relabels the output to match the table. Because the cells partition the dat
 costs one query's worth of ε however many cells it holds. Accuracy depends on how many records each
 cell holds, not on how many cells there are. This is what makes a rich table affordable. It is not
 "CoRTeC without the language model", nor is it a general improvement over its input. A coarse
-12-cell table is the obvious design. In our runs on Adult it fixes calibration but adds little
+12-cell table is the obvious design. In our runs on Adult, it fixes calibration but adds little
 utility (+0.025 AUC on AIM and +0.037 on MST). The large gain came only with a richer table and
 against the library-default rows. Use the tool in one specific situation: when your marginal
 synthesiser's output has weak conditional target structure and you need a calibrated rate.
@@ -210,12 +210,12 @@ The tool reuses `cortec`'s audited `PrivacyLedger`, so the composition rules are
 audited once. `table.audit` is the same machine-readable trail: every query with its epsilon,
 sensitivity, composition rule and partition key. The cell sizes it publishes are noised and charged
 in their own group beside the rates. Validation runs before any budget is spent. `n_min` has a hard
-floor of 50 because a rate over fewer records is dominated by its own Laplace noise.
+floor of 50, because a rate over fewer records is dominated by its own Laplace noise.
 
 **ε protects one ROW, and this tool is the one most likely to be used on data where a row is not a
 person.** It corrects a synthesiser you already run, so it tends to be pointed at the table your
 institution already has. That often includes encounter-level clinical data, where one patient
-contributes many rows. Under group privacy a person who contributes `k` rows receives `k · ε`. On a
+contributes many rows. Under group privacy, a person who contributes `k` rows receives `k · ε`. On a
 real hospital dataset whose heaviest patient has 40 encounters, a declared ε of 2.0 is an ε of 80
 for that patient. That carries no meaningful guarantee.
 
@@ -233,8 +233,9 @@ tbl.audit["epsilon_per_person"]          # -> 80.0
 tbl.audit["epsilon_per_person_vacuous"]  # -> True
 ```
 
-Leave it out and the audit records `"UNDECLARED"` rather than assuming 1. If your data has more than
-one row per person, aggregate before releasing or report `ε_person` rather than the per-row number.
+Leave it out, and the audit records `"UNDECLARED"` rather than assuming 1. If your data has more
+than one row per person, aggregate before releasing or report `ε_person` rather than the per-row
+number.
 
 ## 7. Why rate matching alone
 
@@ -246,7 +247,7 @@ default of `relabel()`.
 Rank preservation helps only when the input synthetic data already carries structure within each
 cell. When its target is close to noise (exactly the case this tool targets), a ranking model fitted
 on that target learns the noise. Ordering by it then adds false structure that a downstream model
-mistakes for signal. On the renal registry that cost 0.068 AUC against plain random assignment
+mistakes for signal. On the renal registry, that cost 0.068 AUC against plain random assignment
 (0.546 against 0.614 in the table below).
 
 The guard we first wrote for this did not work, and the reason is worth knowing. `_rank_scores`
