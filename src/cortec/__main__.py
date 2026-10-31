@@ -1,6 +1,6 @@
 """The `cortec` command (also `python -m cortec`). `cortec run ...` runs the whole pipeline on your
-table (docs/setup.md step 1); `cortec --help` prints what you can run, in what order; `cortec <name>`
-prints one function or class with its arguments and defaults read from the code."""
+table (docs/setup.md, step 1). `cortec --help` prints what you can run and in what order. `cortec
+<name>` prints one function or class with its arguments and defaults read from the code."""
 import sys
 
 import cortec

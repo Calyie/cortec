@@ -1,7 +1,7 @@
 """`cortec run`: the whole pipeline on your own table, from any directory once the package is
-installed. Stage A (release), Stage B (generate), Stage C (bound), then the evaluation beside
-real references; every stage printed in the standard layout, every file under one folder that is
-named at the end.
+installed. It runs Stage A (release), Stage B (generate) and Stage C (bound), then the evaluation
+beside real references. Every stage is printed in the standard layout, and every file goes into one
+folder that is named at the end.
 
   cortec run --data private.csv --schema my_schema.py --backend mock
   cortec run --data private.csv --schema my_schema.py \\
@@ -9,11 +9,11 @@ named at the end.
   cortec run --data private.csv --holdout holdout.csv --schema my_schema.py \\
       --backend gemini --model gemini-3.5-flash --n-rows 1000
 
-`my_schema.py` defines `SCHEMA = Schema(...)` from public facts only (docs/setup.md step 4). `--data`
-is the private table, one row per person, with the schema's columns (docs/setup.md step 3). Without
-`--holdout`, one fifth of the data is set aside before Stage A, for the Stage C ceiling and the
-evaluation; it is never used for the release. Stage A runs once per output folder and stores
-release.json there; a later run into the same folder reuses it, because a release cannot be
+`my_schema.py` defines `SCHEMA = Schema(...)` from public facts only (docs/setup.md step 4).
+`--data` is the private table, one row per person, with the schema's columns (docs/setup.md step 3).
+Without `--holdout`, one fifth of the data is set aside before Stage A for the Stage C ceiling and
+the evaluation. It is never used for the release. Stage A runs once per output folder and stores
+release.json there. A later run into the same folder reuses it, because a release cannot be
 regenerated identically and re-running Stage A would spend the budget again.
 
 `--backend mock` needs no key and no spend and runs the whole pipeline offline, so run it first.
@@ -71,12 +71,12 @@ def save_record(rec, out: str, stem: str, exports: str) -> dict:
 def parser(prog: str = "cortec run") -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog=prog, description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--data", required=True, help="the private table (CSV), one row per person")
+    ap.add_argument("--data", required=True, help="the private table as a CSV, with one row per person")
     ap.add_argument("--schema", required=True, help="a Python file that defines SCHEMA = Schema(...)")
     ap.add_argument("--holdout", help="real rows not used for the release (CSV). Default: one fifth of --data")
-    ap.add_argument("--backend", default="mock", help="mock (offline, default), anthropic, openai, gemini, ollama")
+    ap.add_argument("--backend", default="mock", help="mock (offline, the default), anthropic, openai, gemini or ollama")
     ap.add_argument("--model", default="claude-fable-5", help="the model name. Must pass the capability gate")
-    ap.add_argument("--surface", default="public", help="public (default), bedrock, azure or vertex (docs/setup.md step 2)")
+    ap.add_argument("--surface", default="public", help="public (the default), bedrock, azure or vertex (docs/setup.md, step 2)")
     ap.add_argument("--surface-model", default=None, help="the identifier the enterprise surface expects")
     ap.add_argument("--effort", default=None, choices=("low", "medium", "high"),
                     help="the thinking level for a reasoning model served by Ollama (gpt-oss). Default: the model's")
@@ -85,8 +85,8 @@ def parser(prog: str = "cortec run") -> argparse.ArgumentParser:
                          "spends its budget before writing any CSV needs more")
     ap.add_argument("--no-quota-by-class", action="store_true",
                     help="state the exact counts as totals only, not per outcome (the totals-only "
-                         "prompt). By default each outcome's rows per bin are stated as well, so the "
-                         "class-specific marginals are enforced whichever model generates")
+                         "prompt). By default each outcome's rows per bin are stated as well, so that "
+                         "the class-specific marginals are enforced whichever model generates")
     ap.add_argument("--allow-unvalidated", action="store_true",
                     help="run a model the capability gate has not measured. The output says so")
     ap.add_argument("--request-timeout", type=float, default=None,
@@ -94,8 +94,8 @@ def parser(prog: str = "cortec run") -> argparse.ArgumentParser:
                          "locally can need several minutes per call")
     ap.add_argument("--n-rows", type=int, default=300, help="synthetic rows to produce (default 300)")
     ap.add_argument("--pool-factor", type=int, default=1,
-                    help="1 (default): generate exactly n rows; 3: generate 3n and select the n that match "
-                         "the release best, the setup guide's recommendation, at three times the spend")
+                    help="1 (the default) generates exactly n rows. 3 generates 3n and selects the n that "
+                         "match the release best. The setup guide recommends 3, at three times the spend")
     ap.add_argument("--budget-usd", type=float, default=None,
                     help="spend cap. The run stops when it is reached and keeps the rows completed")
     ap.add_argument("--epsilon-total", type=float, default=2.0, help="the Stage A budget (default 2.0)")
@@ -107,12 +107,12 @@ def parser(prog: str = "cortec run") -> argparse.ArgumentParser:
     ap.add_argument("--out", default=None, help="output folder. Default results/<schema name>_<backend>")
     ap.add_argument("--no-evaluate", action="store_true", help="skip the evaluation (needs scikit-learn)")
     ap.add_argument("--reference-draws", type=int, default=5,
-                    help="real samples (each with a permuted copy) the evaluation scores as references. "
-                         "their range is what the results panel reads each synthetic number against "
-                         "(default 5; 1 scores one sample)")
+                    help="the number of real samples (each with a permuted copy) the evaluation scores as "
+                         "references. The results panel reads each synthetic number against their range "
+                         "(default 5, and 1 scores a single sample)")
     ap.add_argument("--exports", choices=("json", "all"), default="json",
-                    help="json (default): one record per stage, complete. All: also the Markdown, "
-                         "CSV and figure renderings of each record")
+                    help="json (the default) writes one complete record per stage. all also writes the "
+                         "Markdown, CSV and figure renderings of each record")
     return ap
 
 
@@ -136,8 +136,8 @@ def main(argv: list[str] | None = None, prog: str = "cortec run") -> int:
         holdout = data.sample(frac=0.2, random_state=0)
         train = data.drop(holdout.index).reset_index(drop=True)
         holdout = holdout.reset_index(drop=True)
-        holdout_line = (f"{len(holdout):,} of {len(data):,} rows set aside before Stage A (no --holdout given); "
-                        f"they are never shown to Stage A")
+        holdout_line = (f"{len(holdout):,} of {len(data):,} rows set aside before Stage A because no --holdout "
+                        f"was given. Stage A never sees them")
     out = a.out or os.path.join("results", f"{schema.name}_{a.backend}")
     os.makedirs(out, exist_ok=True)
     outdir = os.path.abspath(out)
@@ -153,7 +153,7 @@ def main(argv: list[str] | None = None, prog: str = "cortec run") -> int:
         ("backend", f"{a.backend} / {a.model}" + (f" ({a.surface} surface)" if a.surface != "public" else "")
                     + (f", thinking {a.effort}" if a.effort else "")),
         ("privacy budget", f"epsilon {fmt(a.epsilon_total)} for the release (Stage A) + {fmt(a.epsilon_cert)} for "
-                           f"the bound (Stage C) = {fmt(a.epsilon_total + a.epsilon_cert)} per row; "
+                           f"the bound (Stage C) = {fmt(a.epsilon_total + a.epsilon_cert)} per row, with "
                            f"n_min {a.n_min}"),
         ("synthetic rows", pool + (f". Spend cap ${a.budget_usd:.2f}" if a.budget_usd else "")),
         ("stages", "A release" + (" (reused)" if reuse else "") + ", B generate, C bound"
@@ -271,9 +271,9 @@ def main(argv: list[str] | None = None, prog: str = "cortec run") -> int:
             entries.append((stem + ".*", f"{what}: {kinds(files)}"))
     emit(files_block("everything this run wrote", entries))
     if a.exports == "json":
-        emit(note("each JSON record renders to Markdown, CSV and a figure: --exports all, or "
+        emit(note("each JSON record renders to Markdown, CSV and a figure with --exports all or "
                   "RunRecord.from_json(path).save(folder)"))
-    emit(note("the terms used above (tolerance, ceiling, floor, TSTR, share ...): cortec terms"))
+    emit(note("cortec terms explains the words used above (tolerance, ceiling, floor, TSTR, share ...)"))
     return 0
 
 

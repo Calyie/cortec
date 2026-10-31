@@ -3,9 +3,9 @@ Privacy accounting for CoRTeC.
 
 This module exists to be audited. A privacy engineer should be able to read it end to end and
 confirm that the epsilon a caller is charged equals the epsilon the mechanism actually spends,
-without reading any other file. Every quantity that is charged is recorded as a `Query` in a
-ledger; the total is the sum over the ledger, computed the same way whether or not anyone is
-watching. There is no code path that releases a statistic without appending to the ledger, because
+without reading any other file. Every quantity that is charged is recorded as a `Query` in a ledger.
+The total is the sum over the ledger, computed the same way whether or not anyone is watching. There
+is no code path that releases a statistic without appending to the ledger, because
 `PrivacyLedger.spend()` is the only function that returns a noise scale.
 
 The composition rules used here, and why each applies:
@@ -17,11 +17,11 @@ The composition rules used here, and why each applies:
     bins the histogram has. This is why a whole distribution costs what a single count costs.
   * **Sequential composition.** Queries that can both be influenced by the same record add:
     k queries at `eps` each cost `k*eps`.
-  * **Parallel composition** (McSherry 2009). Queries over *disjoint* subsets of the data cost
-    the MAXIMUM, not the sum, because any one record can influence only one of them. This is
-    what makes cohorts and conditional cells cheap, and it is the single most load-bearing rule
-    in the accounting: `PrivacyLedger` therefore requires callers to declare a partition key,
-    and refuses to apply the parallel rule to queries whose partitions overlap.
+  * **Parallel composition** (McSherry 2009). Queries over *disjoint* subsets of the data cost the
+    MAXIMUM, not the sum, because any one record can influence only one of them. This is what makes
+    cohorts and conditional cells cheap, and it is the most important rule in the accounting.
+    `PrivacyLedger` therefore requires callers to declare a partition key, and it refuses to apply
+    the parallel rule to queries whose partitions overlap.
   * **Post-processing immunity** (Dwork & Roth 2014). Any function of a released quantity, using
     no further access to the private data, is free. Generation is entirely post-processing.
 
@@ -70,31 +70,31 @@ class Query:
 # "record-level eps-differential privacy" and "within_budget: true" with no stated boundary reads as
 # a proof of privacy safety, which is the misreading this project renamed Stage C to avoid.
 DP_CAVEATS = [
-    "The privacy unit is one ROW. Under group privacy a person contributing k rows receives "
-    "k*epsilon, so on data with repeated individuals the per-person guarantee is weaker than "
-    "epsilon_accounted. See max_rows_per_person and epsilon_per_person in this report. If they say "
+    "The privacy unit is one ROW. Under group privacy a person who contributes k rows receives "
+    "k*epsilon. On data with repeated individuals the per-person guarantee is therefore weaker "
+    "than epsilon_accounted. See max_rows_per_person and epsilon_per_person in this report. If they say "
     "UNDECLARED, the per-person guarantee of this release is unknown, not equal to epsilon.",
     "Noise is sampled with a floating-point Laplace generator. Naive floating-point Laplace "
     "sampling is vulnerable to the Mironov (2012) least-significant-bit attack. A deployment "
     "handling real PHI should use a discrete or snapping sampler. This implementation does not, "
     "and that is a known gap.",
     "The guarantee covers the RELEASED STATISTICS recorded in this report. It says nothing about "
-    "the generator's pretraining data, which is outside the DP boundary entirely, and nothing "
-    "about whether a memorised record could surface from that corpus.",
-    "Which cohorts, class blocks and cells appear is decided by comparing their NOISED, charged "
-    "counts with the public floor n_min (a noisy threshold, post-processing) when "
-    "charge_suppression=True, the default. If charge_suppression=False was passed, those decisions "
+    "the generator's pretraining data, which is entirely outside the DP boundary. Nor does it say "
+    "whether a memorised record could surface from that corpus.",
+    "With charge_suppression=True (the default), which cohorts, class blocks and cells appear is "
+    "decided by comparing their NOISED, charged counts with the public floor n_min. That is a "
+    "noisy threshold and counts as post-processing. If charge_suppression=False was passed, those decisions "
     "were made from the exact private counts and are NOT covered by the stated guarantee. Check "
     "charge_suppression in this report.",
 ]
 
 WHAT_THIS_IS = {
     "artifact": "differential privacy accounting record for one Stage A release",
-    "records": "every privatised query, its epsilon, sensitivity, composition rule and partition "
-               "key, so a privacy engineer can recompute the total by hand",
-    "is_not": "a privacy audit, a re-identification risk assessment, or a certificate that the "
+    "records": "every privatised query with its epsilon, sensitivity, composition rule and "
+               "partition key. A privacy engineer can recompute the total by hand",
+    "is_not": "a privacy audit, a re-identification risk assessment or a certificate that the "
               "released data is safe to publish. It records what was spent, not what was achieved.",
-    "read_with": "where_this_guarantee_does_not_hold, below, and the privacy-unit fields",
+    "read_with": "where_this_guarantee_does_not_hold (below) and the privacy-unit fields",
 }
 
 
@@ -128,8 +128,8 @@ class PrivacyLedger:
     """Records every DP query and enforces a hard total.
 
     The ledger is the only source of noise scales in this package. Code that wants to release a
-    statistic must call `spend()`, which both charges the budget and returns the Laplace scale to
-    use, so it is not possible to release something without it appearing in the audit trail.
+    statistic must call `spend()`. That call both charges the budget and returns the Laplace scale
+    to use, so nothing can be released without appearing in the audit trail.
     """
 
     def __init__(self, epsilon_total: float, *, delta: float = 0.0,
@@ -358,7 +358,7 @@ class PrivacyLedger:
         lines.append(f"  generation       post-processing, eps = 0 (unlimited draws)")
         # A reader who sees only the console must not leave thinking this asserts privacy safety.
         lines.append("\n  THIS IS AN ACCOUNTING RECORD, NOT A PRIVACY AUDIT. It records what was "
-                     "spent,\n  not what was achieved, and it is not a certificate that the output "
+                     "spent,\n  not what was achieved. It is not a certificate that the output "
                      "is safe to publish.")
         lines.append("  WHERE THIS GUARANTEE DOES NOT HOLD:")
         for c in r["where_this_guarantee_does_not_hold"]:

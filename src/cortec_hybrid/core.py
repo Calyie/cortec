@@ -2,13 +2,13 @@
 cortec-hybrid: conditional-signal correction for a marginal DP synthesiser, with no LLM.
 
 **What this tool claims, precisely.** Marginal-based DP synthesisers (AIM, MST, PrivBayes) are
-excellent at the statistic they optimise, low-order marginals, and are evaluated on it in their
-own papers. They do not release a conditional target table: on UCI Adult at matched budget and
-sample size the reference AIM's seen-conditional error is 0.055 and MST's 0.140 against a real
-sample's 0.062 and CoRTeC's 0.027 (the paper's Table 3), while the reference AIM's downstream
-utility is at the real sample's level. Measured at a library's defaults during development, with a
-sampler later found defective, the two had shown a large utility gap; that gap was the sampler's, and
-the paper reports the reference implementations instead (its Appendix D).
+excellent at the statistic they optimise (low-order marginals), and their own papers evaluate them
+on it. They do not release a conditional target table. On UCI Adult at matched budget and sample
+size, the reference AIM's seen-conditional error is 0.055 and MST's is 0.140, against a real
+sample's 0.062 and CoRTeC's 0.027 (the paper's Table 3). The reference AIM's downstream utility is
+at the real sample's level. Measured during development at a library's defaults, with a sampler
+later found to be defective, the two had shown a large utility gap. That gap came from the sampler,
+and the paper reports the reference implementations instead (its Appendix D).
 
 This tool spends a *small, separately accounted* slice of the privacy budget on one thing those
 mechanisms do not target: a conditional target table, P(y | cell) over a disjoint partition. It
@@ -19,25 +19,25 @@ beyond the table itself.
 **What this tool does NOT claim.** It is not "CoRTeC without the LLM", and it is not a general
 improvement over its inputs. In our own runs a coarse 12-cell table, the obvious implementation,
 fixed calibration and added little utility (+0.025 AUC on AIM, +0.037 on MST). The gain requires a
-*rich* table (measured during development against the library-default AIM and MST), and it is worth having in one specific situation: your marginal synthesiser's output has
-weak conditional target structure and you need a calibrated rate. Measure before and after with
-`estimate_gain()`; if the gain is small, use the marginal synthesiser alone and keep the budget.
+*rich* table (measured during development against the library-default AIM and MST), and it is worth
+having in one specific situation: when your marginal synthesiser's output has weak conditional
+target structure and you need a calibrated rate. Measure before and after with `estimate_gain()`. If
+the gain is small, use the marginal synthesiser alone and keep the budget.
 
-**A correction found while testing this package.** Rank-preserving assignment was assumed
-necessary for the correction to pay for itself. That is true
-only when the input synthetic data already carries within-cell structure. When its target is close
-to noise, precisely the case this tool targets, a ranking model fitted on that target learns the
-noise, and ordering by it injects spurious structure that a downstream model mistakes for signal.
-That guard did not work, and the way it failed is the useful part. `_rank_scores` gated on whether
-the synthetic target is PREDICTABLE from the synthetic features (cross-validated AUC against
-`RANK_INFORMATIVENESS_FLOOR`). But a synthesiser generates its target AS a function of those
-features, so that score is near-perfect almost always -- 0.981 on one dataset whose real downstream
-AUC is 0.631. **It measures self-consistency, not validity, and it is highest exactly when the
-synthesiser has confidently learned a wrong relationship, so it selected FOR the failure mode it
-was built to prevent.** Replicated over three datasets and three seeds each, plain i.i.d.
-assignment led rank preservation in 9 of 9 runs. `preserve_ranking=False` is therefore the default
-and rate matching alone is the mechanism; the gate survives only for callers who opt in
-explicitly.
+**A correction found while testing this package.** Rank-preserving assignment was assumed necessary
+for the correction to pay for itself. That is true only when the input synthetic data already
+carries within-cell structure. When its target is close to noise (precisely the case this tool
+targets), a ranking model fitted on that target learns the noise. Ordering by it then injects false
+structure that a downstream model mistakes for signal. That guard did not work, and the way it
+failed is the useful part. `_rank_scores` gated on whether the synthetic target is PREDICTABLE from
+the synthetic features (cross-validated AUC against `RANK_INFORMATIVENESS_FLOOR`). But a synthesiser
+generates its target AS a function of those features, so that score is almost always near-perfect:
+0.981 on one dataset whose real downstream AUC is 0.631. **It measures self-consistency, not
+validity. It is highest exactly when the synthesiser has confidently learned a wrong relationship,
+so it selected FOR the failure mode it was built to prevent.** Over three datasets and three seeds
+each, plain i.i.d. assignment scored higher than rank preservation in 9 of 9 runs.
+`preserve_ranking=False` is therefore the default, and rate matching alone is the mechanism. The
+gate survives only for callers who opt in explicitly.
 
 **Why it exists separately from `cortec`.** An organisation that cannot run an LLM at all, or does
 not want to, can still correct the one axis marginal methods leave weakest. The dependency is
@@ -156,25 +156,25 @@ def check_feasible(schema: Schema, *, n_rows: int | None = None,
     """Warn or refuse BEFORE the user spends hours discovering the synthesiser will not converge.
 
     **This gate used to be domain size, and our own ablation refuted that.** Adult has the largest
-    domain of every schema we measured -- 4.4e13, six million times larger than a diabetes prefix
-    that times out -- and Adult is the one that fits. Worse, within one dataset the arm with the
-    LARGER domain fit 425 s FASTER than the arm with the smaller one. Domain volume does not
-    predict convergence and gating on it refuses the wrong schemas.
+    domain of every schema we measured (4.4e13, six million times larger than a diabetes prefix that
+    times out), yet Adult is the one that fits. Worse, within one dataset the arm with the LARGER
+    domain fit 425 s FASTER than the arm with the smaller one. Domain volume does not predict
+    convergence and gating on it refuses the wrong schemas.
 
     What did predict it, each demonstrated by a controlled flip against AIM_OBSERVATIONS:
 
-      * **attribute count** -- the full 19-column healthcare schema times out at the same row count
-        where the 15-column census schema fits;
-      * **row count** -- the same 10-column schema at the same domain moves from a 26-minute fit to
-        a timeout purely by going from 26,048 rows to 81,410;
-      * **high-cardinality correlated numeric columns** -- finance has Adult's width, FEWER rows and
-        a 30x smaller domain and still does not converge. Dropping any three columns does not
+      * **Attribute count.** The full 19-column healthcare schema times out at the same row count
+        where the 15-column census schema fits.
+      * **Row count.** The same 10-column schema at the same domain moves from a 26-minute fit to a
+        timeout purely by going from 26,048 rows to 81,410.
+      * **High-cardinality correlated numeric columns.** Finance has Adult's width, FEWER rows and a
+        30x smaller domain, yet it still does not converge. Dropping any three columns does not
         rescue it. Dropping three *amount* columns does. A width-matched control (drop three
         demographics instead) still times out, which is the only way to separate the two causes.
 
-    Scope, stated because it bounds the rule: ten fits, one dataset family per cause, one AIM
-    implementation, one time budget. This is a heuristic from observations, not a theory of AIM.
-    `max_domain` is accepted and ignored, for callers written against the old signature.
+    The scope bounds the rule: ten fits, one dataset family per cause, one AIM implementation and
+    one time budget. This is a heuristic from observations, not a theory of AIM. `max_domain` is
+    accepted and ignored, for callers written against the old signature.
     """
     n_cols = len(schema.columns)
     wide = _wide_numeric_columns(schema)
@@ -193,7 +193,7 @@ def check_feasible(schema: Schema, *, n_rows: int | None = None,
         reasons.append(
             f"{len(wide)} high-cardinality numeric columns ({', '.join(wide[:6])}"
             f"{', ...' if len(wide) > 6 else ''}): the one schema in our measurements with this "
-            f"shape did not converge, and a width-matched control showed the cause was those "
+            f"shape did not converge. A width-matched control showed that the cause was those "
             f"columns rather than the width")
 
     report = {
@@ -221,7 +221,7 @@ def check_feasible(schema: Schema, *, n_rows: int | None = None,
               f"did NOT predict convergence in our measurements and is not used here.)\n"
               f"  Options: drop or coarsen the high-cardinality numeric columns first (that is "
               f"what rescued the one failing schema we diagnosed), reduce attributes, subsample "
-              f"rows, or use MST, whose cost grew far more gently across the same schemas.\n"
+              f"rows or use MST. MST's cost grew far more gently across the same schemas.\n"
               f"  This is a heuristic from ten fits under one implementation, not a theory. Pass "
               f"raise_on_fail=False to proceed and measure it yourself."
         )
@@ -246,16 +246,16 @@ def release_conditional_table(schema: Schema, df: pd.DataFrame, columns: tuple[s
     """
     if n_min < 50:
         raise CorrectionError(
-            f"n_min={n_min} is below the safe floor of 50: a rate over fewer records is dominated "
+            f"n_min={n_min} is below the safe floor of 50. A rate over fewer records is dominated "
             f"by its own Laplace noise.")
     # the cell columns must be schema features; a typo used to surface as a pandas KeyError
     known = list(schema.numerical) + list(schema.categorical)
     if not columns:
-        raise CorrectionError("columns is empty: name at least one schema column to build the cells over")
+        raise CorrectionError("columns is empty. Name at least one schema column to build the cells over")
     for c in columns:
         if c == schema.target:
             raise CorrectionError(
-                f"column '{c}' is the target: the cells are built over features, and the target "
+                f"column '{c}' is the target. The cells are built over features, and the target "
                 f"is what the table conditions on. NO privacy budget was spent.")
         if c not in known:
             raise CorrectionError(
@@ -277,8 +277,8 @@ def release_conditional_table(schema: Schema, df: pd.DataFrame, columns: tuple[s
                 f"epsilon_per_person={_eps_person:.1f}, past the "
                 f"{VACUOUS_EPSILON_PER_PERSON:.0f} beyond which a per-person guarantee carries no "
                 f"meaning. The privacy unit here is one row, so unaggregated longitudinal data "
-                f"degrades the guarantee by the maximum contribution count. Either aggregate to "
-                f"one row per person before releasing, or lower epsilon, or pass "
+                f"weakens the guarantee by the maximum contribution count. Aggregate to "
+                f"one row per person before releasing or lower epsilon. Otherwise, pass "
                 f"acknowledge_vacuous_privacy_unit=True to proceed with a ROW-level guarantee and "
                 f"have the acknowledgement recorded.")
     led = PrivacyLedger(epsilon, max_rows_per_person=max_rows_per_person)
@@ -483,8 +483,8 @@ def estimate_gain(schema: Schema, before: pd.DataFrame, after: pd.DataFrame,
     """Measure what the correction actually changed, using only released quantities.
 
     Reports conditional error against the DP table before and after, and the change in marginal
-    fidelity between the two synthetic sets, because a correction that fixes conditional
-    structure while wrecking marginals is not an improvement, and the user should see both.
+    fidelity between the two synthetic sets. A correction that fixes conditional structure while
+    wrecking marginals is not an improvement, and the user should see both.
     """
     def cond_err(df):
         keys = _cell_keys(df, table.columns, schema)
@@ -527,11 +527,11 @@ def estimate_gain(schema: Schema, before: pd.DataFrame, after: pd.DataFrame,
     out["worth_it_measures"] = "conditional calibration against the released table, nothing else"
     out["worth_it_does_not_predict"] = (
         "downstream utility. Across 11 datasets this correction improved calibration in "
-        "essentially every case while downstream AUC moved in BOTH directions. Of 9 runs flagged "
-        "worth_it, downstream AUC fell on 6 in one run and on 3 of 10 in a repeat, and the "
+        "essentially every case, while downstream AUC moved in BOTH directions. Of 9 runs flagged "
+        "worth_it, downstream AUC fell on 6 in one run and on 3 of 10 in a repeat. The "
         "direction was not stable between runs. Three datasets were reliably negative (a renal "
-        "registry, hospital readmission, cervical cancer): there the correction reliably improved "
-        "calibration AND reliably reduced downstream AUC. Validate on your own held-out data "
+        "registry, hospital readmission and cervical cancer). On them the correction reliably "
+        "improved calibration AND reliably reduced downstream AUC. Validate on your own held-out data "
         "before adopting this. Do not read worth_it as a recommendation.")
     return out
 

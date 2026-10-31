@@ -1,14 +1,14 @@
 """autoconfig.py: derive a conditional hierarchy from a schema, privately. On by default.
 
 A CoRTeC deployment has to decide which columns the conditional table conditions on and how fine
-that table should be. Choosing those by inspecting the data is what a research study does; it is
-not something a deploying institution can legitimately do, and in our own study getting it wrong
-cost real utility: a hierarchy conditioned on two demographic attributes carrying 0.009 and 0.004
-of mutual information while omitting two payment attributes carrying 0.057 and 0.042.
+that table should be. A research study can choose those by inspecting the data, but a deploying
+institution legitimately cannot. In our own study, getting it wrong cost real utility. The hierarchy
+conditioned on two demographic attributes carrying 0.009 and 0.004 of mutual information and left
+out two payment attributes carrying 0.057 and 0.042.
 
-So the tool derives it. `Schema.conditional` left empty means "derive"; supplying it means "I know
-what I want, use mine". Autoconfig is the default because the failure mode of hand-tuning is silent:
-nothing in the output says the hierarchy was the wrong one.
+So the tool derives it. Leaving `Schema.conditional` empty means "derive". Supplying it means "I
+know what I want, so use mine". Autoconfig is the default because the failure mode of hand-tuning is
+silent: nothing in the output says the hierarchy was the wrong one.
 
 The derivation spends a small, declared share of the budget on noised (column x target) contingency
 tables, L1 sensitivity 1 each, and everything after the noised counts is post-processing. Wide
@@ -116,14 +116,14 @@ def derive(schema, private: pd.DataFrame, *, epsilon_total: float, n_records: in
            ledger=None) -> DerivedConfig:
     """Derive a conditional hierarchy. Consumes `selection_fraction` of `epsilon_total`.
 
-    `ledger`, when supplied, is charged for the selection query HERE and supplies the noise scale,
-    which is the package's central invariant: `PrivacyLedger.spend()` is meant to be the only
+    When `ledger` is supplied, it is charged for the selection query HERE and supplies the noise
+    scale. This is the package's central invariant. `PrivacyLedger.spend()` is meant to be the only
     function that returns a noise scale, so that nothing can be released without appearing in the
-    audit trail. This function used to compute `m / eps_sel` itself and be charged separately by
-    the caller afterwards. The two agreed, but only by convention: a change to the epsilon in one
-    place and not the other would have added noise at one budget while charging another, silently,
-    which is precisely the class of defect the ledger exists to prevent. Callers that pass no
-    ledger keep the old behaviour and must charge the selection themselves.
+    audit trail. This function used to compute `m / eps_sel` itself and be charged separately by the
+    caller afterwards. The two agreed, but only by convention. Changing the epsilon in one place and
+    not the other would have silently added noise at one budget while charging another. That is
+    precisely the class of defect the ledger exists to prevent. Callers that pass no ledger keep the
+    old behaviour and must charge the selection themselves.
     """
     cols = [c for c in list(schema.numerical) + list(schema.categorical)]
     m = max(1, len(cols))

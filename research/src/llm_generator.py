@@ -723,7 +723,7 @@ class LLMSyntheticGenerator:
                 )
             else:
                 df = pd.DataFrame(columns=prior_c.columns)
-                print(f"  [{_lbl}] complete from the resumed rows ({len(prior_c)}); no call made")
+                print(f"  [{_lbl}] complete from the resumed rows ({len(prior_c)}). No call made")
             if len(prior_c):
                 df = pd.concat([prior_c, df], ignore_index=True)
             if len(df):
@@ -850,7 +850,7 @@ class LLMSyntheticGenerator:
                (self._tok_out / 1e6) * self.PRICE_OUT_PER_MTOK
 
     def _checkpoint(self) -> None:
-        """Inspect results every CHECK_EVERY calls; abort the run if they are not what we expect."""
+        """Inspect results every CHECK_EVERY calls. Abort the run if they are not what we expect."""
         rate = self._window_ok / max(self._window_calls, 1)
         overall = self._n_parse_ok / max(self._n_calls, 1)
         spend = self.spend_usd()
@@ -911,7 +911,7 @@ class LLMSyntheticGenerator:
                        "permission", "authentication", "daily", "monthly")   # a daily/monthly cap is not transient
 
     class _RateLimited(Exception):
-        """The vendor asked us to wait; raised by _handle_api_error, caught by _call_llm."""
+        """The vendor asked us to wait. Raised by _handle_api_error, caught by _call_llm."""
 
     def _is_rate_limit(self, e: Exception) -> bool:
         low = str(e).lower()
@@ -928,7 +928,7 @@ class LLMSyntheticGenerator:
                     # persisted for the whole backoff window: count it the ordinary way
                     self._consecutive_api_errors += 1
                     self._last_api_error = str(rl)
-                    print(f"  rate limit persisted through {attempt} waits; counting it as an API error")
+                    print(f"  rate limit persisted through {attempt} waits. Counting it as an API error")
                     if self._consecutive_api_errors >= self.MAX_CONSECUTIVE_API_ERRORS:
                         raise self.GenerationAborted(
                             f"ABORTED: {self._consecutive_api_errors} consecutive API errors. Last: {str(rl)[:300]}")
@@ -1120,7 +1120,7 @@ class LLMSyntheticGenerator:
                 if r.status_code < 500:
                     break
                 wait = 5 * (attempt + 1)
-                print(f"  Ollama proxy {r.status_code}; retry {attempt + 1}/3 in {wait}s")
+                print(f"  Ollama proxy {r.status_code}. Retry {attempt + 1}/3 in {wait}s")
                 time.sleep(wait)
             if r.status_code == 403 and self._ollama_host_override is None:
                 # Ollama rejected the forwarded Host; retry once with the loopback override and
@@ -1148,7 +1148,7 @@ class LLMSyntheticGenerator:
             if not content.strip() and msg.get("thinking"):
                 print(f"  [ollama] empty content but {len(msg['thinking'])} chars of reasoning "
                       f"(done_reason={d.get('done_reason')}, eval_count={d.get('eval_count')}): "
-                      f"the reasoning budget was exhausted before any output; raise "
+                      f"the reasoning budget was exhausted before any output. Raise "
                       f"ollama_num_predict (currently {self.ollama_num_predict}).")
             return content
         except Exception as e:

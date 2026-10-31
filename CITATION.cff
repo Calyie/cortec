@@ -9,25 +9,25 @@ doi: "10.5281/zenodo.22945315"
 repository-code: "https://github.com/Calyie/cortec"
 abstract: >-
   We propose CoRTeC, a differentially private release for synthetic tabular data that separates
-  spending the privacy budget from generating rows. CoRTeC spends the budget once, on a small
-  release of noisy counts designed for training a classifier. For each cohort of the data, the
+  spending the privacy budget from generating rows. CoRTeC spends the budget once on a small
+  release of noisy counts designed for training a classifier. For each cohort of the data the
   release gives the cohort's size, its class balance, a histogram of every attribute for each
-  outcome class, and the outcome rate in a set of non-overlapping cells. A reviewer can check
-  every one of these numbers before the release leaves the institution. Everything after the
-  release is post-processing and costs no further privacy. A maximum-entropy decoder can turn the
-  counts into rows, and so can each of the five frozen language models we tested, none of which
-  ever sees a record. A selection step then matches the decoded rows to the released counts. One
-  release can therefore serve any number of draws, by any team and with any model, and the model
-  can be replaced without touching the guarantee. At ε = 2, the auto-configured release, decoded
-  without a language model, trains classifiers to within 0.02 AUC of a real sample of the same
-  size on Adult, over three splits. The gap is larger on NHANES and bank marketing, reaching 0.07
-  AUC on the medical dataset. The fixed workload carries the conditional rates a deployment names,
-  at some cost to pairs of columns. Four controls show where the utility comes from: the release
-  and the selection step provide most of it, and a language model adds what it knows from the
-  column names. No private row ever reaches a decoder, the strongest membership attack stays far
-  below the bound the budget allows, and no synthetic row copies a training row. This repository
-  holds the Apache-2.0 reference implementation with its tests, the research pipeline, the paper,
-  the deployment guide and the frozen auto-configurations.
+  outcome class and the outcome rate in a set of non-overlapping cells. A reviewer can check every
+  one of these numbers before the release leaves the institution. Everything after the release is
+  post-processing and costs no further privacy. A maximum-entropy decoder can turn the counts into
+  rows. So can each of the five frozen language models we tested, and none of them ever sees a
+  record. A selection step then matches the decoded rows to the released counts. One release can
+  therefore serve any number of draws by any team with any model, and the model can be replaced
+  without touching the guarantee. Decoded without a language model, the auto-configured release at
+  ε = 2 trains classifiers to within 0.02 AUC of a real sample of the same size on Adult over
+  three splits. The gap is larger on NHANES and bank marketing, reaching 0.07 AUC on the medical
+  dataset. The fixed workload carries the conditional rates a deployment names at some cost to
+  pairs of columns. Four controls show where the utility comes from: the release and the selection
+  step provide most of it, and a language model adds what it knows from the column names. No
+  private row ever reaches a decoder and no synthetic row copies a training row. The strongest
+  membership attack stays far below the bound the budget allows. This repository holds the
+  Apache-2.0 reference implementation with its tests, the research pipeline, the paper, the
+  deployment guide and the frozen auto-configurations.
 authors:
   - family-names: "Nnona"
     given-names: "Calister"

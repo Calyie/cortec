@@ -1,10 +1,10 @@
 """cortec.plots: figures in the paper's style, from a RunRecord.
 
-The rc parameters are those of the paper's figures: one type scale, constrained layout,
-no top or right spine, a light grid behind the marks, DejaVu Sans, and the validated palette
-assigned in fixed order. `figure_for(record, path)` draws the figure a record's stage calls for
-and returns the path, or None when the stage has no figure. matplotlib is optional: the import
-happens inside the functions, and `RunRecord.save()` records a missing matplotlib instead of failing.
+The rc parameters are those of the paper's figures: one type scale, constrained layout, no top or
+right spine, a light grid behind the marks, DejaVu Sans and the validated palette assigned in a
+fixed order. `figure_for(record, path)` draws the figure a record's stage calls for and returns the
+path, or None when the stage has no figure. matplotlib is optional. The import happens inside the
+functions, and `RunRecord.save()` records a missing matplotlib instead of failing.
 """
 from __future__ import annotations
 

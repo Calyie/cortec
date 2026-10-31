@@ -16,23 +16,24 @@ the noise into a one-sided confidence bound,
 Three design points carry the guarantee and are enforced here rather than documented.
 
   * Each cell's rate is taken over max(|c|, n_min) and the Laplace scale uses the PUBLIC suppression
-    floor `n_min` as the sensitivity bound, so the bound holds for every cell whatever its true size. A scale set from the true cell size is data-dependent under add/remove
-    adjacency and is not pure epsilon-DP. The bound is conservative by n_c / n_min on each cell,
-    which is the price of that.
-  * Cells partition the private data, so the k rate queries compose in PARALLEL: each may spend the
+    floor `n_min` as the sensitivity bound, so the bound holds for every cell whatever its true
+    size. A scale set from the true cell size is data-dependent under add/remove adjacency and is
+    not pure epsilon-DP. The price of that is a bound that is conservative by n_c / n_min on each
+    cell.
+  * Cells partition the private data, so the k rate queries compose in PARALLEL. Each may spend the
     full `epsilon_cert`, and the deployment has spent `epsilon_release + epsilon_cert` in total. The
     spend goes through a `PrivacyLedger`, so it appears in the audit trail like every other query.
   * The noise is drawn from a cryptographically secure, unseedable source. A seeded draw would let
     anyone holding the seed subtract the noise and recover `p_c` exactly, which voids the spend.
 
 Floor and ceiling. `bound_with_controls()` scores three conditions against ONE noisy release of the
-private rates: the synthetic data, a real hold-out sample (the ceiling, which should clear the
-tolerance) and the same sample with its target permuted (the floor, which must not). If the ceiling
-fails or the floor clears, the test did not discriminate and NO verdict is issued. Scoring all three
-against one draw spends `epsilon_cert` once, not three times.
+private rates. They are the synthetic data, a real hold-out sample (the ceiling, which should clear
+the tolerance) and the same sample with its target permuted (the floor, which must not). If the
+ceiling fails or the floor clears, the test did not discriminate and NO verdict is issued. Scoring
+all three against one draw spends `epsilon_cert` once, not three times.
 
 Cells the synthetic data does not cover are scored at the trivial bound of 1.0, so a bound cannot be
-obtained by covering a convenient subset of the cells; cells with fewer than
+obtained by covering a convenient subset of the cells. Cells with fewer than
 `MIN_SYNTH_ROWS_PER_CELL` synthetic rows are reported as thin rather than silently trusted.
 """
 from __future__ import annotations
@@ -56,7 +57,7 @@ __all__ = ["transmission_bound", "bound_with_controls", "BoundResult", "BoundRep
 # Below this many synthetic rows in a cell, q_c is too coarse to mean much (with one row it can
 # only be 0 or 1). Such cells are reported, not silently trusted.
 MIN_SYNTH_ROWS_PER_CELL = 20
-TOLERANCE_RULE = ("derived from the release: the Laplace half-width plus half the largest gap between a released cell rate and the released base rate, so the permuted floor cannot pass at any sample size. Reads released quantities only")
+TOLERANCE_RULE = ("derived from the release as the Laplace half-width plus half the largest gap between a released cell rate and the released base rate. The permuted floor therefore cannot pass at any sample size. Reads released quantities only")
 
 
 class BoundError(RuntimeError):
@@ -66,9 +67,9 @@ class BoundError(RuntimeError):
 # ── the report's fixed text: what it is, what it is not, where the guarantee stops ──────
 WHAT_THIS_IS = {
     "artifact": "utility transmission bound",
-    "bounds": "how far the synthetic conditional structure can differ from the private one, over "
+    "bounds": "how far the synthetic conditional structure can differ from the private one over "
               "the released cells, at a stated confidence and a stated epsilon",
-    "is_not": "a privacy audit, a re-identification risk assessment, or any form of privacy "
+    "is_not": "a privacy audit, a re-identification risk assessment or any form of privacy "
               "guarantee. It does not attest to privacy and must not be presented as doing so.",
     "privacy_evidence_lives_elsewhere": "the DP release itself (its accounting record) and the "
                                         "measured re-identification evidence, not this bound",
@@ -81,36 +82,36 @@ DP_CLAIM = {
     "privacy_unit": "one dataset row",
     "composition": "parallel across the disjoint released cells",
     "mechanism": "Laplace",
-    "sensitivity": "1/n_min per released cell rate, taken over max(|c|, n_min): the public size floor, not the private cell "
-                   "size. The bound is conservative by n_c/n_min on each cell.",
+    "sensitivity": "1/n_min per released cell rate, taken over max(|c|, n_min). The floor is the public size floor, not the "
+                   "private cell size. The bound is conservative by n_c/n_min on each cell.",
 }
 
 DP_CAVEATS = [
-    "The privacy unit is one ROW. Under group privacy a person contributing k rows receives "
+    "The privacy unit is one ROW. Under group privacy a person who contributes k rows receives "
     "k*epsilon. The per-person figure in this report is the declared maximum rows per person times "
     "the row-level total. Reduce k before Stage A if a per-person guarantee is needed.",
-    "Noise is sampled with a floating-point Laplace generator, which is vulnerable to the Mironov "
-    "(2012) least-significant-bit attack. A deployment handling real PHI should use a discrete or "
+    "Noise is sampled with a floating-point Laplace generator. Such a generator is vulnerable to the "
+    "Mironov (2012) least-significant-bit attack. A deployment handling real PHI should use a discrete or "
     "snapping sampler. This implementation does not, and that is a known gap.",
     "The guarantee covers the released statistics and this bound's own query. It says nothing "
-    "about the generator's pretraining data, which is outside the DP boundary entirely.",
+    "about the generator's pretraining data, which is entirely outside the DP boundary.",
     "This is a UTILITY TRANSMISSION BOUND computed under DP. It bounds how far the synthetic "
-    "conditional structure can differ from the private one. It does NOT attest to privacy, says "
-    "nothing about re-identification risk, and must never be presented as a privacy audit.",
-    "Which cells enter the bound is decided by the release. With charge_suppression=True, the "
-    "default, a cell was released only if its noised, charged support reached n_min, so the "
+    "conditional structure can differ from the private one. It does NOT attest to privacy and says "
+    "nothing about re-identification risk. It must never be presented as a privacy audit.",
+    "Which cells enter the bound is decided by the release. With charge_suppression=True (the "
+    "default) a cell was released only if its noised, charged support reached n_min, so the "
     "selection is post-processing. With charge_suppression=False it read the exact counts. The "
     "release's accounting record says which rule applied.",
-    "Cells for which the synthetic data supplies no rows are scored at the trivial bound of 1.0, "
-    "so a bound cannot be obtained by covering a convenient subset of the cells.",
+    "Cells for which the synthetic data supplies no rows are scored at the trivial bound of 1.0. "
+    "A bound therefore cannot be obtained by covering a convenient subset of the cells.",
 ]
 
 STANDARDS_ALIGNED = {
     "NIST SP 800-226": "parameter reporting for the DP claim block, and documenting where the "
                        "guarantee does not hold",
     "NIST SP 800-188": "governance and documentation of the release package. This is the "
-                       "documented utility claim attached to a release, fitness for use. It is NOT "
-                       "a disclosure review: disclosure risk is assessed by the aggregation floor "
+                       "documented utility claim (fitness for use) attached to a release. It is NOT "
+                       "a disclosure review. Disclosure risk is assessed by the aggregation floor "
                        "and the measured re-identification evidence, not by this bound.",
 }
 
@@ -118,17 +119,17 @@ STANDARDS_NOT_CLAIMED = {
     "HIPAA Expert Determination":
         "NOT claimed. Expert Determination requires a statistical assessment of re-identification "
         "risk. This report bounds a utility quantity, and mapping it to that route would be a "
-        "category error with compliance consequences. That route is carried by the DP release "
-        "itself (with epsilon stated per person) together with measured re-identification "
-        "evidence, not by this bound.",
+        "category error with compliance consequences. That route is served by the DP release "
+        "itself (with epsilon stated per person) and by measured re-identification evidence, "
+        "not by this bound.",
     "ISO/IEC 27559 / ISO/IEC 20889":
         "NOT claimed. These frame re-identification risk and de-identification technique. The "
         "corresponding evidence is the aggregation floor (cells of at least n_min) and the "
-        "measured membership-inference results, neither of which is this report.",
+        "measured membership-inference results. Neither of them is this report.",
     "GDPR Art. 25 / Recital 26":
-        "NOT claimed. Data protection by design is carried by the architecture, in which private "
-        "data never leaves the regulated zone and the prompt carries only the DP release, not by "
-        "a utility bound computed downstream of it.",
+        "NOT claimed. Data protection by design comes from the architecture, not from a utility "
+        "bound computed downstream of it. Private data never leaves the regulated zone, and the "
+        "prompt carries only the DP release.",
 }
 
 
@@ -365,19 +366,18 @@ def bound_with_controls(schema: Schema, release: Release, private_df: pd.DataFra
                         seed: int = 0) -> BoundReport:
     """Stage C with its floor and ceiling. Spends `epsilon_cert` once, on `private_df`.
 
-    `tolerance` is "auto" by default: the half-width plus half the largest gap between a released
-    cell rate and the released base rate, read from the release alone (post-processing), so that
-    the permuted floor cannot pass at any sample size. The fixed default of 0.15 that preceded this rule was chosen
-    by repetition on research data, which a shipped rule must not be. Pass a number to override.
-    No verdict is issued while any released cell holds fewer than MIN_SYNTH_ROWS_PER_CELL
-    synthetic rows: such a rate moves by a third on three rows and the bound carries no sampling
-    term for it.
-    `holdout_df` must be real data that was NOT used to build the release, so that the ceiling is a
-    genuine real sample rather than the training set compared against its own subset. `seed`
-    controls only which hold-out rows form the ceiling and how the floor is permuted. It never
-    touches the DP noise. `max_rows_per_person` is read from the release's accounting record when
-    the release declared it. Pass it here otherwise, because the report will not state a per-person
-    figure it was not given.
+    `tolerance` is "auto" by default. It is the half-width plus half the largest gap between a
+    released cell rate and the released base rate, read from the release alone (post-processing).
+    The permuted floor therefore cannot pass at any sample size. The fixed default of 0.15 that
+    preceded this rule was chosen by repetition on research data, which a shipped rule must not be.
+    Pass a number to override. No verdict is issued while any released cell holds fewer than
+    MIN_SYNTH_ROWS_PER_CELL synthetic rows: such a rate moves by a third on three rows and the bound
+    carries no sampling term for it. `holdout_df` must be real data that was NOT used to build the
+    release, so that the ceiling is a genuine real sample rather than the training set compared
+    against its own subset. `seed` controls only which hold-out rows form the ceiling and how the
+    floor is permuted. It never touches the DP noise. `max_rows_per_person` is read from the
+    release's accounting record when the release declared it. Pass it here otherwise, because the
+    report will not state a per-person figure it was not given.
     """
     lv, cols, cells, eff, p_hat, n_priv, ledger = _noisy_private_rates(
         schema, release, private_df, epsilon_cert=epsilon_cert, level=level, ledger=None)

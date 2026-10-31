@@ -1,11 +1,11 @@
 # The result record
 
-Every run of `cortec` and `cortec-hybrid` can be printed and exported in one layout, through
+Every run of `cortec` and `cortec-hybrid` can be printed and exported in one layout through
 `cortec.report`. The printed form is a stage header, a block of named values, one or more tables,
-the warnings, and a verdict. The exported form is one JSON record with a declared format version.
-Alongside it come a Markdown rendering of the same content, one CSV of the named values, one CSV
-per table, and, when matplotlib is installed, a figure in the paper's style. This document is the
-contract for the JSON record. The other exports are derived from it.
+the warnings and a verdict. The exported form is one JSON record with a declared format version.
+Alongside it come a Markdown rendering of the same content, one CSV of the named values and one
+CSV per table. When matplotlib is installed, a figure in the paper's style is added. This document
+is the contract for the JSON record. The other exports are derived from it.
 
 ## Producing a record
 
@@ -22,8 +22,8 @@ rec = show(correct(schema, private_df, synthetic_df, columns=("age",), epsilon=0
 files = rec.save("results/run-2026-09-24", "stage_c")   # {name: path}
 ```
 
-`record(obj, ...)` builds the record without printing, and `RunRecord.from_json(path)` reads one
-back. Colour is used only on a terminal. `NO_COLOR` or `CORTEC_COLOR=0` turns it off, and
+`record(obj, ...)` builds the record without printing. `RunRecord.from_json(path)` reads one back.
+Colour is used only on a terminal. `NO_COLOR` or `CORTEC_COLOR=0` turns it off, and
 `CORTEC_COLOR=1` forces it on. The exported files never carry colour.
 
 ## Fields
@@ -34,21 +34,21 @@ back. Colour is used only on a terminal. `NO_COLOR` or `CORTEC_COLOR=0` turns it
 | `tool` | string | `cortec` or `cortec-hybrid` |
 | `version` | string | the package version that wrote the record |
 | `stage` | string | `Stage A`, `Stage B`, `Stage C`, `Evaluation`, `Results` or `Correction` |
-| `title` | string | the stage's name in words: `Release`, `Generate`, `Utility transmission bound`, `Fidelity and utility beside real references`, `Relabel the target column`; `marginal fidelity and downstream utility against real references` for `Results` |
+| `title` | string | the stage's name in words: `Release`, `Generate`, `Utility transmission bound`, `Fidelity and utility beside real references`, `Relabel the target column`. `marginal fidelity and downstream utility against real references` for `Results` |
 | `schema` | string | the schema's `name` |
 | `created` | string | UTC time, ISO 8601, to the second |
-| `values` | object | the named values of the run, `name: value`; numbers are numbers, booleans are booleans, text is text |
+| `values` | object | the named values of the run, `name: value`. Numbers are numbers, booleans are booleans, text is text |
 | `value_order` | array | the names in `values` in display order |
-| `epsilon` | object | the budget the stage spent or inherited: `declared`, `accounted`, `per_row`, `per_person` for Stage A; `per_row: 0` for Stage B; `release`, `bound`, `per_row`, `per_person` for Stage C; `table`, `accounted`, `per_row` for the correction |
-| `tables` | array | one object per table: `name`, `columns`, `rows` (arrays in column order), `reference_rows` (indices of rows that are references, such as a real sample or a permuted floor), `note`, `decimals`; `subtitle` (optional: the question the table answers) |
-| `warnings` | array | the run's warnings, each a sentence; empty when there were none |
+| `epsilon` | object | the budget the stage spent or inherited: `declared`, `accounted`, `per_row`, `per_person` for Stage A. `per_row: 0` for Stage B. `release`, `bound`, `per_row`, `per_person` for Stage C. `table`, `accounted`, `per_row` for the correction |
+| `tables` | array | one object per table: `name`, `columns`, `rows` (arrays in column order), `reference_rows` (indices of rows that are references, such as a real sample or a permuted floor), `note`, `decimals`. `subtitle` (optional: the question the table answers) |
+| `warnings` | array | the run's warnings, each a sentence. Empty when there were none |
 | `notes` | array | standing statements that travel with the stage, such as "This bounds utility. It is not a privacy audit." |
 | `verdict` | string or null | the stage's one-sentence verdict, or null when the stage has none |
 | `verdict_role` | string | `ok`, `warning` or `refusal`: how the verdict is to be read, and the colour it is printed in |
 | `files` | object | the paths `save()` wrote, by name: `json`, `markdown`, `values_csv`, `table_csv:<table name>`, and `figure` (a path, or `not written: ...` when matplotlib is absent) |
 
-Numbers are stored at full precision. The printed and Markdown forms show three decimal places,
-the paper's convention, and integers with a thousands separator.
+Numbers are stored at full precision. The printed and Markdown forms follow the paper's
+convention: three decimal places, and integers with a thousands separator.
 
 ## The tables each stage writes
 
@@ -58,39 +58,39 @@ the paper's convention, and integers with a thousands separator.
 | Stage A | `conditional table, level k` (the finest released level) | cell, rate, support |
 | Stage A | `privacy accounting` | group, queries, partitions, epsilon |
 | Stage B | `reasoning evidence` | measure, count |
-| Stage C | `bound per condition` | condition, cells, covered, uncovered, thin, mean bound, worst bound, within tolerance; rows 1 and 2 are the real-sample ceiling and the permuted-target floor |
-| Stage C | the verdict line | `within bound`, `outside tolerance`, or `no verdict` with its reason: a released cell below 20 synthetic rows, or controls that did not discriminate; the record's values carry the tolerance and `tolerance rule` (derived from the release, or explicit) |
-| Evaluation | `fidelity and utility` | table, rows, 1-way TV, TSTR-LR, TSTR-RF, TSTR-GBM, absent categories; the last two rows are the real sample and the permuted floor |
-| Evaluation | `reference spread` (when `reference_draws` > 1) | measure, real sample mean, real min, real max, permuted mean, permuted min, permuted max; one row per measure, over the real samples drawn as references and their permuted copies |
-| Results | `marginal fidelity result` | measure, synthetic, real sample, permuted, gap; the note carries the reading |
-| Results | `downstream utility result` | student, synthetic AUC, real sample, permuted, gap, share of real-sample utility; one row per student; the note carries the readings |
+| Stage C | `bound per condition` | condition, cells, covered, uncovered, thin, mean bound, worst bound, within tolerance. Rows 1 and 2 are the real-sample ceiling and the permuted-target floor |
+| Stage C | the verdict line | `within bound`, `outside tolerance`, or `no verdict` with its reason: a released cell below 20 synthetic rows, or controls that did not discriminate. The record's values carry the tolerance and `tolerance rule` (derived from the release, or explicit) |
+| Evaluation | `fidelity and utility` | table, rows, 1-way TV, TSTR-LR, TSTR-RF, TSTR-GBM, absent categories. The last two rows are the real sample and the permuted floor |
+| Evaluation | `reference spread` (when `reference_draws` > 1) | measure, real sample mean, real min, real max, permuted mean, permuted min, permuted max. One row per measure, over the real samples drawn as references and their permuted copies |
+| Results | `marginal fidelity result` | measure, synthetic, real sample, permuted, gap. The note carries the reading |
+| Results | `downstream utility result` | student, synthetic AUC, real sample, permuted, gap, share of real-sample utility. One row per student. The note carries the readings |
 | Correction | `released conditional table` | cell, rate, support |
 
 The evaluation table uses the layout of the paper's main results table. A synthetic row is read
 against the two reference rows, never against a threshold. The real sample is the ceiling at that
-size, and the shuffled floor is what data with no usable target information scores. The reference
-rows are means over `reference_draws` real samples (five by default). `reference spread` holds the
-lowest and highest value of each measure across those samples, which is the range that real data of
+size. The shuffled floor is what data with no usable target information scores. The reference rows
+are means over `reference_draws` real samples (five by default). `reference spread` holds the
+lowest and highest value of each measure across those samples. That is the range that real data of
 that size spans on that holdout.
 
 The results record (`record_results(evaluation=..., bound=..., generation=..., release=...)`) is
-built from the other records, so it can be rebuilt from their JSON files. Its values block has one
-line each for marginal fidelity, downstream utility, the Stage C verdict, the privacy spent and
-the cost. Its two tables place every synthetic number against the real-sample range: within it,
-beyond every real sample, or outside it by a stated amount. They also give each student's share of
-real-sample utility, computed as (synthetic - shuffled) / (real sample - shuffled). Its verdict is
-the run's one-sentence headline. It is `ok` when every measure reads within or beyond the range
-and `warning` otherwise, and it is a reading at one draw, not a pass or a fail. `cortec run`
-prints it last and writes it as `RESULTS.md` beside `results.json`. The results record has no
-figure.
+built from the other records. It can therefore be rebuilt from their JSON files. Its values block
+has one line each for marginal fidelity, downstream utility, the Stage C verdict, the privacy
+spent and the cost. Its two tables place every synthetic number against the real-sample range:
+within it, beyond every real sample or outside it by a stated amount. They also give each
+student's share of real-sample utility, computed as (synthetic - shuffled) / (real sample -
+shuffled). Its verdict is the run's one-sentence headline. It is `ok` when every measure reads
+within or beyond the range and `warning` otherwise. It is a reading at one draw, not a pass or a
+fail. `cortec run` prints it last and writes it as `RESULTS.md` beside `results.json`. The results
+record has no figure.
 
 ## Figures
 
 `rec.save()` writes a figure, `<stem>.png`, for four kinds of record. For Stage A it shows the
 cohort rates and the finest conditional level. For Stage C it shows the bound for each condition
-against the tolerance. For the evaluation it shows fidelity and utility beside the references, and
-for the correction it shows the conditional error before and after. Stage B has no figure. The
-style is the paper's. `cortec.plots.paper_rcparams()` returns the plotting parameters the paper's
-figure script uses, and the palette is the paper's checked categorical palette, assigned in a
-fixed order. Reference rows are drawn in grey, results in blue, and the tolerance in the paper's
-reference-line colour.
+against the tolerance. For the evaluation it shows fidelity and utility beside the references. For
+the correction it shows the conditional error before and after. Stage B has no figure. The style
+is the paper's. `cortec.plots.paper_rcparams()` returns the plotting parameters the paper's figure
+script uses. The palette is the paper's checked categorical palette, assigned in a fixed order.
+Reference rows are drawn in grey, results in blue and the tolerance in the paper's reference-line
+colour.

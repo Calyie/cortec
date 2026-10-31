@@ -312,7 +312,7 @@ def _selection_fraction(spec, train: pd.DataFrame) -> tuple[float, str]:
     need = NOISE_FLOOR_MULTIPLE * m * L * ny / max(1, len(train))
     frac = float(np.clip(need, SELECTION_FRACTION_MIN, SELECTION_FRACTION_MAX))
     why = (f"m={m}, median levels={L:.0f}, |Y|={ny}, n={len(train)} -> selection needs "
-           f"eps>={need:.3f} of the total; using {frac:.0%}")
+           f"eps>={need:.3f} of the total. Using {frac:.0%}")
     return frac, why
 
 
@@ -342,7 +342,7 @@ def autoconfigure(spec, train: pd.DataFrame, *, epsilon_total: float, n_records:
     if not ranking:
         notes.append("no column had cells large enough to survive the selection noise at this "
                      "epsilon and sample size, so conditioning on nothing, which is the safe "
-                     "fallback; raise epsilon_selection or supply more records")
+                     "fallback. Raise epsilon_selection or supply more records")
     if len(ranking) > 1 and ranking[0][1] <= 0:
         notes.append("no column showed positive mutual information after noising: the target may "
                      "be weakly predictable, or epsilon_selection may be too small")

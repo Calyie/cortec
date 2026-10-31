@@ -1,11 +1,11 @@
 """cortec.help: the help page behind the `cortec` and `cortec-hybrid` commands (and
 `python -m cortec`, `python -m cortec_hybrid`).
 
-`--help` is one screen: the run order with a one-line purpose each, the other public names
-grouped by what they are, and where to go next. `<command> <name>` prints one function or class:
-its arguments one per line with type and default, then its documentation; `<command>
-<Class>.<method>` prints one method. Every argument, default and description is read from the
-code with `inspect`, so the page cannot disagree with the package it describes.
+`--help` is one screen: the run order with a one-line purpose each, the other public names grouped
+by what they are, and where to go next. `<command> <name>` prints one function or class, with its
+arguments one per line with type and default, then its documentation. `<command> <Class>.<method>`
+prints one method. Every argument, default and description is read from the code with `inspect`, so
+the page cannot disagree with the package it describes.
 """
 from __future__ import annotations
 
@@ -103,80 +103,80 @@ TERMS_CORTEC = [
     ("n_min", "the smallest cohort or cell that is released. Smaller ones are suppressed, because "
               "a rate over fewer records is mostly its own noise"),
     ("cohort", "a group of records formed by a public rule over one column (a band of age, say). "
-               "each cohort has its own released histograms"),
+               "Each cohort has its own released histograms"),
     ("conditional table, level, cell", "P(target | cell): the target rate in each cell of a "
                                        "partition of the records by one or more columns. Level 0 "
                                        "is the coarsest partition. The finest level has the most "
                                        "cells"),
     ("support, released size", "the number of private records in a cell or cohort, with noise "
                                "added and charged to the budget"),
-    ("class-conditional", "histograms released once per outcome class in a cohort, where both "
-                          "classes clear n_min, so the model sees what positives and negatives "
+    ("class-conditional", "histograms released once per outcome class in a cohort where both "
+                          "classes clear n_min. The model then sees what positives and negatives "
                           "each look like"),
     ("queries, groups, partitions", "every released statistic is a query charged to the ledger. "
                                     "Queries over disjoint parts of the data (partitions) share "
-                                    "one charge. The groups add up"),
+                                    "one charge, and the groups add up"),
     ("yield", "rows kept divided by rows requested from the model. Rows outside the schema's "
               "bounds or carrying an undeclared category are dropped and counted, never kept"),
     ("positive rate", "the share of rows whose target is the positive label"),
     ("reasoning evidence", "whether the model reported reasoning tokens on each call. Reasoning is "
-                           "the largest single effect measured, and a count that was never "
+                           "the largest single effect measured. A count that was never "
                            "reported is not a count of zero"),
     ("pool factor", "generate pool_factor times n rows, then keep the n whose cell counts match "
-                    "the release; 1 generates exactly n"),
-    ("utility transmission bound", "Stage C: for each released cell, a differentially private "
-                                   "estimate of the private target rate and a bound on the gap "
-                                   "between it and the synthetic rate. The bounds hold over every "
+                    "the release. A factor of 1 generates exactly n"),
+    ("utility transmission bound", "Stage C. For each released cell it gives a differentially "
+                                   "private estimate of the private target rate and a bound on the "
+                                   "gap between it and the synthetic rate. The bounds hold over every "
                                    "cell at once with probability 1 - alpha. It bounds utility. It "
                                    "is not a privacy audit"),
-    ("tolerance", "the largest per-cell gap you accept. By default it is derived from the release: the "
+    ("tolerance", "the largest per-cell gap you accept. By default it is derived from the release as the "
                   "noise half-width plus half the largest gap between a released cell rate and the released "
-                  "base rate, so the permuted floor cannot pass at any sample size. Pass a number to "
+                  "base rate. The permuted floor therefore cannot pass at any sample size. Pass a number to "
                   "override. A table is within tolerance when its worst bound is at or below it. No "
                   "verdict is issued while a released cell holds fewer than 20 synthetic rows"),
-    ("alpha", "the bound holds over every cell with probability at least 1 - alpha; 0.05 gives "
-              "95% simultaneous confidence"),
+    ("alpha", "the bound holds over every cell with probability at least 1 - alpha. A value of "
+              "0.05 gives 95% simultaneous confidence"),
     ("ceiling", "a real sample of the same size as the synthetic table, scored the same way: the "
                 "best any synthetic method can do at that size"),
     ("floor", "the same real sample with its target column permuted: data with no conditional "
               "signal at all"),
     ("discriminating", "the test had power in this run: the ceiling is within tolerance and the "
-                       "floor is not. When it is not discriminating, the verdict on the synthetic "
-                       "table is not reported, because the test could not have told good from "
-                       "bad"),
+                       "floor is not. When the test is not discriminating, the verdict on the "
+                       "synthetic table is not reported, because the test could not have told "
+                       "good from bad"),
     ("covered, uncovered", "a released cell is covered when the synthetic table has rows in it. "
-                           "An uncovered cell scores the trivial bound 1.0, so a bound cannot be "
-                           "earned by covering a convenient subset"),
+                           "An uncovered cell scores the trivial bound 1.0. A bound therefore "
+                           "cannot be earned by covering a convenient subset"),
     ("thin", "a covered cell with fewer than 20 synthetic rows. Its bound rests on few rows"),
     ("mean bound, worst bound", "the average and the largest per-cell bound. The verdict uses "
                                 "the worst"),
-    ("1-way TV", "for each column, the total-variation distance between the table's histogram and "
-                 "the real holdout's on the public bins, averaged over the columns. 0 is "
-                 "identical. Lower is better"),
-    ("TSTR-LR, TSTR-RF, TSTR-GBM", "train on synthetic, test on real: a logistic regression, a "
-                                   "random forest and a gradient-boosting classifier trained on "
+    ("1-way TV", "the total-variation distance between the table's histogram and the real "
+                 "holdout's on the public bins, averaged over the columns. 0 means identical, and "
+                 "lower is better"),
+    ("TSTR-LR, TSTR-RF, TSTR-GBM", "train on synthetic, test on real. A logistic regression, a "
+                                   "random forest and a gradient-boosting classifier are trained on "
                                    "the table and scored by AUC on the real holdout. Higher is "
-                                   "better. Read against the ceiling and floor rows"),
-    ("absent categories", "declared categories that never appear in the table: a "
+                                   "better. Read them against the ceiling and floor rows"),
+    ("absent categories", "declared categories that never appear in the table. This is a "
                           "representativeness failure that no aggregate measure shows"),
     ("reference rows", "the ceiling and floor rows of the evaluation table, printed in grey. Read "
                        "every other row against them, not against a threshold"),
     ("reference draws, reference spread", "the evaluation scores several real samples of the "
                                            "synthetic table's size (five by default), each with a "
-                                           "permuted copy. The reference rows carry their means and "
-                                           "the `reference spread` table their lowest and highest "
+                                           "permuted copy. The reference rows carry their means. The "
+                                           "`reference spread` table carries their lowest and highest "
                                            "values. That range is what real data of this size spans "
                                            "on this holdout"),
-    ("results panel, reading", "the last block of a run: the marginal fidelity result and the downstream "
-                               "utility result placed against the real-sample range, the Stage C "
-                               "verdict, the privacy spent and the cost. A reading says where the "
-                               "synthetic number lies: within the range, beyond every real sample, or "
-                               "outside it by how much. Nothing is passed or failed against a threshold"),
+    ("results panel, reading", "the last block of a run. It places the marginal fidelity result and the "
+                               "downstream utility result against the real-sample range, and gives the "
+                               "Stage C verdict, the privacy spent and the cost. A reading says where "
+                               "the synthetic number lies: within the range, beyond every real sample "
+                               "or outside it by a stated amount. Nothing is passed or failed against a threshold"),
     ("gap", "synthetic minus real sample on one measure. Negative on an AUC means the synthetic-"
             "trained student scored lower"),
     ("share of real-sample utility", "(synthetic - permuted) / (real sample - permuted) on one "
-                                     "student: the part of a real sample's utility above the "
-                                     "no-information floor that the synthetic table reaches; 100% "
+                                     "student. It is the part of a real sample's utility above the "
+                                     "no-information floor that the synthetic table reaches. 100% "
                                      "is the real sample's own utility"),
 ]
 
@@ -267,8 +267,8 @@ def overview(package, *, tool: str, module: str, command: str, run_order, groups
         lines += ["", paint("  also public", "key")]
         for label, names in rows:
             lines += _names_row(label, names, width)
-        lines.append(note(f"refusals print as a boxed block, not a traceback, under install_guard() "
-                          f"or guard()"))
+        lines.append(note(f"under install_guard() or guard(), refusals print as a boxed block, not "
+                          f"a traceback"))
     more = [(f"{command} <name>", "one function or class: arguments, defaults, notes"),
             (f"{command} <Class>.<method>", "one method"),
             (f"{command} terms", "what each word in the output means (tolerance, ceiling ...)"),
@@ -325,7 +325,7 @@ def detail(package, name: str, *, tool: str, command: str) -> str | None:
                 lines += _labelled_row(m, _first_sentence(fn) or "(no description)", width)
             lines.append(note(f"{command} {name}.<method> prints one of them in full"))
     if _is_refusal(obj):
-        lines.append(note("a refusal: printed as a boxed block, not a traceback, under install_guard()"))
+        lines.append(note("a refusal. Under install_guard() it prints as a boxed block, not a traceback"))
     lines += ["", kv_block([(f"{command} --help", "the overview of every public name")], indent=2)]
     return "\n".join(lines)
 
@@ -333,9 +333,9 @@ def detail(package, name: str, *, tool: str, command: str) -> str | None:
 def main(package, argv, *, tool: str, module: str, command: str, run_order, groups, readme: str,
          example: str | None = None, subcommands: dict | None = None, terms=None) -> int:
     """Behind the `cortec` and `cortec-hybrid` commands and `python -m <module>`: a subcommand
-    (`run`) is dispatched with the rest of the arguments. `--help`, `-h` or no argument prints
-    the overview. `terms` prints the glossary. A public name prints its page, a term its entry;
-    an unknown name lists the public names and returns 2."""
+    (`run`) is dispatched with the rest of the arguments. `--help`, `-h` or no argument prints the
+    overview. `terms` prints the glossary. A public name prints its page and a term prints its
+    entry. An unknown name lists the public names and returns 2."""
     if argv and subcommands and argv[0] in subcommands:
         return int(subcommands[argv[0]](argv[1:]) or 0)
     if not argv or argv[0] in ("-h", "--help", "help"):

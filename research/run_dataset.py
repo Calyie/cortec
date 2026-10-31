@@ -273,13 +273,13 @@ def main():
     ap.add_argument("--dataset", required=True, choices=available() + ["diabetes", "credit"])
     ap.add_argument("--resume-partial", action="store_true",
                     help="complete the first draw's pool from the partial_generated_rows.csv an aborted run "
-                         "left in --outdir (same release, same seed); the file is renamed once used")
+                         "left in --outdir (same release, same seed). The file is renamed once used")
     ap.add_argument("--stage", required=True,
                     choices=["release", "generate", "baselines"])
     ap.add_argument("--backend", default="anthropic")
     ap.add_argument("--openai-reasoning-effort", default=None,
                     choices=["minimal", "low", "medium", "high"],
-                    help="vendor-native OpenAI reasoning level; overrides the --effort mapping, under which "
+                    help="vendor-native OpenAI reasoning level. Overrides the --effort mapping, under which "
                          "'low' means minimal. GPT-5's default (medium) cost 14.5x the minimal draw")
     ap.add_argument("--effort", default=None, choices=["low", "medium", "high", "xhigh", "max"],
                     help="reasoning effort; 'low' maps to minimal on OpenAI and to a 128-token "
@@ -306,17 +306,17 @@ def main():
                     help="control = CoRTeC's prompt with the released arrays deleted (§7.1.2)")
     ap.add_argument("--no-class-conditional", dest="class_conditional", action="store_false",
                     default=True,
-                    help="release POOLED cohort histograms only (one block per cohort, no class blocks); the "
+                    help="release POOLED cohort histograms only (one block per cohort, no class blocks). The "
                          "default releases one histogram block per (cohort, class) where both "
                          "classes clear n_min, at the same epsilon per query")
     ap.add_argument("--by-cell", dest="by_cell", action="store_true", default=True,
                     help="generate per released cell with an exact positive COUNT (default: on). "
-                         "Asking for a rate saturates; asking for 'exactly k of n' does not.")
+                         "Asking for a rate saturates. Asking for 'exactly k of n' does not.")
     ap.add_argument("--anthropic-max-tokens", type=int, default=None,
-                    help="output budget per Anthropic call (thinking counts against it); above "
+                    help="output budget per Anthropic call (thinking counts against it). Above "
                          "8192 the call streams")
     ap.add_argument("--quota-seed", type=int, default=None,
-                    help="seed of the exact-count apportionment (default: --seed); pin it when draws run as separate "
+                    help="seed of the exact-count apportionment (default: --seed). Pin it when draws run as separate "
                          "processes so every process, and every model, is asked for the same cohort targets")
     ap.add_argument("--no-quota-by-class", action="store_true",
                     help="with --quota: state the exact counts as totals only (the totals-only prompt). By "
@@ -324,7 +324,7 @@ def main():
                          "(the positives' rows per bin from the positive block, the negatives' from the negative "
                          "block), so the class-specific marginals are enforced, not only read")
     ap.add_argument("--cohort-workers", type=int, default=1,
-                    help="cohorts generated on this many parallel threads (scheduling only: every cohort keeps its own sequence of calls, prompts, counts and seed; default 1 = sequential)")
+                    help="cohorts generated on this many parallel threads (scheduling only: every cohort keeps its own sequence of calls, prompts, counts and seed. Default 1 = sequential)")
     ap.add_argument("--quota", action="store_true",
                     help="cohort-wise path: give every batch exact per-column counts apportioned "
                          "from the release instead of shares to match")
@@ -334,7 +334,7 @@ def main():
     ap.add_argument("--no-by-cell", dest="by_cell", action="store_false",
                     help="use the original per-cohort rate-based path")
     ap.add_argument("--methods", nargs="+", default=["mst", "aim", "patectgan"],
-                    help="smartnoise-synth baselines (a development comparison at library defaults, not reported in the paper); the paper's reference AIM and MST "
+                    help="smartnoise-synth baselines (a development comparison at library defaults, not reported in the paper). The paper's reference AIM and MST "
                          "come from controls/pgm_baselines.py")
     ap.add_argument("--aim-max-model-size", type=int, default=None,
                     help="AIM junction-tree cap in MB (smartnoise default 80). Lower "
@@ -352,7 +352,7 @@ def main():
     _asked = sorted(set(a.cond_levels))
     _clamped = sorted({min(lv, _max_level) for lv in _asked if lv >= 0})
     if _clamped != _asked:
-        print(f"  note: --cond-levels {_asked} clamped to {_clamped}; this spec has "
+        print(f"  note: --cond-levels {_asked} clamped to {_clamped}. This spec has "
               f"{_max_level + 1} conditional level(s) (0..{_max_level})")
         a.cond_levels = _clamped
     out = Path(a.outdir or f"results/{a.dataset}")

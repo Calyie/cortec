@@ -5,15 +5,15 @@ The prompt is not a configuration value. Two elements of it are load-bearing, an
 collapses CoRTeC's behaviour back to that of an unconditioned model:
 
   * the **global conditional target table**, which is the only channel through which the private
-    conditional structure reaches the generator; and
+    conditional structure reaches the generator.
   * the **"even if this contradicts your expectations" instruction**, without which a model
     reconciles the released statistics against its own prior and emits the prior.
 
 In the research that produced this tool, removing the conditional table changed a faithful
 transmission (slope ~1.0) into a flat line: the same output an unconditioned prompt gives. A tool
-that exposes the template as an editable string is a tool that can be silently broken by a
-well-meaning user, and the breakage is invisible: the pipeline still runs, still produces
-plausible rows, and is simply no longer conditioned on the data.
+that exposes the template as an editable string can be silently broken by a well-meaning user, and
+the breakage is invisible. The pipeline still runs and still produces plausible rows, but it is no
+longer conditioned on the data.
 
 So the templates are frozen and fingerprinted. `render()` verifies the fingerprint before every
 use. A user who genuinely needs a different template must register it under a new version through
@@ -258,9 +258,9 @@ def render_cell_prompt(*, cell_description: str, n_rows: int, n_positive: int,
                        target: str, positive: str, negative: str) -> tuple[str, PromptRecord]:
     """Render the cell-wise prompt, which states the outcome as an exact count.
 
-    `n_positive` must already be an integer count over `n_rows`; converting a released rate into a
-    count is the caller's job because that is where stochastic rounding belongs (see
-    generate.positives_for_cell), and doing it here would hide the rounding from the audit trail.
+    `n_positive` must already be an integer count over `n_rows`. Converting a released rate into a
+    count is the caller's job, because that is where stochastic rounding belongs (see
+    generate.positives_for_cell). Doing it here would hide the rounding from the audit trail.
     """
     verify_integrity()
     if not 0 <= n_positive <= n_rows:

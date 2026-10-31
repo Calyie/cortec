@@ -1,13 +1,13 @@
 """Stage B without a language model: decode a release with the maximum-entropy table.
 
 The release fixes a set of counts. Among every table that agrees with those counts, the
-maximum-entropy one assumes nothing the release did not say; Private-PGM (the estimator AIM and
-MST use) finds it from the released counts and their noise scales, nothing else. This module
-fits that table, samples a pool of `pool_factor * n_rows` records from it, and returns the
-`n_rows` of them that the selection step (`cortec.select.select_to_release`) rakes to the released
-cells. It reads the release and the public schema only: post-processing, no privacy cost, no model,
-CPU only. It is the paper's decoder-with-selection control (Table 3), where it matched the best
-language-model arm on single columns and on the conditionals the release names.
+maximum-entropy one assumes nothing the release did not say. Private-PGM (the estimator AIM and MST
+use) finds it from the released counts and their noise scales alone. This module fits that table,
+samples a pool of `pool_factor * n_rows` records from it, and returns the `n_rows` of them that the
+selection step (`cortec.select.select_to_release`) rakes to the released cells. It reads the release
+and the public schema only: post-processing, no privacy cost, no model, CPU only. It is the paper's
+decoder-with-selection control (Table 3), where it matched the best language-model arm on single
+columns and on the conditionals the release names.
 
 Needs the optional dependency: `pip install 'cortec[pgm]'` (private-pgm's `mbi` 1.1, with JAX).
 """
@@ -62,7 +62,7 @@ def _epsilons(schema: Schema, release: Release) -> tuple[float, float | None, di
             return eps_q, eps_coh, eps_lv
     import warnings
     warnings.warn("the release carries no usable audit block. The decoder assumes the package's "
-                  "default budget split (0.2 conditional, 0.1 counts, the rest marginals)")
+                  "default budget split: 0.2 for the conditional table, 0.1 for counts and the rest for marginals")
     e = float(release.epsilon_total)
     return 0.7 * e / nq, 0.05 * e, {li: 0.2 * e / max(len(levels), 1) for li in levels}
 
@@ -109,9 +109,9 @@ def _representative_rows(schema: Schema, cols: list[str], values: dict, edges: d
 
 def fit_release_model(schema: Schema, release: Release, *, iters: int = 3000, seed: int = 42,
                       verbose: bool = True) -> ReleaseModel:
-    """Fit the maximum-entropy table to exactly the released counts: cohort sizes, class
-    balances, the per-cohort histograms (per class where the release carries class blocks) and
-    the conditional cells, each at the noise scale its budget implies. Private-PGM's mirror
+    """Fit the maximum-entropy table to exactly the released counts, each at the noise scale its
+    budget implies. These are the cohort sizes, the class balances, the per-cohort histograms (per
+    class where the release carries class blocks) and the conditional cells. Private-PGM's mirror
     descent on the junction tree. A fit with a non-finite or collapsed marginal is rejected and
     retried from another seed, up to three times."""
     _require_pgm()
@@ -147,8 +147,8 @@ def fit_release_model(schema: Schema, release: Release, *, iters: int = 3000, se
                 lo, hi = edges[col][i], edges[col][i + 1]
                 if any(lo < e < hi for e in cuts):
                     import warnings
-                    warnings.warn(f"{col}: public bin [{lo:g}, {hi:g}) straddles a cohort band edge; "
-                                  f"the decoder assigns the bin to the band of its left edge")
+                    warnings.warn(f"{col}: public bin [{lo:g}, {hi:g}) straddles a cohort band edge. "
+                                  f"The decoder assigns the bin to the band of its left edge.")
     rep, flats = _representative_rows(schema, strat_cols, values, edges)
     names = [str(c["cohort_name"]) for c in release.cohorts]
     keys = _cohort_keys(eff, rep).astype(str).tolist() if strat_cols else ["all"] * len(flats)
@@ -324,8 +324,8 @@ def fit_release_model(schema: Schema, release: Release, *, iters: int = 3000, se
     worst.sort(reverse=True)
     mean_tv = float(np.mean([w[0] for w in worst])) if worst else 0.0
     if verbose:
-        report.emit(report.note(f"decoder consistency with the release (mean per-cohort column TV): {mean_tv:.4f}; "
-                                f"worst {worst[0][1]} / {worst[0][2]} at {worst[0][0]:.3f}" if worst else
+        report.emit(report.note(f"decoder consistency with the release (mean per-cohort column TV): {mean_tv:.4f}. "
+                                f"The worst is {worst[0][1]} / {worst[0][2]} at {worst[0][0]:.3f}" if worst else
                                 "decoder consistency: nothing to compare"))
     return ReleaseModel(schema=schema, release=release, model=model, columns=cols, values=values, edges=edges,
                         known_total=known_total, measurements=summary, consistency_mean_tv=mean_tv,
@@ -409,11 +409,11 @@ def _undiscretise(schema: Schema, idx: pd.DataFrame, values: dict, edges: dict, 
 def decode_release(schema: Schema, release: Release, n_rows: int, *, pool_factor: int = 3,
                    seed: int = 42, iters: int = 3000, select: bool = True, sub_bin: str = "release",
                    verbose: bool = True, model: ReleaseModel | None = None) -> pd.DataFrame:
-    """`n_rows` synthetic records decoded from `release` with no language model: the
-    maximum-entropy table that fits the released counts, sampled at `pool_factor * n_rows`, and
-    the selection step over that pool (`select=False` returns `n_rows` samples of the table as
-    they are). Post-processing of the release. Repeatable at no privacy cost. Pass a fitted
-    `model` (from `fit_release_model`) to draw again without refitting."""
+    """Decode `n_rows` synthetic records from `release` with no language model. The maximum-entropy
+    table that fits the released counts is sampled at `pool_factor * n_rows`, and the selection step
+    chooses from that pool (`select=False` returns `n_rows` samples of the table as they are).
+    Post-processing of the release. Repeatable at no privacy cost. Pass a fitted `model` (from
+    `fit_release_model`) to draw again without refitting."""
     from .select import select_to_release
     if n_rows < 1:
         raise DecodeError("n_rows must be at least 1")
@@ -435,9 +435,9 @@ def main(argv: list[str] | None = None, prog: str = "cortec decode") -> int:
     from .run import load_schema
     install_guard()
     ap = argparse.ArgumentParser(prog=prog, description=(
-        "Decode a release with no language model: the maximum-entropy table that fits every released count "
-        "(Private-PGM), sampled at a multiple of the requested size and raked to the released cells by the "
-        "selection step. Reads the release and the schema only. Spends no privacy budget. Needs cortec[pgm]."))
+        "Decode a release with no language model. The decoder fits the maximum-entropy table that agrees with "
+        "every released count (Private-PGM), samples it at a multiple of the requested size and rakes the "
+        "sample to the released cells with the selection step. Reads the release and the schema only. Spends no privacy budget. Needs cortec[pgm]."))
     ap.add_argument("--schema", required=True, help="a Python file that defines SCHEMA = Schema(...)")
     ap.add_argument("--release", required=True, help="the release (release.json written by cortec run or Release.to_json)")
     ap.add_argument("--n-rows", type=int, default=300, help="synthetic rows per draw (default 300)")

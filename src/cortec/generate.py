@@ -1,21 +1,22 @@
 """
-Stage B: generation. Reads only a `Release`; never touches private data, so it is post-processing
-and costs no privacy budget. Any number of datasets may be drawn from one release.
+Stage B: generation. It reads only a `Release` and never touches private data, so it is
+post-processing and costs no privacy budget. Any number of datasets may be drawn from one release.
 
 Most of this file is guardrails rather than generation, and that is deliberate. Each check below
 corresponds to a defect that, during the research behind this tool, produced a plausible but wrong
 conclusion before being caught. They are cheap to check and expensive to rediscover:
 
-  1. context truncation silently dropping the conditional table -> looked like "this model family
-     ignores the DP statistics";
-  2. a reasoning model spending its whole output budget on hidden chain-of-thought and returning
-     empty content -> looked like "this model cannot follow the CSV schema";
-  3. a reverse-proxy request timeout -> looked like "this backend is unstable";
-  4. pandas reading the string 'None' as missing, deleting 83% of rows at a 100% call-success rate;
-  5. rows accepted outside the schema's declared domain;
-  6. uniform row allocation across cohorts of very different sizes, over-representing a 2% cohort
-     by 12x;
-  7. a low apparent yield measured over a denominator too small to act on.
+  1. Context truncation silently dropping the conditional table, which looked like "this model
+     family ignores the DP statistics".
+  2. A reasoning model spending its whole output budget on hidden chain-of-thought and returning
+     empty content, which looked like "this model cannot follow the CSV schema".
+  3. A reverse-proxy request timeout, which looked like "this backend is unstable".
+  4. Pandas reading the string 'None' as missing, which deleted 83% of rows at a 100% call-success
+     rate.
+  5. Rows accepted outside the schema's declared domain.
+  6. Uniform row allocation across cohorts of very different sizes, which over-represented a 2%
+     cohort by 12x.
+  7. A low apparent yield measured over a denominator too small to act on.
 """
 from __future__ import annotations
 
@@ -431,8 +432,8 @@ def cell_description(cell_key: str, columns, coarsen: dict | None = None,
     their frequencies is barely better: it pins WHICH values are legal and says nothing about how
     often each occurs, and the model then spreads them roughly uniformly. Measured on a HIPAA
     discharge-disposition column coarsened into 7-value groups, the dominant category fell from a
-    real 0.592 to 0.143 -- which is 1/7, the uniform-spreading signature -- and the column's total
-    variation went 0.050 to 0.641.
+    real 0.592 to 0.143. That is 1/7, the signature of uniform spreading, and the column's total
+    variation went from 0.050 to 0.641.
 
     So the group is expanded into its members WITH their within-group shares. Those shares are a
     renormalisation of proportions already in the release, so supplying them is post-processing
@@ -471,22 +472,22 @@ def cell_description(cell_key: str, columns, coarsen: dict | None = None,
 class ModelRefusalError(GenerationError):
     """The model declined to answer. Distinct from an exhausted output budget.
 
-    Both surface as "no text content", and the remedies are opposite: a refusal needs a different
-    prompt, a coarser cell, or a different generator, while an exhausted budget needs a larger one.
-    Reporting a refusal as a budget problem sends the operator to re-run the same request at
-    greater cost -- the same shape as the yield-guard defect, where a confident diagnosis pointed
-    at the wrong subsystem entirely.
+    Both surface as "no text content", but the remedies are opposite. A refusal needs a different
+    prompt, a coarser cell or a different generator, while an exhausted budget needs a larger one.
+    Reporting a refusal as a budget problem sends the operator to re-run the same request at greater
+    cost. It is the same pattern as the yield-guard defect, where a confident diagnosis pointed at
+    the wrong subsystem entirely.
     """
 
 
 class FatalAPIError(GenerationError):
     """An API refusal that will not resolve by retrying: credits, quota, auth, permissions.
 
-    Separated from a normal call failure because the retry path treats the two very differently.
-    A depleted account surfaced through the generic path looks like a PARSE problem -- the yield
-    guard reports "0% of calls produced usable rows", which sends the operator to inspect the
-    schema when the actual cause is billing. Worse, every retry spends wall-clock and, on a
-    partially-funded account, real money, chasing a condition that cannot improve.
+    Separated from a normal call failure because the retry path treats the two very differently. A
+    depleted account surfaced through the generic path looks like a PARSE problem. The yield guard
+    reports "0% of calls produced usable rows", which sends the operator to inspect the schema when
+    the actual cause is billing. Worse, every retry spends time, and on a partially funded account
+    real money, chasing a condition that cannot improve.
     """
 
 
@@ -538,7 +539,7 @@ def _classify_api_error(vendor: str, e: Exception) -> Exception:
                 f"{vendor} refused the call for a reason that will not resolve by retrying "
                 f"({marker!r}): {str(e)[:300]}\n"
                 f"  Nothing further was attempted and no budget was spent retrying. Clear the "
-                f"account condition and re-run. The DP release is unchanged, so resuming costs "
+                f"account condition and run again. The DP release is unchanged, so resuming costs "
                 f"no additional privacy budget."
             )
     return e
@@ -614,8 +615,8 @@ class Generator:
         self.reasoning = reasoning
         if reasoning == "suppressed":
             self.stats.warnings.append(
-                "reasoning=suppressed: measured 3.8x WORSE conditional fidelity, to below a "
-                "no-information control, on the one model tested against itself. Aggregate "
+                "reasoning=suppressed: on the one model tested against itself, conditional fidelity was "
+                "3.8x WORSE and fell below a no-information control. Aggregate "
                 "utility barely moves, so this will not show up in a TSTR check. Verify "
                 "conditional fidelity on your own data before relying on this output.")
 
@@ -661,14 +662,14 @@ class Generator:
         if SURFACES[surface] and SURFACES[surface] != backend:
             raise GenerationError(
                 f"surface={surface!r} serves the {SURFACES[surface]!r} backend, not {backend!r}. "
-                f"Bedrock serves Claude, Azure OpenAI serves GPT, Vertex AI serves Gemini.")
+                f"Bedrock serves Claude, Azure OpenAI serves GPT and Vertex AI serves Gemini.")
         self.surface = surface
         self._request_model = surface_model or model
         if surface == "public" and backend in ("anthropic", "openai", "gemini"):
             self.stats.warnings.append(
                 f"surface='public': {backend} is being reached through the vendor's PUBLIC developer "
-                f"API. That is the surface the paper's measurements used and it is NOT the "
-                f"recommended deployment for regulated data. The weights are the same, the "
+                f"API. That is the surface the paper's measurements used, and it is NOT the "
+                f"recommended deployment for regulated data. The weights are the same, but the "
                 f"contractual envelope (BAA, residency, private networking, no training on inputs) "
                 f"is not. Use surface='bedrock' | 'azure' | 'vertex' inside your own account.")
 
@@ -679,8 +680,8 @@ class Generator:
                 if not region:
                     raise GenerationError(
                         "surface='bedrock' needs AWS_REGION (or AWS_DEFAULT_REGION) in the "
-                        "environment; AWS credentials come from the standard chain (environment, "
-                        "profile, instance role). Set surface_model to the Bedrock model id or "
+                        "environment. AWS credentials come from the standard chain (environment, "
+                        "profile or instance role). Set surface_model to the Bedrock model id or "
                         "inference-profile ARN your account has access to.")
                 _require_bedrock_deps()
                 self._client = anthropic.AnthropicBedrock(aws_region=region, timeout=request_timeout)
@@ -755,7 +756,7 @@ class Generator:
         elif backend != "mock":
             raise GenerationError(
                 f"unknown backend {backend!r}. Expected one of "
-                f"'anthropic', 'openai', 'gemini', 'ollama', 'mock'")
+                f"'anthropic', 'openai', 'gemini', 'ollama' or 'mock'.")
 
     # ── prompt safety ───────────────────────────────────────────────────────────────
 
@@ -772,7 +773,7 @@ class Generator:
             raise ContextTruncationError(
                 f"prompt (~{est - self.max_output_tokens} tokens) plus output budget "
                 f"({self.max_output_tokens}) exceeds num_ctx={self.num_ctx}. Ollama silently "
-                f"truncates, which cuts the conditional table off the end of the prompt and "
+                f"truncates. That cuts the conditional table off the end of the prompt and "
                 f"produces unconditioned output that still looks valid. Raise num_ctx or lower "
                 f"rows_per_call."
             )
@@ -837,10 +838,10 @@ class Generator:
                     raise ModelRefusalError(
                         f"{self.model} declined to answer (stop_reason=refusal). This is not a "
                         f"token-budget problem and raising max_output_tokens will not fix it. It "
-                        f"usually means a cell asked for very few rows, or the schema resembles "
+                        f"usually means a cell asked for very few rows or the schema resembles "
                         f"personal records closely enough to trip a safety filter. The prompt "
                         f"carries only DP-released statistics, never a private record. Try a "
-                        f"coarser conditional level so each cell asks for more rows, or a "
+                        f"coarser conditional level so that each cell asks for more rows, or try a "
                         f"different generator."
                     )
                 raise EmptyContentError(
@@ -1192,7 +1193,7 @@ class Generator:
                 f"{s.positives_off_by_more_than_one} of {s.calls} cell-wise calls emitted a positive "
                 f"count that missed the 'exactly k' requested by more than one row "
                 f"({s.positives_emitted} emitted against {s.positives_requested} requested in total). "
-                f"The model is ASKED for the count, not forced to it, so verify the per-cell rates of "
+                f"The model is ASKED for the count, not forced to it. Verify the per-cell rates of "
                 f"this output against the release before relying on them. The tool never relabels "
                 f"rows to hide the miss.")
         if self.reasoning != "on" or not s.calls:
@@ -1200,24 +1201,24 @@ class Generator:
         if s.calls_without_reasoning >= s.calls:
             s.warnings.append(
                 f"reasoning='on' was requested but the backend reported ZERO reasoning tokens on "
-                f"all {s.calls} calls. Either this model has no reasoning mode, or it did not "
-                f"engage. Measured effect of running without it: conditional error 3.8x worse, to "
+                f"all {s.calls} calls. Either this model has no reasoning mode or it did not "
+                f"engage. Without reasoning, the measured conditional error was 3.8x worse and fell "
                 f"below a no-information control. Verify conditional fidelity before relying on "
-                f"this output. (Some vendors do not report the count at all, in which case this "
-                f"warning is not evidence of a problem. Check the vendor's usage fields.)")
+                f"this output. Some vendors do not report the count at all, and then this "
+                f"warning is not evidence of a problem. Check the vendor's usage fields.")
         elif s.calls_without_reasoning:
             s.warnings.append(
                 f"reasoning was intermittent: {s.calls_without_reasoning} of {s.calls} calls "
-                f"showed no reasoning: no reported tokens AND no reasoning block. Those calls "
-                f"carry the suppressed configuration's fidelity, so check conditional fidelity "
+                f"showed no reported tokens AND no reasoning block. Those calls carry the "
+                f"suppressed configuration's fidelity, so check conditional fidelity "
                 f"before relying on this output.")
         if s.calls_reasoning_unmeasured:
             s.warnings.append(
                 f"reasoning could NOT be verified on {s.calls_reasoning_unmeasured} of {s.calls} "
-                f"calls: this backend returned no reasoning-token count and no reasoning block, "
-                f"so those calls are unmeasured rather than known-bad. Do not read this as "
+                f"calls. This backend returned no reasoning-token count and no reasoning block, "
+                f"so those calls are unmeasured rather than known to be bad. Do not read this as "
                 f"reasoning being off, and do not read it as reasoning being on. If you need "
-                f"the guarantee, verify conditional fidelity against a held-out sample directly.")
+                f"certainty, verify conditional fidelity directly against a held-out sample.")
 
     def generate_selected(self, release: Release, n_rows: int, *, pool_factor: int = 3,
                           seed: int | None = None, verbose: bool = True,
@@ -1225,10 +1226,10 @@ class Generator:
         """Generate `pool_factor * n_rows` records cohort-wise, then return the `n_rows` of them
         whose cell counts match the release (see `cortec.select`). The pool is post-processing of
         the release, so the selection costs no privacy budget. It costs `pool_factor` times the
-        generation spend. Measured during development (design notes, section 4; Adult, three pools): a random 300
-        of the pool carries 1-way marginal error 0.050 against real data. The selected 300 carry
-        0.026, below a 300-record real sample's 0.043 and at MST's level, with the three
-        downstream students unchanged or up by at most 0.017 AUC.
+        generation spend. Measured during development on Adult with three pools (design notes,
+        section 4), a random 300 of the pool carries 1-way marginal error 0.050 against real data.
+        The selected 300 carry 0.026, below a 300-record real sample's 0.043 and at MST's level,
+        with the three downstream students unchanged or up by at most 0.017 AUC.
 
         `sub_bin="release"` (default) then makes every numeric value's position inside its bin
         the release's own in the cohorts that carry class-conditional blocks
@@ -1311,8 +1312,8 @@ class Generator:
             self.stats.warnings.append(
                 f"budget cap reached: ${self.stats.spend_usd:.2f} of ${self.budget_usd:.2f} after "
                 f"{self.stats.calls} calls. This output holds the {self.stats.rows} rows completed "
-                f"within the budget, not the {total} requested. Raise budget_usd, or use a cheaper "
-                f"validated model, for the full request.")
+                f"within the budget, not the {total} requested. For the full request, raise "
+                f"budget_usd or use a cheaper validated model.")
         if not frames:
             raise GenerationError(
                 f"the budget of ${self.budget_usd:.2f} was spent (${self.stats.spend_usd:.2f} over "
@@ -1327,16 +1328,16 @@ class Generator:
                          allow_low_coverage: bool = False, verbose: bool = True) -> pd.DataFrame:
         """Generate one released conditional cell at a time, with an explicit positive COUNT.
 
-        `generate()` asks for a mixed batch and leaves the model to allocate rows across cells.
-        That caps how finely any single cell's rate can be expressed: on UCI Adult with 12 rows per
-        call, `education = Masters` receives 0.65 rows per call and can only emit 0% or 100%, so a
-        released rate of 0.554 rounds to 1.000 on every call. Measured end to end this produced
-        MAE 0.253 with slope 1.64: an apparent "rates above 0.24 saturate" threshold that was
-        really "cells rarer than one row per call cannot express their rate".
+        `generate()` asks for a mixed batch and leaves the model to allocate rows across cells. That
+        caps how finely any single cell's rate can be expressed. On UCI Adult with 12 rows per call,
+        `education = Masters` receives 0.65 rows per call and can only emit 0% or 100%. A released
+        rate of 0.554 therefore rounds to 1.000 on every call. Measured end to end this produced MAE
+        0.253 with slope 1.64: an apparent "rates above 0.24 saturate" threshold that was really
+        "cells rarer than one row per call cannot express their rate".
 
-        Generating per cell removes the coupling. Each call covers exactly one cell, the row count
-        for that cell is known, and the prompt states the positive count as an integer rather than
-        a probability, so the model has no discretion over the target column at all. Residual error
+        Generating per cell removes the coupling. Each call covers exactly one cell, so the row
+        count for that cell is known. The prompt states the positive count as an integer rather than
+        a probability, and the model has no discretion over the target column at all. Residual error
         is bounded by the stochastic rounding of one row.
 
         Costs more calls than `generate()` for the same output size. That is the trade.
@@ -1419,11 +1420,11 @@ class Generator:
             raise GenerationError(
                 f"cell-wise generation is unsafe on this release: only {_short} lies in released "
                 f"bands (floor {CELL_COVERAGE_FLOOR:.0%} per conditioning column). Rows outside "
-                f"those bands are emitted at essentially rate zero, so that share of the "
+                f"those bands are emitted at a rate of essentially zero. That share of the "
                 f"population would be missing from the output while aggregate fidelity and utility "
                 f"still looked healthy. Either generate cohort-wise with generate(), or lower "
-                f"n_min / use a coarser conditional level so more bands of '{_worst_col}' survive "
-                f"the release. Pass allow_low_coverage=True only if you have checked that the "
+                f"n_min or use a coarser conditional level so that more bands of '{_worst_col}' "
+                f"survive the release. Pass allow_low_coverage=True only if you have checked that the "
                 f"uncovered population does not matter for your use.")
         alloc = _largest_remainder(support / support.sum(), n_rows)
         total = int(sum(alloc))
@@ -1433,8 +1434,8 @@ class Generator:
         # halfway with an abort that looks like a model-capability result.
         _per = n_rows / max(len(cells), 1)
         if _per < MIN_ROWS_PER_CELL:
-            report.emit(report.warn(f"{n_rows} rows across {len(cells)} cells is {_per:.1f} rows per cell; "
-                  f"below ~{MIN_ROWS_PER_CELL} the per-cell prompt asks for one or two records and "
+            report.emit(report.warn(f"{n_rows} rows across {len(cells)} cells is {_per:.1f} rows per cell. "
+                  f"Below ~{MIN_ROWS_PER_CELL}, the per-cell prompt asks for one or two records and "
                   f"parsing degrades. Raise n_rows to >= {int(MIN_ROWS_PER_CELL*len(cells))} or "
                   f"generate at a coarser level."))
 
@@ -1518,8 +1519,8 @@ class Generator:
             self.stats.warnings.append(
                 f"budget cap reached: ${self.stats.spend_usd:.2f} of ${self.budget_usd:.2f} after "
                 f"{self.stats.calls} calls. This output holds the {self.stats.rows} rows completed "
-                f"within the budget, not the {total} requested. Raise budget_usd, or use a cheaper "
-                f"validated model, for the full request.")
+                f"within the budget, not the {total} requested. For the full request, raise "
+                f"budget_usd or use a cheaper validated model.")
         if not frames:
             raise GenerationError(
                 f"the budget of ${self.budget_usd:.2f} was spent (${self.stats.spend_usd:.2f} over "

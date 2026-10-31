@@ -1,6 +1,6 @@
-"""The `cortec-hybrid` command (also `python -m cortec_hybrid`). `cortec-hybrid run ...` corrects
-a synthetic table you already generated (docs/hybrid.md step 1); `cortec-hybrid --help` prints what you
-can run; `cortec-hybrid <name>` prints one function or class with its arguments and defaults."""
+"""The `cortec-hybrid` command (also `python -m cortec_hybrid`). `cortec-hybrid run ...` corrects a
+synthetic table you already generated (docs/hybrid.md, step 1). `cortec-hybrid --help` prints what
+you can run. `cortec-hybrid <name>` prints one function or class with its arguments and defaults."""
 import sys
 
 import cortec_hybrid
@@ -26,16 +26,16 @@ TERMS = [
     ("feasibility", "whether a marginal synthesiser (AIM) is likely to fit this schema, from the "
                     "attribute count, the row count and high-cardinality numeric columns. The "
                     "domain size is reported and not used"),
-    ("released conditional table, rate, support", "the DP table P(positive | cell): the rate with "
-                                                  "Laplace noise, and the cell size with noise. "
+    ("released conditional table, rate, support", "the DP table P(positive | cell), giving the rate "
+                                                  "and the cell size, both with Laplace noise. "
                                                   "Cells with fewer than n_min private records "
-                                                  "are not released, and their rows are left as "
+                                                  "are not released. Their rows are left as "
                                                   "they were"),
     ("conditional error (before, after)", "the mean absolute gap between each cell's target rate "
                                           "in the table and the released rate, before and after "
                                           "relabelling. `reduction` is the difference"),
     ("feature marginal shift", "the mean total-variation change of the categorical marginals "
-                               "between input and output: zero, because only the target column "
+                               "between input and output. It is zero, because only the target column "
                                "is rewritten"),
     ("cells corrected", "released cells whose rows were relabelled"),
     ("worth it (calibration only)", "true when conditional error fell by more than 0.02. A "

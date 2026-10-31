@@ -217,7 +217,7 @@ def test_bound_record_carries_the_verdict_and_refuses_when_not_discriminating():
                       accounting={}, meta={})
     r = record_bound(bad)
     assert r.verdict_role == "warning" and r.verdict.startswith("no verdict")
-    assert any("vacuous" in w for w in r.warnings)
+    assert any("meaningless" in w for w in r.warnings)
     with pytest.raises(TypeError):
         record(object())
 

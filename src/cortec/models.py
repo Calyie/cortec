@@ -12,9 +12,9 @@ the failure mode they prevent is a false privacy-preserving-data-generation clai
 looks fine and carries none of your data's structure.
 
 Two facts shape the policy:
-  * scale matters: within one family, magnitude error fell monotonically from 7B to 72B;
-  * scale is not sufficient: at comparable size, models from different families differed by 2x,
-    with a 24B model beating a 32B one.
+  * Scale matters. Within one family, magnitude error fell monotonically from 7B to 72B.
+  * Scale is not sufficient. At comparable size, models from different families differed by 2x, with
+    a 24B model recording lower error than a 32B one.
 
 Because family matters and this list cannot enumerate every model, an unknown model is not
 assumed good. It is allowed to run only in `measure` mode, which requires the caller to verify
@@ -63,7 +63,7 @@ class ModelProfile:
 # 0% / 50% / 100% and regressing generated rate on the rate actually shown to the model.
 PROFILES: list[ModelProfile] = [
     ModelProfile(r"claude.*(fable|opus|sonnet)", Tier.VALIDATED, 0.009, 0.995,
-                 "frontier API model. Most accurate measured"),
+                 "frontier API model, and the most accurate we measured"),
     # Measured 2026-09-10 on the SAME transmission sweep as every other row here (diabetes,
     # number_inpatient forced to 0/50/100%, 3 rates x 75 rows): shown 0.004/0.505/0.995 ->
     # generated 0.000/0.521/1.000, slope 1.009, MAE 0.008. Added only after running that sweep:
@@ -79,10 +79,10 @@ PROFILES: list[ModelProfile] = [
     # the axis this tool runs and the axis the recommendation is built on -- so a model measured
     # THERE is validated, with magnitude_error left None because the sweep number does not exist.
     ModelProfile(r"gemini.*3\.1.*pro", Tier.VALIDATED, None, None,
-                 "validated on full-dataset generation: conditional error 0.041, the lowest of "
-                 "any generator measured. Not scored on the transmission sweep."),
+                 "validated on full-dataset generation with conditional error 0.041, the lowest of "
+                 "any generator we measured. Not scored on the transmission sweep."),
     ModelProfile(r"gpt-5", Tier.VALIDATED, None, None,
-                 "validated on full-dataset generation at DEFAULT reasoning: conditional error "
+                 "validated on full-dataset generation at DEFAULT reasoning, with conditional error "
                  "0.045. At reasoning_effort='minimal' the same model scores 0.173, past the "
                  "no-information floor. Not scored on the transmission sweep."),
     # DEMOTED from VALIDATED. On the transmission sweep these reach 0.020 and 0.030, inside the
@@ -93,21 +93,21 @@ PROFILES: list[ModelProfile] = [
     # control's identical 0.238), and is worse than the control on 1-way TV. None of these models
     # has a reasoning mode, which is the likely mechanism.
     ModelProfile(r"llama3\.3.*70b", Tier.SWEEP_ONLY, 0.020, 0.988,
-                 "self-hostable. Passes the transmission sweep but on full-dataset generation is "
+                 "self-hostable. It passes the transmission sweep, but on full-dataset generation it is "
                  "close to indistinguishable from an unconditioned prompt"),
     ModelProfile(r"qwen2\.5.*72b", Tier.SWEEP_ONLY, 0.030, 1.011,
-                 "self-hostable. Sweep-only, same caveat as llama3.3:70b"),
+                 "self-hostable and sweep-only, with the same caveat as llama3.3:70b"),
     ModelProfile(r"mistral-small.*24b", Tier.ADEQUATE, 0.049, 0.877,
-                 "does better than larger models from other families. Magnitude approximate"),
-    ModelProfile(r"gemma2.*27b", Tier.ADEQUATE, 0.067, 0.890, "magnitude approximate"),
+                 "does better than larger models from other families. The magnitude is approximate"),
+    ModelProfile(r"gemma2.*27b", Tier.ADEQUATE, 0.067, 0.890, "the magnitude is approximate"),
     ModelProfile(r"gpt-oss.*20b", Tier.ADEQUATE, 0.078, 0.913,
-                 "reasoning model: budget output tokens generously, see generate.py"),
+                 "a reasoning model. Budget output tokens generously (see generate.py)"),
     ModelProfile(r"qwen2\.5.*32b", Tier.ADEQUATE, 0.098, 1.014,
-                 "slope is near 1 but midpoints are badly off. Judge on magnitude error"),
+                 "the slope is near 1 but midpoints are badly off. Judge it on magnitude error"),
     ModelProfile(r"qwen2\.5.*14b", Tier.ADEQUATE, 0.105, 1.011,
-                 "slope near 1 but generated 81% for a 50% target"),
+                 "the slope is near 1, but it generated 81% for a 50% target"),
     ModelProfile(r"qwen2\.5.*7b", Tier.INSUFFICIENT, 0.406, 0.208,
-                 "does not track the released statistics. Output is effectively unconditioned"),
+                 "does not track the released statistics. Its output is effectively unconditioned"),
     # Measured 2026-10 on full-dataset generation (one Adult release and one NHANES release decoded
     # through vLLM, three draws at n = 300 and 1,000, the same prompts and flags as every other
     # backbone; the paper's Appendix E.4). Not scored on the transmission sweep, so the two sweep
@@ -119,16 +119,16 @@ PROFILES: list[ModelProfile] = [
     # on the same release read 0.110 and wrote its own prior for marital status and education over
     # the released distributions, which agrees with its INSUFFICIENT row above.
     ModelProfile(r"qwen3.*32b", Tier.VALIDATED, None, None,
-                 "validated on full-dataset generation (4-bit AWQ, served through vLLM): 1-way "
+                 "validated on full-dataset generation (4-bit AWQ, served through vLLM), with 1-way "
                  "total variation 0.049 and seen-conditional error 0.031 on Adult at n = 300. Not "
                  "scored on the transmission sweep."),
     ModelProfile(r"qwen3.*14b", Tier.VALIDATED, None, None,
-                 "validated on full-dataset generation (served through vLLM, the paper's primary "
-                 "open backbone): 1-way total variation 0.046 and seen-conditional error 0.027 on "
+                 "validated on full-dataset generation (served through vLLM as the paper's primary "
+                 "open backbone), with 1-way total variation 0.046 and seen-conditional error 0.027 on "
                  "Adult at n = 300. Not scored on the transmission sweep."),
     ModelProfile(r"qwen3.*8b", Tier.ADEQUATE, None, None,
-                 "measured on full-dataset generation: 1-way total variation 0.068 on Adult at "
-                 "n = 300, and it writes range labels into numerical columns at times. Check the "
+                 "measured on full-dataset generation, with 1-way total variation 0.068 on Adult at "
+                 "n = 300. It sometimes writes range labels into numerical columns. Check the "
                  "parse and repair counts in gen.stats. Not scored on the transmission sweep."),
 ]
 
@@ -178,15 +178,15 @@ def check_model(model: str, *, allow_unvalidated: bool = False,
     if p.tier is Tier.SWEEP_ONLY and not acknowledge_insufficient:
         raise ModelCapabilityError(
             f"{model!r} passes the transmission sweep but FAILS full-dataset generation.\n"
-            f"  sweep: magnitude error {p.magnitude_error}, slope {p.slope}, inside the frontier "
-            f"band, the sweep-only reading this table does not accept as validation.\n"
-            f"  full-dataset generation, 3 draws: it closes 12% of the conditional-error gap to an "
-            f"UNCONDITIONED prompt, closes nothing at all on 2-way total variation, and is worse "
+            f"  sweep: magnitude error {p.magnitude_error} and slope {p.slope}, inside the frontier "
+            f"band. This table does not accept a sweep-only reading as validation.\n"
+            f"  full-dataset generation, 3 draws: it closes only 12% of the conditional-error gap "
+            f"to an UNCONDITIONED prompt and nothing at all on 2-way total variation. It is worse "
             f"than that control on 1-way total variation.\n"
             f"  {p.note}\n"
             f"  On the metrics this method exists to improve, its output is close to "
-            f"indistinguishable from asking a model for plausible records with no conditioning, "
-            f"and no output check reveals that. Use a validated model "
+            f"indistinguishable from asking a model for plausible records with no conditioning. "
+            f"No output check reveals that. Use a validated model "
             f"({', '.join(validated_models())}), or pass acknowledge_insufficient=True if you are "
             f"deliberately reproducing the finding."
         )
@@ -194,7 +194,7 @@ def check_model(model: str, *, allow_unvalidated: bool = False,
     if p.tier is Tier.INSUFFICIENT and not acknowledge_insufficient:
         raise ModelCapabilityError(
             f"{model!r} is below the capability floor for CoRTeC.\n"
-            f"  measured transmission slope {p.slope} (faithful is ~1.0), "
+            f"  measured transmission slope {p.slope} (faithful is ~1.0) and "
             f"magnitude error {p.magnitude_error}\n"
             f"  {p.note}\n"
             f"  This model will still produce well-formed synthetic rows. They will not carry "
@@ -212,8 +212,8 @@ def check_model(model: str, *, allow_unvalidated: bool = False,
             + (f"  However, we DO have other evidence about this model: {ev}\n"
                f"  That is a different experiment and does not clear this gate on its own.\n"
                if ev else "")
-            + f"  Capability here is family-dependent, not just size-dependent: at comparable "
-              f"scale a 24B model in our measurements recorded lower error than a 32B one. Size "
+            + f"  Capability depends on the model family, not just its size. At comparable "
+              f"scale a 24B model in our measurements recorded lower error than a 32B one, so size "
               f"alone cannot clear this gate.\n"
               f"  Either use a validated model ({', '.join(validated_models())}), "
               f"or pass allow_unvalidated=True and verify transmission on your own data before "
@@ -234,17 +234,17 @@ def check_model(model: str, *, allow_unvalidated: bool = False,
 # What this table changes is only the error message: a user with one of these keys deserves to
 # know what we actually measured rather than being told "unmeasured" with no further detail.
 MEASURED_ON_GENERATION_ONLY: dict[str, str] = {
-    "gpt-5": ("measured on full-dataset generation at DEFAULT reasoning: conditional error 0.045, "
-              "inside the 0.041-0.047 band of the frontier models we validated, and below what a "
-              "real 300-record sample achieves (0.062). At reasoning_effort='minimal' the same "
-              "model scored 0.173, worse than a no-information control. Not scored on the "
-              "transmission sweep, so its PROFILES entry carries no magnitude error."),
-    "gemini-3.1-pro": ("measured on full-dataset generation with reasoning on: conditional error "
-                       "0.041, the lowest of any generator we measured. Not scored on the "
-                       "transmission sweep, so its PROFILES entry carries no magnitude error."),
-    "claude-opus-5": ("measured on full-dataset generation at default reasoning: conditional error "
-                      "0.046. Matched by the `claude.*opus` PROFILES entry on the transmission "
-                      "sweep."),
+    "gpt-5": ("measured on full-dataset generation at DEFAULT reasoning, with conditional error "
+              "0.045. That is inside the 0.041-0.047 band of the frontier models we validated and "
+              "below what a real 300-record sample achieves (0.062). At reasoning_effort='minimal' "
+              "the same model scored 0.173, worse than a no-information control. It was not scored "
+              "on the transmission sweep, so its PROFILES entry carries no magnitude error."),
+    "gemini-3.1-pro": ("measured on full-dataset generation with reasoning on, with conditional "
+                       "error 0.041 (the lowest of any generator we measured). It was not scored on "
+                       "the transmission sweep, so its PROFILES entry carries no magnitude error."),
+    "claude-opus-5": ("measured on full-dataset generation at default reasoning, with conditional "
+                      "error 0.046. On the transmission sweep it is matched by the `claude.*opus` "
+                      "PROFILES entry."),
 }
 
 
@@ -265,16 +265,16 @@ def generation_evidence_for(model: str) -> str | None:
 # Conditional error on full-dataset generation, against a real 300-record sample (0.062) and a
 # permuted-target no-information floor (0.152).
 RECOMMENDED: dict[str, str] = {
-    "gemini-3.1-pro":  "0.041, the lowest of any generator measured. Reasoning on",
+    "gemini-3.1-pro":  "0.041, the lowest of any generator we measured, with reasoning on",
     "gpt-5":           "0.045 at DEFAULT reasoning. At reasoning_effort='minimal' the same model "
                        "scores 0.173, past the no-information floor. Set the effort explicitly",
-    "claude-fable-5":  "0.046. Reasoning on",
+    "claude-fable-5":  "0.046, with reasoning on",
     "claude-opus-5":   "0.046, reached with reasoning verifiably NOT firing",
-    "gemini-3.5-flash": "0.008 on the transmission sweep. The cost-efficient option of the set "
-                        "(the name is served by Gemini 3.6 Flash since 2026-10-08: 1-way total "
-                        "variation 0.027 and seen-conditional error 0.013 on Adult at n = 300)",
+    "gemini-3.5-flash": "0.008 on the transmission sweep. The cost-efficient option of the set. "
+                        "Since 2026-10-08 the name is served by Gemini 3.6 Flash, which reached 1-way "
+                        "total variation 0.027 and seen-conditional error 0.013 on Adult at n = 300",
     "qwen3-14b":       "0.027 seen-conditional error on Adult at n = 300, served through vLLM. "
-                        "the paper's primary open backbone",
+                        "It is the paper's primary open backbone",
     "qwen3-32b":       "0.031 seen-conditional error on Adult at n = 300 (4-bit AWQ), served "
                         "through vLLM",
 }
@@ -293,11 +293,11 @@ def validated_models() -> list[str]:
 def recommended_table() -> str:
     """The recommendation, with what each model measured, for printing to an operator."""
     w = max(len(k) for k in RECOMMENDED)
-    lines = ["Recommended generators (conditional error on full-dataset generation;",
-             " real sample at matched n = 0.062, no-information floor = 0.152):"]
+    lines = ["Recommended generators, with their conditional error on full-dataset generation",
+             " (a real sample at matched n scores 0.062 and the no-information floor 0.152):"]
     lines += [f"  {k:<{w}}  {v}" for k, v in RECOMMENDED.items()]
     lines.append("  An unlisted model is refused unless you pass allow_unvalidated=True. "
-                 "if you do, verify transmission on your own data first.")
+                 "If you do, verify transmission on your own data first.")
     return "\n".join(lines)
 
 
@@ -308,7 +308,7 @@ def warnings_for(model: str) -> list[str]:
     if p.tier is Tier.ADEQUATE:
         out.append(
             f"{model} is ADEQUATE, not validated: measured magnitude error "
-            f"{p.magnitude_error:.3f}. Direction of relationships is reliable. Absolute rates "
+            f"{p.magnitude_error:.3f}. The direction of relationships is reliable, but absolute rates "
             f"carry error of roughly this size. Do not use it for a regulated rate without "
             f"verifying transmission on your own data."
         )
@@ -321,8 +321,8 @@ def warnings_for(model: str) -> list[str]:
         )
     if re.search(r"gpt-oss|deepseek-r1|.*thinking", model, flags=re.IGNORECASE):
         out.append(
-            "this looks like a reasoning model: its chain of thought is billed against the same "
+            "this looks like a reasoning model. Its chain of thought is billed against the same "
             "output budget as the CSV, and an exhausted budget returns empty content that looks "
-            "like an inability to follow the schema. Output budget is raised automatically."
+            "like an inability to follow the schema. The output budget is raised automatically."
         )
     return out

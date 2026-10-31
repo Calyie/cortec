@@ -1,18 +1,17 @@
 """`cortec-hybrid run`: the correction on your own tables, from any directory once the package is
-installed. Releases a DP conditional target table from the private data and relabels ONLY the
-target column of synthetic data you already generated (with AIM, MST, PrivBayes, or cortec) so
-each cell matches the table. Prints the correction in the standard layout, writes corrected.csv
-and the record, and, when a holdout is given, scores the table before and after beside real
-references.
+installed. Releases a DP conditional target table from the private data and relabels ONLY the target
+column of synthetic data you already generated (with AIM, MST, PrivBayes, or cortec) so each cell
+matches the table. Prints the correction in the standard layout and writes corrected.csv and the
+record. When a holdout is given, it also scores the table before and after beside real references.
 
   cortec-hybrid run --data private.csv --synthetic synthetic.csv \\
       --schema my_schema.py --columns age,sex --epsilon 0.5
   cortec-hybrid run --data private.csv --synthetic synthetic.csv --holdout holdout.csv \\
       --schema my_schema.py --columns age,sex,education --n-min 100
 
-`my_schema.py` defines `SCHEMA = Schema(...)` from cortec (docs/setup.md, step 4). This tool does not
-generate data. `worth_it` in the output is a calibration criterion only; read the evaluation table
-beside it before adopting the correction. A refusal prints as a boxed block and exits with 2.
+`my_schema.py` defines `SCHEMA = Schema(...)` from cortec (docs/setup.md, step 4). This tool does
+not generate data. `worth_it` in the output is a calibration criterion only. Read the evaluation
+table beside it before adopting the correction. A refusal prints as a boxed block and exits with 2.
 """
 from __future__ import annotations
 
@@ -31,11 +30,11 @@ def parser(prog: str = "cortec-hybrid run") -> argparse.ArgumentParser:
     ap.add_argument("--epsilon", type=float, default=0.5, help="the budget for the table (default 0.5)")
     ap.add_argument("--n-min", type=int, default=150, help="cells below this size are not released. Floor 50")
     ap.add_argument("--max-rows-per-person", type=int, default=1, help="the privacy unit (default 1)")
-    ap.add_argument("--holdout", help="real rows not in --data (CSV). Enables the before/after evaluation")
-    ap.add_argument("--out", default=None, help="output folder. Default: the synthetic table's folder")
+    ap.add_argument("--holdout", help="real rows not in --data, as a CSV. It enables the before-and-after evaluation")
+    ap.add_argument("--out", default=None, help="the output folder. The default is the synthetic table's folder")
     ap.add_argument("--exports", choices=("json", "all"), default="json",
-                    help="json (default): one record per step, complete. All: also the Markdown, "
-                         "CSV and figure renderings of each record")
+                    help="json (the default) writes one complete record per step. all also writes the "
+                         "Markdown, CSV and figure renderings of each record")
     return ap
 
 
@@ -82,8 +81,8 @@ def main(argv: list[str] | None = None, prog: str = "cortec-hybrid run") -> int:
             rec_e.show()
             files_e = save_record(rec_e, out, "evaluation", a.exports)
     else:
-        emit(note("no --holdout given: the before/after evaluation was skipped. worth_it alone does "
-                  "not say whether downstream utility improved"))
+        emit(note("no --holdout was given, so the before-and-after evaluation was skipped. worth_it "
+                  "alone does not say whether downstream utility improved"))
 
     emit("")
     outdir = os.path.abspath(out)
@@ -92,16 +91,16 @@ def main(argv: list[str] | None = None, prog: str = "cortec-hybrid run") -> int:
         return ", ".join(sorted({os.path.splitext(p)[1].lstrip(".") for p in stage_files.values()
                                  if not str(p).startswith("not written")}))
     entries = [("folder", outdir),
-               ("corrected.csv", "the corrected table: features unchanged, target relabelled")]
+               ("corrected.csv", "the corrected table, with the features unchanged and the target relabelled")]
     for stem, what, stage_files in (("correction", "the correction record", files),
                                     ("evaluation", "the before/after evaluation record", files_e)):
         if stage_files:
             entries.append((stem + ".*", f"{what}: {kinds(stage_files)}"))
     emit(files_block("everything this run wrote", entries, tool="cortec-hybrid"))
     if a.exports == "json":
-        emit(note("each JSON record renders to Markdown, CSV and a figure: --exports all, or "
+        emit(note("each JSON record renders to Markdown, CSV and a figure with --exports all or "
                   "RunRecord.from_json(path).save(folder)"))
-    emit(note("the words above (worth it, conditional error, ceiling, floor ...): cortec-hybrid terms"))
+    emit(note("cortec-hybrid terms explains the words above (worth it, conditional error, ceiling, floor ...)"))
     return 0
 
 

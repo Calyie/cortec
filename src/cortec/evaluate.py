@@ -1,10 +1,10 @@
 """cortec.evaluate: score a synthetic table the way the paper does.
 
 Never against a bare threshold. Every synthetic table is scored beside two references built from
-real data of the same size: a real sample, the ceiling a synthetic method can reach at that size,
-and the same sample with its target column permuted, the floor of data that carries no usable
-information. Fidelity and utility are reported together in one table, because a method can score
-well on one and poorly on the other.
+real data of the same size. The first is a real sample, which is the ceiling a synthetic method can
+reach at that size. The second is the same sample with its target column permuted, which is the
+floor of data that carries no usable information. Fidelity and utility are reported together in one
+table, because a method can score well on one and poorly on the other.
 
 Measures, as in the paper's tables:
 
@@ -17,7 +17,8 @@ Measures, as in the paper's tables:
                declared categorical values that never appear in the table: a representativeness
                failure that no aggregate measure reports
 
-scikit-learn is needed for the three students; it is the `dev` extra (`pip install '.[dev]'` from the repository root).
+scikit-learn is needed for the three students. It comes with the `dev` extra (`pip install '.[dev]'`
+from the repository root).
 """
 from __future__ import annotations
 
@@ -109,12 +110,12 @@ def evaluate(schema: Schema, tables: dict[str, pd.DataFrame], *, train: pd.DataF
     data that was not used to build the release. Returns the standard record. Its first table is
     the paper's fidelity-and-utility layout with the two reference rows marked.
 
-    `reference_draws` real samples are drawn (seeds `seed`, `seed + 1`, ...), each with its
-    permuted copy, and the two reference rows carry their means. With more than one draw the
-    record gains a second table, `reference spread`: for each measure the mean, the lowest and
-    the highest value over the real samples and over their permuted copies. That range is what
-    real data of this size spans on this holdout, and the results panel reads every synthetic
-    number against it instead of against a threshold. `reference_draws=1` scores one sample."""
+    `reference_draws` real samples are drawn (seeds `seed`, `seed + 1` and so on), each with its
+    permuted copy. The two reference rows carry their means. With more than one draw the record
+    gains a second table, `reference spread`: for each measure the mean, the lowest and the highest
+    value over the real samples and over their permuted copies. That range is what real data of this
+    size spans on this holdout, and the results panel reads every synthetic number against it
+    instead of against a threshold. `reference_draws=1` scores one sample."""
     if not tables:
         raise ValueError("evaluate() needs at least one table to score")
     if reference_draws < 1:
@@ -162,9 +163,9 @@ def evaluate(schema: Schema, tables: dict[str, pd.DataFrame], *, train: pd.DataF
                         rows, reference_rows=[len(names), len(names) + 1],
                         subtitle="Fidelity (1-way TV, lower is better) and utility (train on the table, test on "
                                  "the holdout: AUC, higher is better) in one table, as in the paper." + means,
-                        note="read every row against the two reference rows, not against a threshold: the "
-                             "real sample is the ceiling at this size, the permuted target is the floor of "
-                             "no information")
+                        note="read every row against the two reference rows, not against a threshold. The "
+                             "real sample is the ceiling at this size, and the permuted target is the floor "
+                             "of no information")
     tables_out = [table]
     if reference_draws > 1:
         spread = []

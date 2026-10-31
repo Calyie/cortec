@@ -1,11 +1,11 @@
 """cortec.report: one output standard for both tools.
 
-Every run prints the same layout: a stage header, a block of named values, one or more tables,
-the warnings, and a verdict. Every run can export the same record: one JSON file with a declared
-format version, a Markdown rendering of the same content, one CSV per table, and a figure when
-matplotlib is installed (`cortec.plots`). The palette, the type scale and the table conventions
-are the paper's, so a table printed here reads like the paper's tables and a figure saved here
-looks like the paper's figures. `docs/result-format.md` documents the record.
+Every run prints the same layout: a stage header, a block of named values, one or more tables, the
+warnings and a verdict. Every run can export the same record: one JSON file with a declared format
+version, a Markdown rendering of the same content, one CSV per table, and a figure when matplotlib
+is installed (`cortec.plots`). The palette, the type scale and the table conventions are the
+paper's, so a table printed here reads like the paper's tables and a figure saved here looks like
+the paper's figures. `docs/result-format.md` documents the record.
 
 Terminal colour is used only when stdout is a terminal. `NO_COLOR` disables it, `CORTEC_COLOR=0`
 disables it, `CORTEC_COLOR=1` forces it (for a log that will be read with colour). Every function
@@ -263,10 +263,10 @@ def emit_progress_done() -> None:
 
 @contextmanager
 def ticker(text, *, enabled: bool = True, interval: float = 0.5):
-    """A live progress line while a blocking call runs, so a model call of a minute or more does
-    not look like a frozen screen: `text(elapsed_seconds)` is redrawn on stderr every `interval`
-    seconds until the block ends. Terminal only, like `emit_progress`. Nothing is written when
-    stderr is not a terminal or `enabled` is false.
+    """A live progress line while a blocking call runs, so that a model call of a minute or more
+    does not look like a frozen screen. `text(elapsed_seconds)` is redrawn on stderr every
+    `interval` seconds until the block ends. Terminal only, like `emit_progress`. Nothing is written
+    when stderr is not a terminal or `enabled` is false.
 
         with ticker(lambda t: f"waiting {t:.0f}s"):
             reply = client.call(prompt)
@@ -631,9 +631,9 @@ def fmt_seconds(s) -> str:
 
 def banner(title: str, pairs, *, tool: str = "cortec", version: str | None = None,
            enabled: bool | None = None) -> str:
-    """The block that opens a run: a double rule naming the tool, its version and the run, then
-    the run's facts (data, backend, budget, output, stages) as named values, so a log opens with
-    what was run before any result is shown."""
+    """The block that opens a run. A double rule names the tool, its version and the run, and the
+    run's facts (data, backend, budget, output, stages) follow as named values. A log therefore
+    opens with what was run before any result is shown."""
     if version is None:
         version = _package_version(tool)
     left = f"══ {display_name(tool)} {version} · {title} "
@@ -682,13 +682,13 @@ def record_results(*, evaluation: RunRecord | None = None, bound: RunRecord | No
                    generation: RunRecord | None = None, release: RunRecord | None = None,
                    schema: str = "", seconds: float | None = None,
                    synthetic_label: str = "synthetic") -> RunRecord:
-    """The results panel: the marginal fidelity result and the downstream utility result read against
-    a real sample of the same size and the permuted floor, the Stage C verdict, the privacy spent
-    and the cost, on one screen. It is built from the stage records, so it can be rebuilt from
-    the JSON files of an earlier run. No goal is passed or failed against a threshold: every
-    number is placed against the range real samples of the same size span on the same holdout
-    (the evaluation's `reference spread` table), or against the one real sample when the
-    evaluation drew only one."""
+    """The results panel shows, on one screen, the marginal fidelity result and the downstream
+    utility result read against a real sample of the same size and the permuted floor. It also gives
+    the Stage C verdict, the privacy spent and the cost. It is built from the stage records, so it
+    can be rebuilt from the JSON files of an earlier run. No goal is passed or failed against a
+    threshold. Every number is placed against the range that real samples of the same size span on
+    the same holdout (the evaluation's `reference spread` table). When the evaluation drew only one
+    real sample, the number is placed against that sample."""
     schema = schema or (evaluation.schema if evaluation else "") or (bound.schema if bound else "")
     values, tables, notes, warnings = [], [], [], []
     classes: list[tuple[str, str, str, float | None]] = []        # (measure, class, text, distance)
@@ -718,8 +718,8 @@ def record_results(*, evaluation: RunRecord | None = None, bound: RunRecord | No
             "marginal fidelity result",
             ["measure", "synthetic", "real sample", "permuted", "gap"],
             [["1-way TV (lower is better)", v, r_, p_, (v - r_) if (v is not None and r_ is not None) else None]],
-            subtitle="Does the synthetic table carry the real data's single-column distributions? Mean "
-                     "total-variation distance from the holdout over every column, on the schema's bins.",
+            subtitle="Does the synthetic table carry the real data's single-column distributions? This is "
+                     "the mean total-variation distance from the holdout over every column, on the schema's bins.",
             note=f"reading: {text}. The permuted floor matches the real sample here because permuting "
                  "the target leaves every marginal unchanged. The floor is informative for downstream utility."))
         # downstream utility
@@ -741,10 +741,10 @@ def record_results(*, evaluation: RunRecord | None = None, bound: RunRecord | No
             ["student", "synthetic AUC", "real sample", "permuted", "gap", "share of real-sample utility"],
             rows,
             subtitle="Does a model trained on the synthetic table perform as one trained on real data of "
-                     "the same size? Train on the table, test on the real holdout: AUC of logistic "
+                     "the same size? Train on the table, test on the real holdout and read the AUC of logistic "
                      "regression (LR), a random forest (RF) and gradient boosting (GBM). Higher is better.",
-            note=f"reading: {reading}. Share = (synthetic - permuted) / (real sample - permuted): the part "
-                 "of a real sample's utility above the no-information floor that the synthetic table reaches."))
+            note=f"reading: {reading}. Share = (synthetic - permuted) / (real sample - permuted). It is the "
+                 "part of a real sample's utility above the no-information floor that the synthetic table reaches."))
         absent = get(syn, "absent categories")
         if absent:
             warnings.append(f"{absent} declared categorical value(s) never appear in the synthetic table "
@@ -789,7 +789,7 @@ def record_results(*, evaluation: RunRecord | None = None, bound: RunRecord | No
     else:
         values += [("marginal fidelity", "not scored in this run"),
                    ("downstream utility", "not scored in this run")]
-        notes.append("Marginal fidelity and downstream utility are scored by the evaluation, which did not run: drop "
+        notes.append("Marginal fidelity and downstream utility are scored by the evaluation, which did not run. Drop "
                      "--no-evaluate and install scikit-learn (pip install 'cortec[dev]').")
     # Stage C
     if bound is not None and bound.verdict:
@@ -823,11 +823,11 @@ def record_results(*, evaluation: RunRecord | None = None, bound: RunRecord | No
         values.append(("cost", cost))
     elif seconds is not None:
         values.append(("wall time", fmt_seconds(seconds)))
-    notes += ["Read every number against the two references: a real sample of the same size is the "
+    notes += ["Read every number against the two references. A real sample of the same size is the "
               "ceiling a synthetic table can reach at this size, and the same sample with its target "
               "permuted is the floor of no information.",
-              "One draw at one size is a signal, not a claim. Replicate (three draws) before treating a "
-              "difference as stable."]
+              "One draw at one size is a signal, not a claim. Replicate it with three draws before "
+              "treating a difference as stable."]
     eps = {"per_row": per_row} if per_row is not None else {}
     return RunRecord(tool="cortec", stage="Results", title="marginal fidelity and downstream utility against real references",
                      schema=schema, values=values, tables=tables, warnings=warnings, notes=notes,
@@ -876,7 +876,7 @@ def record_release(release, *, n_private_rows: int | None = None) -> RunRecord:
     if groups:
         rows = [[g, d.get("n_queries"), d.get("n_partitions"), d.get("group_total")] for g, d in groups.items()]
         tables.append(ResultTable("privacy accounting", ["group", "queries", "partitions", "epsilon"], rows,
-                                  note="groups compose sequentially. Partitions within a group in parallel"))
+                                  note="groups compose sequentially, and partitions within a group compose in parallel"))
     warnings = list(a.get("warnings", []))
     rec = RunRecord(tool="cortec", stage="Stage A", title="Release", schema=release.schema_name,
                     values=values, tables=tables, warnings=warnings,
@@ -926,7 +926,7 @@ def record_generation(stats, *, backend: str | None = None, surface: str | None 
     rec = RunRecord(tool="cortec", stage="Stage B", title="Generate", schema=schema, values=values,
                     tables=[reasoning], warnings=list(stats.warnings),
                     epsilon={"per_row": 0.0},
-                    notes=["Generation reads only the release: post-processing, epsilon 0."])
+                    notes=["Generation reads only the release, so it is post-processing at epsilon 0."])
     return rec
 
 
@@ -967,11 +967,11 @@ def record_bound(report, *, schema: str = "") -> RunRecord:
     notes = ["This bounds utility. It is not a privacy audit."]
     if report.verdict == "within bound":
         verdict = (f"within bound: over all {_n} released cells the synthetic conditional rates lie within "
-                   f"{_tol} of the private ones, with {_conf} simultaneous confidence (worst-case bound {_wc:.4f})")
+                   f"{_tol} of the private ones with {_conf} simultaneous confidence (worst-case bound {_wc:.4f})")
         role = "ok"
     elif report.verdict is not None:
         verdict = (f"outside tolerance: the synthetic worst-case bound {_wc:.4f} exceeds the tolerance {_tol} "
-                   f"over {_n} released cells, at {_conf} simultaneous confidence")
+                   f"over {_n} released cells at {_conf} simultaneous confidence")
         role = "refusal"
     else:
         _why = getattr(report, "verdict_reason", None) or "the test did not discriminate"
@@ -983,7 +983,7 @@ def record_bound(report, *, schema: str = "") -> RunRecord:
                         "permuted floor does not.")
     warnings = []
     if c.get("epsilon_per_person_vacuous"):
-        warnings.append("the per-person epsilon is vacuous. No per-person privacy claim may be made from this report")
+        warnings.append("the per-person epsilon is meaningless. No per-person privacy claim may be made from this report")
     eps = {"release": c.get("epsilon_release"), "bound": c.get("epsilon_transmission_bound"),
            "per_row": c.get("epsilon_total_per_row"), "per_person": c.get("epsilon_per_person")}
     values += [("epsilon per row (release + bound)", eps["per_row"]),
@@ -1026,7 +1026,7 @@ def record_correction(gain: dict, table, *, schema: str = "", n_rows: int | None
 
 
 def record(obj, **kw) -> RunRecord:
-    """Build the record for any tool object: a Release, a GenerationStats, a BoundReport, or the
+    """Build the record for any tool object: a Release, a GenerationStats, a BoundReport or the
     (corrected, table, gain) triple that cortec-hybrid's correct() returns."""
     if isinstance(obj, RunRecord):
         return obj

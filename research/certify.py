@@ -82,7 +82,7 @@ for _m in _pkgutil.iter_modules(_src.__path__):
 # Below this many synthetic rows in a cell, q_c is too coarse to be meaningful (with 1 row it can
 # only be 0 or 1). Such cells are reported, not silently trusted.
 MIN_SYNTH_ROWS_PER_CELL = 20
-TOLERANCE_RULE = ("derived from the release: the Laplace half-width plus half the largest gap between a released cell rate and the released base rate, so the permuted floor cannot pass at any sample size; reads released quantities only")
+TOLERANCE_RULE = ("derived from the release: the Laplace half-width plus half the largest gap between a released cell rate and the released base rate, so the permuted floor cannot pass at any sample size. Reads released quantities only")
 
 
 def derive_tolerance(released_rates, base_rate: float, *, n_min: int, epsilon: float,
@@ -143,11 +143,11 @@ DP_CLAIM = {
     "delta": 0.0,
     "neighbouring_relation": "add or remove one record (UNBOUNDED DP)",
     "privacy_unit": "one dataset row",
-    "composition": "parallel across disjoint cells; sequential across overlapping query groups",
+    "composition": "parallel across disjoint cells. Sequential across overlapping query groups",
     "mechanism": "Laplace",
     "sensitivity": "1/n_min per released cell rate, taken over max(|c|, n_min): the PUBLIC size floor, not the private cell "
                    "size. A scale set from the true cell size is data-dependent under add/remove "
-                   "adjacency and is not pure epsilon-DP; the bound is conservative by n/n_min.",
+                   "adjacency and is not pure epsilon-DP. The bound is conservative by n/n_min.",
 }
 
 # Where the guarantee does NOT hold: NIST SP 800-226 asks for this explicitly and it is the part
@@ -164,16 +164,16 @@ DP_CAVEATS = [
     "Noise is sampled with a floating-point Laplace generator. Naive floating-point Laplace "
     "sampling is vulnerable to the Mironov (2012) attack, which can leak the exact value through "
     "the low-order bits. A deployment handling real PHI should use a secure/discrete sampler "
-    "(e.g. discrete Laplace / snapping); this implementation does not, and that is a known gap.",
+    "(e.g. discrete Laplace / snapping). This implementation does not, and that is a known gap.",
     "The guarantee covers the RELEASED STATISTICS and this bound's own query. It says nothing "
     "about the generator's pretraining data, which is outside the DP boundary entirely.",
     "This is a UTILITY TRANSMISSION BOUND computed under DP. It bounds how far the synthetic "
-    "conditional structure can differ from the private one; it does NOT certify privacy, says "
+    "conditional structure can differ from the private one. It does NOT certify privacy, says "
     "nothing about re-identification risk, and must never be presented as a privacy audit.",
     "WHICH cells enter the bound: with --release, the cells the release published, whose "
     "selection the release made by a noisy threshold on its charged, noised counts (post-"
     "processing), so the bound reads no exact private count to choose them. Without --release, "
-    "a cell is included only if it holds at least n_min private records; that selection is "
+    "a cell is included only if it holds at least n_min private records. That selection is "
     "data-dependent and is NOT charged to epsilon here.",
     "Cells for which the synthetic data supplies NO rows are scored at the trivial bound of 1.0. "
     "A bound therefore cannot be obtained by covering a convenient subset of the cells.",
@@ -329,11 +329,11 @@ def certify_with_controls(spec, train, test, synth, *, level, epsilon, alpha=0.0
     if thin:
         res["_verdict"] = None
         res["_verdict_reason"] = (f"{thin} of {res['synthetic'].get('n_cells', 0)} released cells hold fewer than "
-                                 f"{MIN_SYNTH_ROWS_PER_CELL} synthetic rows; no verdict is issued")
+                                 f"{MIN_SYNTH_ROWS_PER_CELL} synthetic rows. No verdict is issued")
     elif not res["_discriminating"]:
         res["_verdict"] = None
         res["_verdict_reason"] = ("the controls did not discriminate (the real-sample ceiling failed or the "
-                                 "permuted floor cleared); no verdict is issued")
+                                 "permuted floor cleared). No verdict is issued")
     else:
         res["_verdict"] = "within bound" if res["synthetic"]["within_bound"] else "outside tolerance"
         res["_verdict_reason"] = None
@@ -351,7 +351,7 @@ def main() -> None:
     ap.add_argument("--tolerance", default="auto",
                     help="'auto' (the default, needs --release) derives the tolerance from the release: "
                          "half-width plus half the largest gap between a released cell rate and the "
-                         "released base rate; or a number such as 0.15")
+                         "released base rate. Or a number such as 0.15")
     ap.add_argument("--n-min", type=int, default=150)
     ap.add_argument("--seed", type=int, default=42)
     # REQUIRED, with no default. Defaulting to 1 is the silent per-person claim itself: the
@@ -361,8 +361,8 @@ def main() -> None:
     # the field cannot notice it is missing. Forcing the declaration is what puts the question in
     # front of the person running the tool, which is the only place it can be answered.
     ap.add_argument("--max-rows-per-person", type=int, required=True,
-                    help="REQUIRED. Worst-case rows contributed by one individual (Diabetes 130: "
-                         "40; pass 1 if the data is one row per person). The per-person guarantee "
+                    help="REQUIRED. Worst-case rows contributed by one individual (40 on Diabetes 130, "
+                         "or 1 if the data is one row per person). The per-person guarantee "
                          "is this times the row-level epsilon, and this report will not state a "
                          "guarantee without it. Count it on your own data before running this.")
     ap.add_argument("--epsilon-release", type=float, default=2.0,
@@ -397,7 +397,7 @@ def main() -> None:
         released_cells = sorted(_tbl.keys())
     if str(a.tolerance).lower() == "auto":
         if not a.release:
-            raise SystemExit("--tolerance auto derives the tolerance from the release; pass --release, or a number")
+            raise SystemExit("--tolerance auto derives the tolerance from the release. Pass --release, or a number")
         _pos = spec.positive_class
         _tot = sum(float(c["cohort_size"]) for c in _rel)
         _base = sum(float(c["cohort_size"]) * float(c["class_balance"][_pos]) for c in _rel) / _tot
@@ -461,7 +461,7 @@ def main() -> None:
     if k > 1:
         print(f"  {'max rows per person':24s} {k}")
         print(f"  {'EPSILON PER PERSON':24s} {eps_person}   <- the number a deployment must "
-              f"report; group privacy, k*epsilon")
+              f"report. Group privacy, k*epsilon")
     else:
         print(f"  {'max rows per person':24s} 1 (declared)")
         print(f"  {'EPSILON PER PERSON':24s} {eps_person}   <- equals the per-row epsilon")

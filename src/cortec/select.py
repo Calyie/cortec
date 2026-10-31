@@ -1,7 +1,7 @@
 """select.py: return a generated pool to the released marginals before handing records over.
 
-The generator's marginal error is decoding error, not privacy noise: a frozen model asked for a
-batch of rows reproduces a released histogram only approximately, and its output then carries that
+The generator's marginal error is decoding error, not privacy noise. A frozen model asked for a
+batch of rows reproduces a released histogram only approximately. Its output then carries that
 approximation plus the multinomial noise of any sample of n rows. The release is public, so nothing
 stops us from asking for more rows than we need and choosing, among them, the n whose marginals
 match the release. Every quantity used here is in the release (cohort sizes, class balance, one
@@ -16,7 +16,7 @@ at size n. Rows are then drawn by systematic sampling on the cumulative weights,
 each cell's count lands within one row of its expected value.
 
 Two details matter and are tested. A cohort whose release carries class-conditional blocks is
-constrained per (class, column); a cohort with only a pooled block is constrained per column at the
+constrained per (class, column). A cohort with only a pooled block is constrained per column at the
 cohort level, because imposing a pooled histogram on each class separately would force both classes
 to the same marginals and erase the feature-target structure the release paid for. And a category
 the release suppressed (below n_min) receives zero mass, so a row the generator invented for it is
@@ -66,10 +66,10 @@ def inclusion_weights(schema: Schema, release: Release, pool: pd.DataFrame, n_ro
                       rounds: int = 40, min_expected_rows: float = MIN_EXPECTED_ROWS) -> np.ndarray:
     """Inclusion weights in [0, 1] summing to n_rows whose cell sums match the release.
 
-    Constraints expecting fewer than `min_expected_rows` rows are dropped (zero-mass constraints
-    for suppressed categories are kept): at integer resolution they cannot be satisfied, and fitting
-    to them measurably worsened held-out conditional error and utility on Adult while buying nothing
-    on the marginals."""
+    Constraints expecting fewer than `min_expected_rows` rows are dropped (zero-mass constraints for
+    suppressed categories are kept). At integer resolution they cannot be satisfied, and fitting to
+    them measurably worsened held-out conditional error and utility on Adult while buying nothing on
+    the marginals."""
     if n_rows <= 0:
         raise ValueError("n_rows must be positive")
     cells = _cells(schema, pool, release)
@@ -198,10 +198,10 @@ def release_subbin_values(schema: Schema, release: Release, df: pd.DataFrame, *,
 
     A released histogram fixes how many rows fall in each declared bin and nothing finer, so a
     value's position inside its bin is never released information. In a cohort that carries
-    class-conditional blocks the class shape is the release's at bin resolution and whatever the
-    generator does below it is prior (on NHANES it separated the classes about twice as far as the
-    data inside each bin and cost the linear student 0.044 AUC. Paper, Appendix H.17): every
-    numeric value there is redrawn uniformly inside its declared bin, intersected with the row's
+    class-conditional blocks, the class shape is the release's at bin resolution, and whatever the
+    generator does below it is prior. On NHANES it separated the classes about twice as far as the
+    data inside each bin and cost the linear student 0.044 AUC. Paper, Appendix H.17): every numeric
+    value there is redrawn uniformly inside its declared bin, intersected with the row's
     stratification band so cohort membership never moves. A cohort with only a pooled block keeps
     the generator's values: there they are the only carrier of the class signal. Post-processing.
     Integer-valued columns draw integers inside the bin, so no bin count changes."""
@@ -279,10 +279,10 @@ def select_to_release(schema: Schema, release: Release, pool: pd.DataFrame, n_ro
     short = {k: v for k, v in cov.items() if v["owed"] >= 1 and v["ratio"] < min_cover}
     if short:
         msg = ("the pool does not cover every released cohort: " +
-               "; ".join(f"{k} has {v['have']} rows for {v['owed']:.0f} owed" for k, v in short.items()) +
+               ", ".join(f"{k} has {v['have']} rows for {v['owed']:.0f} owed" for k, v in short.items()) +
                f". Selection can only choose among rows that exist, so these cohorts would come out "
-               f"short. Generate the full pool (a run that stopped at its spend cap leaves its later "
-               f"cohorts unfilled), or pass allow_short_pool=True to proceed anyway.")
+               f"short. Generate the full pool, or pass allow_short_pool=True to proceed anyway. A run "
+               f"that stopped at its spend cap leaves its later cohorts unfilled.")
         if not allow_short_pool:
             raise ValueError(msg)
         import warnings

@@ -229,7 +229,7 @@ class Schema:
                   "ok": not problems}
         if strict and problems:
             raise DataValidationError(
-                "the data does not match the declared schema; NO privacy budget was spent:\n  - "
+                "the data does not match the declared schema, and NO privacy budget was spent:\n  - "
                 + "\n  - ".join(problems)
             )
         return report
