@@ -58,13 +58,13 @@ class DPKMeans:
       - Data is assumed already scaled into `bounds` (the caller pre-scales to [0,1]^d
         with PUBLIC bounds before calling this, matching diffprivlib's own convention).
       - Budget epsilon is split evenly across `n_iter` Lloyd iterations.
-      - Each iteration: assign points to nearest centroid (non-private — centroids
+      - Each iteration: assign points to nearest centroid (non-private: centroids
         are already DP from the previous round, and assignment doesn't touch raw
         data further under standard treatments of this mechanism family), then
         release noisy per-cluster (sum, count) via the Laplace mechanism and
         recompute centroids from the noisy quantities.
       - Centroids initialised via a fixed, data-independent grid over `bounds`
-        (no privacy cost — does not depend on the data).
+        (no privacy cost: does not depend on the data).
     """
 
     def __init__(self, n_clusters: int, epsilon: float, bounds: tuple, n_iter: int = 6, random_state: int = 42):

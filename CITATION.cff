@@ -8,29 +8,28 @@ date-released: "2026-10-30"
 doi: "10.5281/zenodo.22945315"
 repository-code: "https://github.com/Calyie/cortec"
 abstract: >-
-  An institution that holds sensitive tabular data wants to train models, share samples and
-  support research without exposing a record, under differential privacy. Today's methods spend
-  the budget inside a fitted model or a training run, so what leaves cannot be reviewed as counts
-  or reused. We propose CoRTeC, a differentially private release built for a downstream
-  classifier: inside cohorts formed by a public rule or a charged procedure, the cohort size, the
-  class balance, one histogram per attribute per outcome class and a table of outcome rates over
-  disjoint cells, every count noised, the budget spent once, shipped for review. Everything after
-  the release is post-processing: a maximum-entropy decoder reconstructs rows at no cost, a frozen
-  generative model (five backbones) decodes the same release under exact per-bin counts without
-  seeing a record, and a selection step rakes any decoder's pool to the released cells, so one
-  release serves unlimited draws. At ε = 2 and n = 300 and 1,000, the auto-configured release
-  decoded with no model trains models within 0.02 AUC of a real sample of its size on Adult over
-  three splits; on NHANES and bank marketing the gap is larger, up to 0.07 AUC on the medical
-  dataset at n = 300. It is level with or ahead of the reference AIM on utility in five of six
-  dataset-size cells, ahead on single columns on Adult and bank, level on NHANES, and behind on
-  pairs at n = 1,000 on Adult and at both sizes on NHANES; the fixed-rule release is ahead of AIM
-  on the conditionals it names on Adult. Four controls attribute the rest: the language model adds
-  plausibility from the column names, repairs the pairs it recognises, invents those it expects,
-  and without the release recites the public file. No private row reaches any decoder, the
-  strongest membership attack reaches a small fraction of the permitted advantage, and no
-  synthetic row copies a training row. This repository holds the Apache-2.0 reference
-  implementation with its tests, the research pipeline, the papers and the frozen auto-
-  configurations.
+  Differentially private synthetic tabular data is produced today by marginal mechanisms, which
+  choose their workload on the private rows and ship a fitted model, or by language models
+  fine-tuned or driven under the budget, inseparable from the mechanism that spends it. We propose
+  CoRTeC, which separates the two. CoRTeC spends the privacy budget once, on a small release of
+  noisy counts built for training a classifier. For each cohort of the data it publishes the
+  cohort's size, its class balance, a histogram of every attribute for each outcome class, and the
+  outcome rate in a set of non-overlapping cells. A reviewer can check every number before the
+  release leaves the institution. Everything after the release is post-processing and costs no
+  further privacy. A maximum-entropy decoder turns the counts into rows, five frozen language
+  models can do the same without seeing a record, and a selection step matches any decoder's rows
+  to the released counts. One release therefore serves any number of draws, by any team and with
+  any model, and the model can be changed without touching the guarantee. At ε = 2, with 300 and
+  1,000 rows, the auto-configured release decoded without a language model trains classifiers
+  within 0.02 AUC of a real sample of the same size on Adult, over three splits. The gap is larger
+  on NHANES and bank marketing, up to 0.07 AUC on the medical dataset. Its utility reaches that of
+  the reference AIM in five of the six dataset-size settings, while AIM's adaptive workload fits
+  pairs of columns more closely. Four controls show what each part contributes. What the language
+  model adds comes from the column names, and without the release it copies the public file. No
+  private row reaches any decoder, the strongest membership attack stays far below the bound the
+  budget allows, and no synthetic row copies a training row. This repository holds the Apache-2.0
+  reference implementation with its tests, the research pipeline, the paper, the deployment guide
+  and the frozen auto-configurations.
 authors:
   - family-names: "Nnona"
     given-names: "Calister"

@@ -1,5 +1,5 @@
 """
-dataset_spec.py — everything that is dataset-specific, in one object.
+dataset_spec.py: everything that is dataset-specific, in one object.
 
 The pipeline was written against UCI Adult and hard-coded it in several places: the column lists
 and bounds in `data_loader`, the education/hours stratification and the income conditional table
@@ -106,8 +106,8 @@ class DatasetSpec:
 
     def stratum_keys(self, df: pd.DataFrame) -> pd.Series:
         # No stratification means ONE cohort covering every record. This is a legitimate,
-        # declared configuration — every spec in datasets_regulated.py ships `stratify=[]` and
-        # expects autoconfig to supply the hierarchy — but the empty list used to reach `parts[0]`
+        # declared configuration: every spec in datasets_regulated.py ships `stratify=[]` and
+        # expects autoconfig to supply the hierarchy, but the empty list used to reach `parts[0]`
         # and raise IndexError, so those specs could not be released without autoconfig.
         if not self.stratify:
             return pd.Series(["*"] * len(df), index=df.index)
@@ -184,7 +184,7 @@ def available() -> list[str]:
     return sorted(_REGISTRY)
 
 
-# ── UCI Adult — built from the existing constants so current results stay reproducible ──
+# ── UCI Adult: built from the existing constants so current results stay reproducible ──
 @register("adult")
 def adult_spec() -> DatasetSpec:
     from src.data_loader import (NUMERICAL_COLS, CATEGORICAL_COLS, TARGET_COL, FEATURE_BOUNDS,

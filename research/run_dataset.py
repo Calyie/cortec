@@ -1,5 +1,5 @@
 """
-run_dataset.py — the whole CoRTeC pipeline on ANY registered dataset.
+run_dataset.py: the whole CoRTeC pipeline on ANY registered dataset.
 
 Stage A (DP release) -> Stage B (generation) -> baselines -> evaluation, all driven by a
 DatasetSpec. This is what makes the multi-dataset validation possible: every Adult-specific
@@ -85,17 +85,17 @@ def stage_generate(spec, a, out: Path):
     if not stats_p.exists():
         # A fresh --outdir means a fresh DP release, i.e. another full eps_total spent on the
         # same private data. That is almost never what is wanted: extra draws are supposed to be
-        # post-processing of ONE release, at zero additional cost. Say so loudly — this silently
+        # post-processing of ONE release, at zero additional cost. Say so loudly: this silently
         # double-charged the credit dataset once before it was caught.
         print("!" * 78)
-        print(f"!! NO RELEASE IN {out} — performing a NEW DP release at eps={a.epsilon_total}.")
+        print(f"!! NO RELEASE IN {out}: performing a NEW DP release at eps={a.epsilon_total}.")
         print("!! This spends the budget AGAIN on the same data. Extra draws from an existing")
         print("!! release are free: copy that release's cohort_statistics.json into this")
         print("!! directory first, and the draws will cost no additional privacy budget.")
         print("!" * 78, flush=True)
         stage_release(spec, a, out)
     else:
-        print(f"  reusing DP release at {stats_p} — no additional privacy budget spent",
+        print(f"  reusing DP release at {stats_p}: no additional privacy budget spent",
               flush=True)
     cs = json.load(open(stats_p))
 
@@ -345,7 +345,7 @@ def main():
     spec = get_spec(a.dataset)
     # `--cond-levels` defaults to (0, 3), which assumes the spec has at least four conditional
     # levels. Autoconfig derives a VARIABLE number: nhanes_auto picks 3 columns (4 levels, index 3
-    # valid) while adult_auto picks 2 (3 levels, index 3 out of range) — and the pipeline died with
+    # valid) while adult_auto picks 2 (3 levels, index 3 out of range), and the pipeline died with
     # a bare IndexError from `conditional_levels[level]`. Clamp to what the spec actually has, and
     # say so, rather than requiring the caller to know the derived depth in advance.
     _max_level = len(spec.conditional_levels) - 1

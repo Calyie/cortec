@@ -2,10 +2,11 @@
 
 A differentially private release for synthetic tabular data, decodable by any generator: a frozen model, or the maximum-entropy decoder with no model, reads only DP statistics.
 
-The privacy budget is spent once, on a statistics release (Stage A). A frozen model, or the
-maximum-entropy decoder with no model (`cortec decode`), then generates records from that release
-and never sees a private record (Stage B), so generation is post-processing: it adds no privacy cost, and unlimited datasets can be drawn from one release. An
-optional Stage C attaches a budgeted utility bound to the output.
+The privacy budget is spent once, on a release of statistics (Stage A). A frozen model, or the
+maximum-entropy decoder with no model at all (`cortec decode`), then generates records from that
+release (Stage B). It never sees a private record, so generation is post-processing. It adds no
+privacy cost, and you can draw as many datasets as you like from one release. An optional Stage C
+attaches a utility bound to the output, at a budget of its own.
 
 ```
 private data ──► DP release (Stage A) ──►│──► frozen LLM (Stage B) ──► synthetic records
@@ -32,15 +33,15 @@ the settings that matter, and what to check before moving on.
 | 10. Troubleshooting | What each refusal means and what to change |
 | 11. Output and exports | One printed layout and one exportable record for every stage |
 
-Two further documents: the [deployment guide](../paper/CoRTeC_deployment_guide.pdf) is the operational manual for
-a regulated deployment (the architecture, the parameters, the full prompt, the checklist, the
-controls mapped to standards, the failure modes with their guards, and the cost), and
+Two further documents may help. The [deployment guide](../paper/CoRTeC_deployment_guide.pdf) is the
+manual for a regulated deployment: the architecture, the parameters, the full prompt, the checklist,
+the controls mapped to standards, the failure modes with their guards, and the cost.
 [`design-notes.md`](design-notes.md) records the measurements behind the defaults.
 
 ## 1. Install and run
 
-Python 3.10 or later. The package depends on numpy and pandas; each vendor SDK is an optional
-extra. The package is not on PyPI, so install from a clone of this repository:
+You need Python 3.10 or later. The package depends on numpy and pandas, and each vendor SDK is an
+optional extra. The package is not on PyPI, so install it from a clone of this repository:
 
 ```bash
 git clone https://github.com/Calyie/cortec
@@ -60,15 +61,15 @@ AWS), `azure` and `vertex`. Install `'.[dev]'` as well to run the tests:
 python3 -m pytest tests -q     # offline, each test named after the defect it prevents
 ```
 
-**Run it.** Installing the package puts the `cortec` command on PATH. `cortec run` runs the
-whole pipeline on your own table from any directory: Stage A (the release), Stage B
-(generation), Stage C (the bound) and the evaluation, printing each in the standard layout and
-writing every file under one folder that it names at the end. The run opens with a banner of
-what is about to run and closes with a results panel: the marginal fidelity result and the
-downstream utility result placed against the range real samples of the same size span on the
-same holdout, the Stage C verdict, the privacy spent and the cost, on one screen and in
-`RESULTS.md`. It needs two inputs: the private table as a CSV with one row per person (step 3),
-and a Python file that declares the schema from public facts only (step 4), for example:
+**Run it.** Installing the package puts the `cortec` command on your PATH. `cortec run` runs the
+whole pipeline on your own table from any directory: Stage A (the release), Stage B (generation),
+Stage C (the bound) and the evaluation. It prints each stage in the standard layout and writes every
+file into one folder, which it names at the end. The run opens with a banner that says what is about
+to run, and closes with a results panel on one screen, also saved as `RESULTS.md`. The panel shows
+the marginal fidelity and the downstream utility, each placed against the range that real samples
+of the same size span on the same holdout, together with the Stage C verdict, the privacy spent and
+the cost. The command needs two inputs: the private table as a CSV with one row per person (step
+3), and a Python file that declares the schema from public facts only (step 4). For example:
 
 ```python
 # my_schema.py
@@ -97,28 +98,28 @@ cortec run --data private.csv --schema my_schema.py \
 cortec run --help
 ```
 
-Without `--holdout`, one fifth of the data is set aside before Stage A for the Stage C ceiling
-and the evaluation. The output folder (default `results/<schema name>_<backend>`) holds
-`RESULTS.md` (the results panel), `synthetic.csv`, `release.json` (reused by later runs into the
-same folder, because a release is made once), `bound.json`, and one JSON record per stage and
-for the panel; `--exports all` also writes each record's Markdown, CSV and figure, which
-`RunRecord.from_json` can produce later from the JSON. The
-sections below explain each stage and every setting; the same calls are available from Python
-for your own scripts, and `cortec-hybrid run` is the correction. `python3 run_cortec.py`, in
-this directory, is the same command for a clone whose scripts directory is not on PATH.
+Without `--holdout`, one fifth of the data is set aside before Stage A, for the Stage C ceiling
+and the evaluation. The output folder (by default `results/<schema name>_<backend>`) holds
+`RESULTS.md` (the results panel), `synthetic.csv`, `bound.json`, and one JSON record for each stage
+and for the panel. It also holds `release.json`, which later runs into the same folder reuse,
+because a release is made only once. `--exports all` also writes each record's Markdown, CSV and
+figure, which `RunRecord.from_json` can produce later from the JSON. The sections below explain each
+stage and every setting. The same calls are available from Python for your own scripts, and
+`cortec-hybrid run` runs the correction. In a clone whose scripts directory is not on PATH,
+`python3 run_cortec.py` in this directory is the same command.
 
-For a full tour of the three stages in the standard output, with no API key and no data, run
-the bundled example (it builds a small synthetic table in code and uses the offline `mock`
-backend, so the release and the bound are real and only the generated numbers are placeholders):
+For a full tour of the three stages, with no API key and no data, run the bundled example. It
+builds a small synthetic table in code and uses the offline `mock` backend, so the release and the
+bound are real and only the generated numbers are placeholders:
 
 ```bash
 python3 example.py
 ```
 
-For the list of everything the package can run, in order, with each function's arguments and
-defaults read from the code, print the help page; give it a name for one function's full
-documentation. The `cortec` command does nothing else: the package is a library, and the runs
-are Python calls.
+To list everything the package can run, in order, with each function's arguments and defaults
+read from the code, print the help page. Give it a function's name for that function's full
+documentation. The `cortec` command does nothing else: the package is a library, and the runs are
+Python calls.
 
 ```bash
 cortec --help                        # the commands, the run order, functions, classes, refusals
@@ -129,9 +130,9 @@ python3 -m cortec --help             # the same, when pip's scripts directory is
 
 ## 2. Choose where the model runs, and set the credentials
 
-The generator is called through one of four backends, and three of them can reach either the
-vendor's public API or an enterprise surface inside your own cloud account. The `model` name is the
-same on both; the surface changes only the client and the credentials.
+The generator is called through one of four backends. Three of them can reach either the vendor's
+public API or an enterprise surface inside your own cloud account. The `model` name is the same on
+both, and the surface changes only the client and the credentials.
 
 | Backend | Surface | Set before running | `Generator(...)` arguments |
 |---|---|---|---|
@@ -142,25 +143,25 @@ same on both; the surface changes only the client and the credentials.
 | `openai` | GPT on Azure OpenAI (recommended) | `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, optionally `AZURE_OPENAI_API_VERSION` | `surface="azure", surface_model="<your deployment name>"` |
 | `gemini` | public API | `GEMINI_API_KEY` | `backend="gemini", model="gemini-3.5-flash"` |
 | `gemini` | Gemini on Google Vertex AI (recommended) | Application Default Credentials, `GOOGLE_CLOUD_PROJECT`, optionally `GOOGLE_CLOUD_LOCATION` (default `global`) | `surface="vertex"` |
-| `ollama` | a local Ollama server | `ollama_url` (default `http://localhost:11434`) | **not an enterprise surface — out of deployment scope**; the capability gate refuses these models by default |
+| `ollama` | a local Ollama server | `ollama_url` (default `http://localhost:11434`) | **not an enterprise surface, out of deployment scope**; the capability gate refuses these models by default |
 | `mock` | none | nothing | offline dry runs of the whole pipeline |
 
-A reasoning model served through Ollama, for example OpenAI's open-weight `gpt-oss:120b` standing in
-for a model an institution hosts itself, needs three settings that `cortec run` exposes: `--effort`
-(`low`, `medium` or `high`) for its thinking level, `--max-output-tokens` large enough that the chain
-of thought never consumes the whole budget before the CSV is written (32,768 at the low level), and
-`--request-timeout` of several minutes per call. The capability gate has not measured that model, so
-`--allow-unvalidated` is required and the output says so.
+A reasoning model served through Ollama needs three settings that `cortec run` exposes. An example
+is OpenAI's open-weight `gpt-oss:120b`, standing in for a model an institution hosts itself. Set
+`--effort` (`low`, `medium` or `high`) for its thinking level. Set `--max-output-tokens` high enough
+that the reasoning never uses up the whole budget before the CSV is written (32,768 at the low
+level). Set `--request-timeout` to several minutes per call. The capability gate has not measured
+that model, so `--allow-unvalidated` is required, and the output says so.
 
-**Which endpoint to point this at.** For regulated data, use the enterprise-hosted, tenant-isolated
-surface in your own cloud account (Bedrock, Azure OpenAI or Vertex AI), with private networking,
-data residency, contractual exclusion of training on inputs, and a BAA where HIPAA applies. The
-vendors' public developer APIs are supported but are not recommended for regulated deployment: the
-weights are the same, the contract and the network path are not, and those are what a compliance
+**Which endpoint to point this at.** For regulated data, use the enterprise-hosted, tenant-isolated surface in
+your own cloud account (Bedrock, Azure OpenAI or Vertex AI). It should have private networking, data
+residency, a contract that excludes training on your inputs, and a BAA where HIPAA applies. The
+vendors' public developer APIs are supported but are not recommended for regulated deployment. The
+weights are the same, but the contract and the network path are not, and those are what a compliance
 review assesses. The privacy argument does not depend on the endpoint, because the request carries
-only the DP release (step 9); the compliance argument does. The paper's own measurements were
-made on the public APIs and on self-hosted open backbones; the deployment guide says which results
-that affects.
+only the DP release (step 9). The compliance argument does. The paper's own measurements were made on
+the public APIs and on self-hosted open models, and the deployment guide says which results that
+affects.
 
 **What is verified.** The tests construct each SDK's real client class offline and replace only the
 transport, so an SDK change fails in CI rather than at your first call.
@@ -185,10 +186,10 @@ Stage A reads one pandas DataFrame with exactly the columns the schema declares.
   with `keep_default_na=False` if a real category is spelled `None`, `NA` or `nan`, because pandas
   otherwise turns it into a missing value.
 - Numeric columns hold numbers inside the declared bounds. Values outside are clipped, and the
-  validation report says how many; a surprise there means the declared bounds are wrong.
+  validation report says how many. If that number surprises you, the declared bounds are wrong.
 - The target column holds exactly two labels, the ones declared as `positive` and `negative`.
 - **One row per person.** ε protects one row. If a person contributes `k` rows, that person's
-  guarantee is `k · ε`. Count rows per individual before Stage A; if the maximum is above 1, cap
+  guarantee is `k · ε`. Count the rows per person before Stage A. If the maximum is above 1, cap
   each person's rows or aggregate to one row per person. Step 5 explains the declaration.
 
 Validation runs before any budget is spent and reports every problem at once.
@@ -228,15 +229,16 @@ schema = Schema(
 | `conditional` | the levels of the conditional target table, coarse to fine, as column tuples | leave it out to have it derived (below) |
 | `coarsen` | `{column: {declared value: group}}`, grouping a wide categorical for conditioning | derived by auto-configuration; may also be supplied |
 
-**Leave `conditional` empty and the hierarchy is derived.** Auto-configuration ranks the columns by
-mutual information with the target, from one DP-noised contingency table per column. It chooses how
-many columns to condition on from the public cardinalities and the number of records you will
-request, coarsens wide categoricals, and derives a cohort stratification on the highest-ranked
-numeric column when the data can support it. The selection spends a declared share of
-`epsilon_total`, between 5% and 30% depending on the schema size and the row count, and is charged
-to the same ledger. Declare `conditional` yourself and it is used untouched. Auto-configuration has
-no concept of a person, so on multi-row data it can select a column that is a proxy for how many
-rows someone contributes; declare the columns yourself if that matters.
+**Leave `conditional` empty and the hierarchy is derived for you.** Auto-configuration ranks the
+columns by their mutual information with the target, using one DP-noised contingency table per
+column. From the public cardinalities and the number of records you will request, it chooses how
+many columns to condition on. It groups wide categorical columns into a few bands, and it forms
+cohorts on the highest-ranked numeric column when the data can support them. The selection spends a
+declared share of `epsilon_total`, between 5% and 30% depending on the schema size and the row count,
+and it is charged to the same ledger. If you declare `conditional` yourself, it is used unchanged.
+Auto-configuration has no concept of a person. On data with several rows per person it can select a
+column that stands in for how many rows someone contributes, so declare the columns yourself if
+that matters.
 
 ## 5. Stage A: release the statistics
 
@@ -249,10 +251,10 @@ print(release.audit["epsilon_accounted"])      # 2.0
 release.to_json("release.json")                # contains no private record
 ```
 
-This is the only call that reads the private data. It forms the cohorts from the public rule;
-releases one Laplace-noised histogram per column per cohort (one per outcome class where both
-classes clear `n_min`), the class balance, noised cohort and cell sizes, and the conditional target
-table; and records every query in a ledger.
+This is the only call that reads the private data. It forms the cohorts from the public rule. It
+releases one Laplace-noised histogram per column and cohort, or one per outcome class where both
+classes clear `n_min`. It also releases the class balance, the noised cohort and cell sizes, and
+the conditional target table, and it records every query in a ledger.
 
 | Parameter | Default | What it does |
 |---|---|---|
@@ -300,10 +302,10 @@ each person's rows, or report `ε_person` rather than the per-row number.
   privacy engineer can recompute the total by hand. `PrivacyLedger.spend()` is the only function
   in the package that returns a noise scale, so nothing is released without appearing there.
 - `release.audit.get("warnings", [])` is empty, or you have read each entry. A seeded release and
-  an undeclared or vacuous privacy unit are recorded there. Two further conditions are printed at
-  release time rather than recorded: an under-spent conditional budget (some declared levels
-  released no cell) and a noise-dominated conditional table (the noise on a level's rates is at or
-  above their spread). Read the console.
+  an undeclared or meaningless privacy unit are recorded there. Two further conditions are printed
+  at release time rather than recorded. One is an under-spent conditional budget, where some
+  declared levels released no cell. The other is a noise-dominated conditional table, where the
+  noise on a level's rates is at least as large as their spread. Read the console.
 - `release.conditional_levels` is non-empty and its finest level has cells. An empty table is
   refused, because the output would be unconditioned.
 - Store `release.json` and hash it. Generation reads only this file, so every later draw and every
@@ -336,23 +338,23 @@ synthetic = gen.generate_selected(release, n_rows=5000, pool_factor=3)
 Three generation methods:
 
 - **`generate_selected(release, n_rows, pool_factor=3)`** is the default recommendation. It
-  generates `pool_factor × n_rows` records cohort by cohort, keeps the `n_rows` whose cell counts
-  match the release, and redraws each numeric value inside its released bin in the cohorts that
-  carry class-conditional blocks (`sub_bin="generator"` keeps the model's values). Both steps read
-  only the release, so they cost no privacy budget; the cost is `pool_factor` times the generation
-  spend.
+  generates `pool_factor × n_rows` records cohort by cohort and keeps the `n_rows` whose cell counts
+  match the release. In the cohorts that carry class-conditional blocks, it then redraws each
+  numeric value inside its released bin (`sub_bin="generator"` keeps the model's values instead).
+  Both steps read only the release, so they cost no privacy budget. The cost is `pool_factor`
+  times the generation spend.
 - **`generate(release, n_rows)`** is the same without the pool. It is adequate when relative
   ordering is all you need.
-- **`generate_by_cell(release, n_rows, level=0)`** makes one call per released conditional cell
+- **`generate_by_cell(release, n_rows, level=0)`** makes one call per released conditional cell,
   with an integer positive count. Use it when absolute conditional rates matter, such as a
   readmission probability or a default rate. It refuses when any conditioning column has less than
-  90% of its released marginal mass inside released bands, because rows outside those bands would
-  be missing from the output while every aggregate check still looked healthy;
-  `allow_low_coverage=True` overrides, for measurement rather than for use. Treat that guard as a
-  heuristic mitigation, not a solved problem: it checks which bands the released cells span and not
-  what happens inside a band, and establishing when a DP conditional table can be conveyed to a
-  language model without silent loss is an open problem. Compare per-column output against the
-  release anyway.
+  90% of its released marginal mass inside released bands. Otherwise rows outside those bands would
+  be missing from the output while every aggregate check still looked healthy.
+  `allow_low_coverage=True` overrides the refusal, for measurement rather than for use. Treat the
+  guard as a heuristic mitigation, not a solved problem. It checks which bands the released cells
+  cover, not what happens inside a band, and when a DP conditional table can be passed to a
+  language model without silent loss is an open problem. Compare the output column by column with
+  the release anyway.
 
 **Which model.** Capability is gated before any call, because a model too weak to follow the
 release produces well-formed, plausible rows that carry none of its structure, and no output check
@@ -364,19 +366,19 @@ reveals that.
 | Gemini Flash (the `gemini.*flash` pattern; `gemini-3.5-flash` is served by 3.6 Flash) | validated | the sweep (0.008) and full-dataset generation (1-way total variation 0.027 on Adult at n = 300) |
 | Qwen3-14B, Qwen3-32B (4-bit AWQ), served through vLLM | validated | full-dataset generation (1-way 0.046 and 0.049, seen-conditional error 0.027 and 0.031 on Adult at n = 300) |
 | Qwen3-8B | adequate | full-dataset generation (1-way 0.068; writes range labels into numerical columns at times) |
-| llama3.3:70b-instruct | **sweep-only — refused** | the sweep (0.020); fails full-dataset generation |
-| qwen2.5:72b-instruct | **sweep-only — refused** | the sweep (0.030); fails full-dataset generation |
+| llama3.3:70b-instruct | **sweep-only, refused** | the sweep (0.020); fails full-dataset generation |
+| qwen2.5:72b-instruct | **sweep-only, refused** | the sweep (0.030); fails full-dataset generation |
 | mistral-small:24b, gemma2:27b, gpt-oss:20b | adequate | the sweep (0.049–0.078) |
 | qwen2.5:32b, qwen2.5:14b | adequate | the sweep (0.098–0.105) |
-| qwen2.5:7b | **insufficient — refused** | the sweep (0.406); on full-dataset generation it wrote its own prior over the released distributions |
+| qwen2.5:7b | **insufficient, refused** | the sweep (0.406); on full-dataset generation it wrote its own prior over the released distributions |
 
 `print(cortec.models.recommended_table())` lists the models we recommend, measured on
-full-dataset generation. A sweep-only model reproduces one forced rate in a short prompt but, on
-full-dataset generation, is close to indistinguishable from an unconditioned prompt; the design
-notes give the measurements. On a ladder of open backbones decoding one release, single-column
+full-dataset generation. A sweep-only model reproduces one forced rate in a short prompt, but on
+full-dataset generation it is close to indistinguishable from an unconditioned prompt. The design
+notes give the measurements. On a ladder of open models decoding one release, single-column
 fidelity improved with capability and stopped improving at 14 billion parameters, and downstream
-utility did not move with the backbone at all; the design notes (section 11) give the numbers. An
-unlisted model is refused unless you pass `allow_unvalidated=True`.
+utility did not change with the model at all (design notes, section 11). An unlisted model is
+refused unless you pass `allow_unvalidated=True`.
 
 **Enable reasoning, and verify that it fired.** Reasoning is the largest single effect measured. On
 one model tested against itself, conditional error moved from 0.173 ± 0.032 to 0.045 ± 0.007 with
@@ -396,15 +398,16 @@ gen.stats.warnings                     # one explicit warning for each condition
 ```
 
 **After the run**, read `gen.stats`: `calls`, `parse_ok`, `rows`, `rows_requested`,
-`rows_out_of_bounds`, `rows_undeclared_category`, `rate_limit_waits`, `spend_usd`. Rows outside
-the declared domain or carrying an undeclared category are dropped and counted, never kept. The
-output carries one provenance column, `_cohort` (or `_cell` for cell-wise generation), naming the
-released unit each row came from; drop it if your consumer expects the schema's columns only.
+`rows_out_of_bounds`, `rows_undeclared_category`, `rate_limit_waits` and `spend_usd`. Rows outside
+the declared domain, or with an undeclared category, are dropped and counted, never kept. The output
+carries one provenance column, `_cohort` (or `_cell` for cell-wise generation), naming the released
+unit each row came from. Drop it if your consumer expects only the schema's columns.
 
-**Decoding with no language model.** The same release decodes without any model: the
-maximum-entropy table that fits every released count (Private-PGM, the estimator AIM and MST use),
-sampled at `pool_factor × n_rows` and passed through the same selection step. It reads the release
-and the schema only, spends no budget, needs no key and runs on a CPU; install the `pgm` extra.
+**Decoding with no language model.** The same release can be decoded without any model. The
+decoder fits the maximum-entropy table that agrees with every released count (Private-PGM, the
+estimator AIM and MST use), samples it at `pool_factor × n_rows`, and passes the rows through the
+same selection step. It reads only the release and the schema, spends no budget, needs no key and
+runs on a CPU. Install the `pgm` extra to use it.
 
 ```python
 from cortec import decode_release
@@ -412,23 +415,24 @@ synthetic = decode_release(schema, release, n_rows=5000, pool_factor=3)   # no m
 ```
 
 or `cortec decode --schema my_schema.py --release results/<name>/release.json --n-rows 5000`. In
-the paper this path is the decoder-with-selection control (Table 3): on Adult at ε = 2 and n = 300
+the paper this path is the decoder-with-selection control (Table 3). On Adult at ε = 2 and n = 300
 it reads 0.033 on single columns and 0.014 on the conditionals the release names, the level of the
-best language-model arm, with students at 0.824, 0.866 and 0.862, above every language-model arm's
+best language-model arm, with students at 0.824, 0.866 and 0.862, above every language-model arm
 (one split, three draws). What a language model adds beyond it is plausibility on the pairs it
-recognises from the column names, and nothing on aggregate utility; the design notes (section 11)
-give the measurements. Decode this way first, and add a model where its per-pair plausibility on a
-schema it knows is the deliverable.
+recognises from the column names, and nothing on aggregate utility (design notes, section 11).
+Decode this way first, and add a model where its plausibility on a schema it knows is what you
+need.
 
 **Dry run first.** `backend="mock"` needs no key and honours the exact-count block, so the whole
-generate-and-select loop runs end to end offline; `tests/test_selection.py` does exactly that.
+generate-and-select loop runs offline from start to finish. `tests/test_selection.py` does exactly
+that.
 
 ## 7. Stage C: attach a utility bound
 
-For each released cell, Stage C releases a Laplace estimate of the private target rate at a
-declared budget `epsilon_cert` and turns the noise into a one-sided bound on the gap between the
-private and the synthetic rates. The bound holds simultaneously over every cell with probability at
-least `1 − alpha`. It is a utility bound computed under DP, and it is not a privacy audit.
+For each released cell, Stage C releases a Laplace estimate of the private target rate, at a
+declared budget `epsilon_cert`, and turns the noise into a one-sided bound on the gap between the
+private and synthetic rates. The bound holds for every cell at once, with probability at least
+`1 − alpha`. It is a utility bound computed under DP. It is not a privacy audit.
 
 ```python
 from cortec import bound_with_controls
@@ -447,75 +451,76 @@ report.to_json("bound.json")       # readable by a third party without the priva
   `epsilon_release + epsilon_cert`, stated per row and per person. Each cell's rate is taken over
   `max(|c|, n_min)` and the Laplace scale uses the public floor `n_min`, so the sensitivity bound holds
   for every cell whatever its true size and the bound is pure ε-DP.
-- A released cell the synthetic data never covers scores the trivial bound of 1.0, so a bound
-  cannot be obtained by covering a convenient subset; cells with fewer than 20 synthetic rows are
-  reported as thin. The noise is unseedable. The report's `_what_this_is` and
-  `_standards_not_claimed` blocks say what it is and which privacy frameworks it must not be mapped
-  to.
+- A released cell that the synthetic data never covers scores the trivial bound of 1.0, so a bound
+  cannot be obtained by covering only a convenient subset of cells. Cells with fewer than 20
+  synthetic rows are reported as thin. The noise cannot be seeded. The report's `_what_this_is`
+  and `_standards_not_claimed` blocks say what it is, and which privacy frameworks it must not be
+  mapped to.
 
 ## 8. Evaluate the output
 
-Never against a bare threshold. Score the synthetic data beside two references built from real
-data of the same size: a real sample, which is the ceiling a synthetic method can reach at that
-size, and the same sample with its target column permuted, which is the floor of data that carries
-no usable information. Report fidelity and utility together, because a method can score well on
-one and poorly on the other, and read the conditional measures beside the aggregate ones. Also
-compare each declared categorical's full support with the release: a category present in the
-release and absent from the output is a representativeness failure that no aggregate metric
+Never against a bare threshold. Score the synthetic data beside two references built from real data
+of the same size. The first is a real sample, the ceiling a synthetic method can reach at that size.
+The second is the same sample with its target column shuffled, a floor that carries no usable
+information. Report fidelity and utility together, because a method can score well on one and
+poorly on the other, and read the conditional measures beside the aggregate ones. Also compare each
+declared categorical column's full set of categories with the release. A category present in the
+release and missing from the output is a representativeness failure that no aggregate metric
 reports.
 
-The package ships this comparison. `evaluate()` scores every table you give it beside a real
-sample of the same size drawn from `train` and that sample with its target permuted, on the
-paper's measures (1-way total variation on the public bins, and TSTR AUC under logistic
-regression, a random forest and gradient boosting on the holdout), and counts the declared
-categories absent from each table. It needs scikit-learn, the `dev` extra.
+The package ships this comparison. `evaluate()` scores every table you give it beside a real sample
+of the same size drawn from `train`, and beside that sample with its target shuffled. It uses the
+paper's measures: 1-way total variation on the public bins, and TSTR AUC under logistic regression,
+a random forest and gradient boosting on the holdout. It also counts the declared categories
+missing from each table. It needs scikit-learn, which the `dev` extra installs.
 
 ```python
 from cortec import evaluate
 from cortec.report import record_results
 
 rec = evaluate(schema, {"cortec": synthetic}, train=private_df, holdout=holdout_df)
-rec.show()                      # the paper's head-to-head table layout, reference rows marked
+rec.show()                      # the paper's table layout, reference rows marked
 rec.save("results", "evaluation")
 panel = record_results(evaluation=rec, bound=rec_c, generation=rec_b, release=rec_a)
 panel.show()                    # fidelity and utility against the real-sample range, the bound, the cost
 panel.write_markdown("results/RESULTS.md")
 ```
 
-`evaluate()` draws five real samples by default (`reference_draws`), each with a permuted copy;
-the two reference rows are their means, and a second table, `reference spread`, gives the lowest
-and highest value of each measure over them. That range is what real data of this size spans on
-this holdout. `record_results()` turns the stage records into the results panel `cortec run`
-prints last: the marginal fidelity result and the downstream utility result, each synthetic
-number read against that range (within it, beyond every real sample, or outside it by how much),
-and each student's share of real-sample utility, (synthetic − permuted) / (real sample −
-permuted), beside its gap. The panel's headline is a reading at one draw, not a pass or a fail;
-nothing in the package compares a number with a threshold.
+`evaluate()` draws five real samples by default (`reference_draws`), each with a shuffled copy. The
+two reference rows are their means, and a second table, `reference spread`, gives the lowest and
+highest value of each measure across them. That range is what real data of this size spans on this
+holdout. `record_results()` turns the stage records into the results panel that `cortec run` prints
+last. The panel shows the marginal fidelity and the downstream utility, and reads each synthetic
+number against that range: within it, beyond every real sample, or outside it by a stated amount.
+For each student it also gives the share of real-sample utility, (synthetic − shuffled) / (real
+sample − shuffled), beside its gap. The panel's headline is a reading at one draw, not a pass or a
+fail, and nothing in the package compares a number with a threshold.
 
-**What to expect.** On UCI Adult at ε = 2 and n = 300, models trained on this package's output
-are within 0.025 AUC of models trained on a real sample of the same size on every student, on an
-open backbone (Qwen3-14B: 0.807, 0.862, 0.833 against the sample's 0.830, 0.870, 0.840) and on a
-served one (Gemini: 0.805, 0.863, 0.838); the seen-conditional error is a fifth of the sample's.
-Two things to know before reading your own panel. First, the release carries that result: decoded
-with no language model at all, by the maximum-entropy table that fits its counts, it trains students
-within 0.012 AUC of the package's output; the language model adds plausibility that comes from the
-column names, and with every name replaced by a neutral token its edge on pairs and on utility
-disappears. On a schema the model does not know, expect the release's own result. Second, the
-reference AIM, fitted the way its authors fit it, is ahead on pairwise fidelity at every seed and on
-utility at n = 1,000; the package is level with it on single columns and ahead on the conditionals
-the release names. On a clinical survey (NHANES) the package's students were 0.07 to 0.10 AUC below
-a real sample's and the model-free decode of the same release was ahead of them. Do not assume
-parity: measure it on your own data against a real sample of matched size, and read the
-conditional measures beside the aggregate ones. The design notes carry the full measurements.
+**What to expect.** On UCI Adult at ε = 2 and n = 300, models trained on this package's output are
+within 0.025 AUC of models trained on a real sample of the same size, on every student. That holds
+on an open model (Qwen3-14B: 0.807, 0.862 and 0.833, against the sample's 0.830, 0.870 and 0.840)
+and on a served one (Gemini: 0.805, 0.863 and 0.838). The seen-conditional error is a fifth of the
+sample's. Two things are worth knowing before you read your own panel. First, most of that result
+comes from the release. Decoded with no language model at all, by the maximum-entropy table that fits its
+counts, it trains students within 0.012 AUC of the package's output. What the language model adds
+comes from the column names, and when every name is replaced by a neutral token
+its advantage on pairs and on utility disappears. On a schema the model does not know, expect the
+release's own result. Second, the reference AIM, fitted the way its authors fit it, fits pairs of columns more closely
+and, at n = 1,000, scores higher on utility. The package is level with it on single columns and,
+on Adult, carries the conditional rates the release names more closely. On a clinical survey (NHANES) the
+package's students were 0.07 to 0.10 AUC below a real sample's, and the model-free decoding of the
+same release scored higher than they did. Do not assume parity. Measure it on your own data against a real
+sample of the same size, and read the conditional measures beside the aggregate ones. The design
+notes carry the full measurements.
 
 ## 9. Where the trust boundary sits
 
 No private record is ever sent to the model. The prompt carries only released statistics: noised
-histograms, class balances and a conditional table. Generation is post-processing of a DP release,
-so by post-processing immunity whoever runs the model learns nothing beyond what the release
-already discloses, and the ε guarantee does not depend on where that computation happens. The
-decoder may be a tenant-isolated enterprise endpoint under a BAA or an air-gapped model on your own
-hardware; the argument is the same, and what differs between those is capability, not trust.
+histograms, class balances and a conditional table. Generation is post-processing of a DP release.
+By post-processing immunity, whoever runs the model learns nothing beyond what the release already
+discloses, and the ε guarantee does not depend on where that computation happens. The decoder may be
+a tenant-isolated enterprise endpoint under a BAA or an air-gapped model on your own hardware. The
+argument is the same for both, and what differs between them is capability, not trust.
 
 The guarantee says nothing about the model's pretraining corpus. If a private record was in it,
 that happened before this tool ran. The sharper version of the concern is that conditioning on
@@ -550,7 +555,7 @@ with guard():            # the same, for one block (works in notebooks too)
   or the setting the reason names and run again.
 ```
 
-Only the classes in this table (and `cortec-hybrid`'s) are treated as refusals; any other
+Only the classes in this table, and those of `cortec-hybrid`, are treated as refusals. Any other
 exception is a fault and keeps its traceback.
 
 | What you see | Why | What to do |
@@ -575,14 +580,14 @@ exception is a fault and keeps its traceback.
 
 ## 11. Output and exports
 
-Every stage prints one layout and exports one record, through `cortec.report`. The layout is a
-stage header, a block of named values, one or more tables (each with the question it answers
-under its name), the warnings, and a verdict; a run opens with a banner of what is about to run
-and closes with the results panel and a block listing every file written. On a
-terminal the numbers the run produced are printed in blue, reference rows (a real sample, a
-permuted floor) in grey, warnings in amber, and a verdict against the output or a refusal in
-orange. Colour is used only on a terminal; `NO_COLOR` or `CORTEC_COLOR=0` turns it off and
-`CORTEC_COLOR=1` forces it. The exported files never carry colour.
+Every stage prints one layout and exports one record, through `cortec.report`. The layout is a stage
+header, a block of named values, one or more tables (each with the question it answers under its
+name), the warnings, and a verdict. A run opens with a banner of what is about to run, and closes
+with the results panel and a list of every file written. On a terminal, the numbers the run produced
+are printed in blue, reference rows (a real sample, a shuffled floor) in grey, warnings in amber, and
+a verdict against the output or a refusal in orange. Colour is used only on a terminal. `NO_COLOR`
+or `CORTEC_COLOR=0` turns it off and `CORTEC_COLOR=1` forces it on. The exported files never carry
+colour.
 
 ```python
 from cortec import show, record
@@ -593,14 +598,14 @@ rec = show(report, schema=schema.name)                 # Stage C
 files = rec.save("results/run-01", "stage_c")          # {name: path}
 ```
 
-`show()` prints and returns a `RunRecord`; `record()` builds one without printing. `save()`
+`show()` prints and returns a `RunRecord`, and `record()` builds one without printing. `save()`
 writes `<stem>.json` (the record, format `cortec-result/1`), `<stem>.md` (the same content as
-Markdown), `<stem>.csv` (the named values), one CSV per table, and `<stem>.png` when matplotlib
-is installed. `RunRecord.from_json()` reads a record back. Tables follow the paper's conventions:
-a label column on the left, numbers to three decimal places, reference rows marked. Figures use
-the paper's own rc parameters and validated palette, available to your own scripts as
-`cortec.plots.paper_rcparams()`. [`result-format.md`](result-format.md) is the contract
-for the record and lists the tables each stage writes.
+Markdown), `<stem>.csv` (the named values), one CSV per table, and `<stem>.png` when matplotlib is
+installed. `RunRecord.from_json()` reads a record back. Tables follow the paper's conventions: a
+label column on the left, numbers to three decimal places, and reference rows marked. Figures use
+the paper's own plotting parameters and checked palette, which your own scripts can use through
+`cortec.plots.paper_rcparams()`. [`result-format.md`](result-format.md) is the contract for the
+record and lists the tables each stage writes.
 
 **The words in the output.** `cortec terms` prints every term the records use, in the order a
 run prints them, and `cortec <term>` (for example `cortec discriminating`) prints one. The ones

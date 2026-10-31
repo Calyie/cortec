@@ -20,7 +20,7 @@ The composition rules used here, and why each applies:
   * **Parallel composition** (McSherry 2009). Queries over *disjoint* subsets of the data cost
     the MAXIMUM, not the sum, because any one record can influence only one of them. This is
     what makes cohorts and conditional cells cheap, and it is the single most load-bearing rule
-    in the accounting — `PrivacyLedger` therefore requires callers to declare a partition key,
+    in the accounting: `PrivacyLedger` therefore requires callers to declare a partition key,
     and refuses to apply the parallel rule to queries whose partitions overlap.
   * **Post-processing immunity** (Dwork & Roth 2014). Any function of a released quantity, using
     no further access to the private data, is free. Generation is entirely post-processing.
@@ -72,11 +72,11 @@ class Query:
 DP_CAVEATS = [
     "The privacy unit is one ROW. Under group privacy a person contributing k rows receives "
     "k*epsilon, so on data with repeated individuals the per-person guarantee is weaker than "
-    "epsilon_accounted. See max_rows_per_person and epsilon_per_person in this report; if they say "
+    "epsilon_accounted. See max_rows_per_person and epsilon_per_person in this report. If they say "
     "UNDECLARED, the per-person guarantee of this release is unknown, not equal to epsilon.",
     "Noise is sampled with a floating-point Laplace generator. Naive floating-point Laplace "
     "sampling is vulnerable to the Mironov (2012) least-significant-bit attack. A deployment "
-    "handling real PHI should use a discrete or snapping sampler; this implementation does not, "
+    "handling real PHI should use a discrete or snapping sampler. This implementation does not, "
     "and that is a known gap.",
     "The guarantee covers the RELEASED STATISTICS recorded in this report. It says nothing about "
     "the generator's pretraining data, which is outside the DP boundary entirely, and nothing "
@@ -84,7 +84,7 @@ DP_CAVEATS = [
     "Which cohorts, class blocks and cells appear is decided by comparing their NOISED, charged "
     "counts with the public floor n_min (a noisy threshold, post-processing) when "
     "charge_suppression=True, the default. If charge_suppression=False was passed, those decisions "
-    "were made from the exact private counts and are NOT covered by the stated guarantee; check "
+    "were made from the exact private counts and are NOT covered by the stated guarantee. Check "
     "charge_suppression in this report.",
 ]
 
@@ -108,7 +108,7 @@ VACUOUS_EPSILON_PER_PERSON = 10.0
 def _lineage_costs(per_partition: dict) -> dict:
     """Cost of each partition INCLUDING its ancestors.
 
-    A partition key may be nested with "/" -- `cohort_3/YES` is the positive-class subset of
+    A partition key may be nested with "/". For example, `cohort_3/YES` is the positive-class subset of
     cohort 3. Sub-partitions of one parent are disjoint from each other (parallel: the max), but
     every record of `cohort_3/YES` is also a record of `cohort_3`, so a query on the parent and a
     query on the child both touch it and compose SEQUENTIALLY. Charging bare keys would have
@@ -129,7 +129,7 @@ class PrivacyLedger:
 
     The ledger is the only source of noise scales in this package. Code that wants to release a
     statistic must call `spend()`, which both charges the budget and returns the Laplace scale to
-    use — so it is not possible to release something without it appearing in the audit trail.
+    use, so it is not possible to release something without it appearing in the audit trail.
     """
 
     def __init__(self, epsilon_total: float, *, delta: float = 0.0,
@@ -152,7 +152,7 @@ class PrivacyLedger:
         if not (epsilon_total > 0):
             raise ValueError(f"epsilon_total must be positive, got {epsilon_total!r}")
         if delta != 0.0:
-            raise ValueError("this implementation is pure eps-DP; delta must be 0.0")
+            raise ValueError("this implementation is pure eps-DP. Delta must be 0.0")
         if max_rows_per_person is not None and (
                 not isinstance(max_rows_per_person, int) or max_rows_per_person < 1):
             raise ValueError(f"max_rows_per_person must be an integer >= 1, "
@@ -176,7 +176,7 @@ class PrivacyLedger:
 
         `partition` identifies the disjoint subset of records this query reads. Two queries with
         the same partition key can both be influenced by the same record and therefore compose
-        sequentially within their group; two with different keys are disjoint and compose in
+        sequentially within their group. Two with different keys are disjoint and compose in
         parallel. Getting this wrong in the unsafe direction is the failure this class exists to
         prevent, so the argument is required and never inferred.
         """
@@ -258,7 +258,7 @@ class PrivacyLedger:
     def audit_report(self) -> dict:
         """A machine-readable trail: every query, its cost, and how the total was reached.
 
-        This is the artefact a compliance team keeps. It is intentionally verbose — it should be
+        This is the artefact a compliance team keeps. It is intentionally verbose: it should be
         possible to recompute the total by hand from this dict alone.
         """
         by_group: dict[str, dict] = {}
@@ -292,7 +292,7 @@ class PrivacyLedger:
             # because a compliance reader will otherwise read epsilon_accounted as per-person.
             "max_rows_per_person": k if k is not None else "UNDECLARED",
             "epsilon_per_person": (round(self.total_epsilon * k, 10) if k is not None
-                                   else "UNDECLARED — epsilon_accounted protects one ROW; if any "
+                                   else "UNDECLARED: epsilon_accounted protects one ROW. If any "
                                         "person contributes k rows their guarantee is k x that"),
             # Machine-readable, because the human-readable warning lives in summary() and a
             # compliance pipeline reading audit.json never sees it. "UNKNOWN" is not "fine".
@@ -303,13 +303,13 @@ class PrivacyLedger:
             "vacuous_threshold": VACUOUS_EPSILON_PER_PERSON,
             "delta": self.delta,
             "charge_suppression": (self.charge_suppression if self.charge_suppression is not None
-                                   else "n/a — this path makes no n_min decision"),
+                                   else "n/a: this path makes no n_min decision"),
             "within_budget": self.total_epsilon <= self.epsilon_total + 1e-9,
             "n_queries": len(self.queries),
             "groups": by_group,
             "composition_rules": {
                 "within_partition": "sequential (same records can influence both queries)",
-                "across_partitions": "parallel — max, not sum (McSherry 2009)",
+                "across_partitions": "parallel: the maximum, not the sum (McSherry 2009)",
                 "across_groups": "sequential (groups describe overlapping populations)",
                 "generation": "post-processing, eps = 0 (Dwork & Roth 2014)",
             },

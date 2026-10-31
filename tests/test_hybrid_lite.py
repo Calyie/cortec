@@ -35,7 +35,7 @@ def frame(n=4000, seed=0) -> pd.DataFrame:
 
 
 def marginal_synth_output(n=1500, seed=1) -> pd.DataFrame:
-    """Stand-in for a marginal synthesiser: right marginals, target unrelated to features —
+    """Stand-in for a marginal synthesiser: right marginals, target unrelated to features,
     which is the specific weakness this tool exists to correct."""
     rng = np.random.default_rng(seed)
     return pd.DataFrame({"age": rng.integers(18, 90, n),
@@ -113,7 +113,7 @@ def test_table_release_stays_within_its_declared_budget():
 
 
 def test_many_cells_cost_one_query_by_parallel_composition():
-    """Cells partition the data, so a richer table costs no more epsilon — the property that
+    """Cells partition the data, so a richer table costs no more epsilon: the property that
     makes richness affordable, and richness is what makes the correction work."""
     a = release_conditional_table(schema(), frame(), ("edu",), epsilon=0.5, n_min=150, seed=3)
     b = release_conditional_table(schema(), frame(), ("edu", "region"), epsilon=0.5,
@@ -210,7 +210,7 @@ def test_ranking_is_skipped_when_the_inputs_own_ordering_is_noise():
 
 
 def test_rank_preservation_never_underperforms_iid_after_the_fix():
-    """With the informativeness check in place, the ranked path must not lose to i.i.d. — that
+    """With the informativeness check in place, the ranked path must not lose to i.i.d. That
     regression is exactly what the check exists to prevent."""
     from sklearn.ensemble import RandomForestClassifier
     from sklearn.metrics import roc_auc_score
@@ -270,7 +270,7 @@ def test_published_support_is_noised_not_exact_private_counts():
     The rate beside it was correctly noised and charged; the count was neither, so the audit
     reported a clean epsilon while the release carried the true number of records in every cell.
     This is the same defect that was found in cortec's release.py, and it survived here because
-    the whole test module failed at collection (no `cortec` on the path) — see tests/conftest.py.
+    the whole test module failed at collection (no `cortec` on the path). See tests/conftest.py.
 
     Asserted against the OUTPUT, not the accounting: a ledger can only total the queries it is
     told about, which is precisely why the leak was invisible.
@@ -296,7 +296,7 @@ def test_published_support_is_noised_not_exact_private_counts():
     truth = sorted(df["grp"].value_counts().tolist())
 
     assert any(r != runs[0] for r in runs), (
-        "support is identical across seeds, so it is not noised — the release publishes exact "
+        "support is identical across seeds, so it is not noised: the release publishes exact "
         "counts of private records")
     assert all(r != truth for r in runs), "a release reproduced the true cell counts exactly"
     assert all(v >= 0 for r in runs for v in r), "counts must stay non-negative"
@@ -352,7 +352,7 @@ def test_relabel_rate_matching_is_unbiased_in_small_cells():
 
     mean_rate = float(np.mean(realised))
     assert abs(mean_rate - 0.30) < 0.04, (
-        f"realised rate {mean_rate:.3f} against a released 0.30 — rounding is biased")
+        f"realised rate {mean_rate:.3f} against a released 0.30: rounding is biased")
     assert len(set(realised)) > 1, "every trial gave the same count: rounding is deterministic"
 
 
@@ -361,7 +361,7 @@ def test_relabel_defaults_to_iid_not_rank_preservation():
 
     `_rank_scores` gates on whether the synthetic target is predictable from the synthetic
     features. A synthesiser generates its target AS a function of those features, so that score is
-    near-perfect regardless of whether the relationship is CORRECT — renal_registry scored CV AUC
+    near-perfect regardless of whether the relationship is CORRECT: renal_registry scored CV AUC
     0.981 while its real downstream AUC was 0.631. The gate measured self-consistency, not
     validity, and was highest exactly when the synthesiser had confidently learned a wrong
     relationship, so it selected FOR the failure it was meant to prevent.

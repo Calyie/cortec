@@ -1,4 +1,4 @@
-"""Stage C — a UTILITY TRANSMISSION BOUND on how much released conditional structure reached the
+"""Stage C: a UTILITY TRANSMISSION BOUND on how much released conditional structure reached the
 synthetic output. Computed under DP. It bounds utility, never privacy.
 
 WHAT THE BOUND COVERS, precisely. For each released cell `c` the private data has a true positive
@@ -11,12 +11,12 @@ noise into a one-sided confidence bound, giving a statement of the form
 
 where `b_c = (1/n_min) / eps_cell` is the Laplace scale -- each cell's rate is taken over max(|c|, n_min),
 so its sensitivity is at most 1/n_min, the PUBLIC floor, whatever the private cell size -- and `k` is the number of cells (a union
-bound over the cells, so the guarantee is SIMULTANEOUS rather than per-cell — reporting a per-cell
+bound over the cells, so the guarantee is SIMULTANEOUS rather than per-cell: reporting a per-cell
 95% bound over 20 cells and calling it simultaneous would be wrong).
 
 Why a confidence bound rather than a p-value. A p-value answers "could this difference be chance?".
 The claim the paper needs is the opposite direction: "the difference is provably no larger than X".
-A one-sided bound states exactly that, and it degrades gracefully — a wide bound is an honest
+A one-sided bound states exactly that, and it degrades gracefully: a wide bound is an honest
 "cannot bound this tightly at this epsilon", not a false negative.
 
 The test costs privacy budget and is accounted for. It is NOT free: `p_hat_c` reads the private
@@ -27,7 +27,7 @@ FLOOR AND CEILING. `certify()` is meaningless unless a known-good input passes a
 fails, so `certify_with_controls()` runs three conditions: the synthetic data, a real hold-out
 sample (should clear the tolerance tightly), and the same real sample with its target permuted
 (must NOT clear it). A run where the permuted control also clears means the tolerance is too loose
-to discriminate and the result should be discarded — the §3 saturation lesson, applied here.
+to discriminate and the result should be discarded: the §3 saturation lesson, applied here.
 """
 from __future__ import annotations
 
@@ -61,7 +61,7 @@ for _m in _pkgutil.iter_modules(_src.__path__):
 
 # ── standards alignment ─────────────────────────────────────────────────────────────
 # NIST SP 800-226 (Guidelines for Evaluating Differential Privacy Guarantees) requires a DP claim
-# to state the parameters below, because "epsilon = 2" alone is not a guarantee — it is a number
+# to state the parameters below, because "epsilon = 2" alone is not a guarantee: it is a number
 # whose meaning depends entirely on the unit, the neighbouring relation and the variant. Most
 # published DP synthetic-data work omits several of these. They are emitted with every bound report
 # so a reviewer or auditor can check the claim rather than take it on trust.
@@ -150,7 +150,7 @@ DP_CLAIM = {
                    "adjacency and is not pure epsilon-DP; the bound is conservative by n/n_min.",
 }
 
-# Where the guarantee does NOT hold — NIST SP 800-226 asks for this explicitly and it is the part
+# Where the guarantee does NOT hold: NIST SP 800-226 asks for this explicitly and it is the part
 # most often left out.
 DP_CAVEATS = [
     "The privacy unit is one ROW, not one person. Under group privacy a person contributing k "
@@ -238,11 +238,11 @@ def certify(spec, real: pd.DataFrame, synth: pd.DataFrame, *, level: int,
     k = len(groups)
     # Cells PARTITION the private data, so the k rate queries are disjoint and compose in parallel:
     # the total cost is max over cells, not the sum, and each cell may therefore spend the full
-    # `epsilon`. (Splitting it k ways would be a k-fold accuracy loss for no privacy gain — the
+    # `epsilon`. (Splitting it k ways would be a k-fold accuracy loss for no privacy gain: the
     # same mistake as the conditional-level split fixed in tools/cortec.)
     eps_cell = epsilon
     # The union bound below is over the k independent Laplace draws. For Laplace(b),
-    # P(|X| > b*ln(k/alpha)) = alpha/k, so k cells give alpha overall — a SIMULTANEOUS guarantee.
+    # P(|X| > b*ln(k/alpha)) = alpha/k, so k cells give alpha overall: a SIMULTANEOUS guarantee.
 
     out = []
     for cell, idx in groups.items():
@@ -296,7 +296,7 @@ def certify_with_controls(spec, train, test, synth, *, level, epsilon, alpha=0.0
     n = len(synth)
     # The ceiling must be INDEPENDENT of the data `p_hat` is computed from. Drawing it from `train`
     # compares the training set against its own subset, which understates the bound a genuine real
-    # sample would achieve — the same tautology as the TRTR ceiling defect in evaluate_generic.
+    # sample would achieve: the same tautology as the TRTR ceiling defect in evaluate_generic.
     # `test` is the held-out split and was previously accepted as a parameter and never used.
     real_ctrl = test.sample(min(n, len(test)), random_state=seed)
     perm = real_ctrl.copy()
@@ -407,7 +407,7 @@ def main() -> None:
         tolerance, tolerance_rule = float(a.tolerance), {"rule": "explicit", "tolerance": float(a.tolerance)}
 
     print("=" * 100)
-    print(f"STAGE C — UTILITY TRANSMISSION BOUND | {spec.name} | level {level} | "
+    print(f"STAGE C: UTILITY TRANSMISSION BOUND | {spec.name} | level {level} | "
           f"eps_cert={a.epsilon} | alpha={a.alpha} | tolerance={tolerance:.4f} ({tolerance_rule['rule'][:40]})")
     print("=" * 100)
     print("This SPENDS privacy budget: the deployment total is eps_release + "
@@ -427,7 +427,7 @@ def main() -> None:
               f"{'YES' if r.get('within_bound') else 'no':>13s}")
     if res["synthetic"].get("n_cells_uncovered"):
         print(f"\n  note: {res['synthetic']['n_cells_uncovered']} released cell(s) have NO synthetic "
-              f"rows and are scored at the trivial bound 1.0 — the synthetic data supplies no "
+              f"rows and are scored at the trivial bound 1.0: the synthetic data supplies no "
               f"evidence for them.")
     if res["synthetic"].get("n_cells_thin"):
         print(f"  note: {res['synthetic']['n_cells_thin']} cell(s) have fewer than "
@@ -516,7 +516,7 @@ def main() -> None:
             "synthetic_files": paths, "n_synthetic_rows": int(len(synth)),
             "cells_from_release": a.release,
             "epsilon_release": a.epsilon_release,
-            "noise_source": "cryptographically secure, unseeded — this bound is ONE draw "
+            "noise_source": "cryptographically secure, unseeded: this bound is ONE draw "
                             "and re-running will not reproduce these bounds",
             "generated_utc": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
         }

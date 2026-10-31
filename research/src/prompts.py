@@ -2,11 +2,11 @@
 prompts.py
 Prompt templates for the two generation conditions being compared:
 
-  Condition A — HEADER-ONLY:
+  Condition A (header-only):
       LLM knows only column names and the dataset context.
       This is the informal "just ask an LLM" baseline many practitioners use.
 
-  Condition B — CoRTeC:
+  Condition B (CoRTeC):
       LLM sees DP-released per-cohort statistics as grounding signal.
       The hypothesis: richer conditioning → rows that better match the
       private joint distribution.
@@ -66,7 +66,7 @@ def build_cortec_prompt(cohort_stats: dict, n_rows: int = 20) -> str:
     """
     Condition B: LLM conditioned on DP-released per-cohort statistics.
     The statistics are the ONLY information from the private dataset that reaches
-    the generator — everything else is post-processing of already-DP-protected values.
+    the generator: everything else is post-processing of already-DP-protected values.
     """
     cid     = cohort_stats["cohort_id"]
     n_c     = cohort_stats["cohort_size"]
@@ -132,7 +132,7 @@ def build_cortec_prompt(cohort_stats: dict, n_rows: int = 20) -> str:
             lines.append(f"  P(income='>50K' | {g}) ≈ {r:.0%}")
 
     # The joint table is more specific than the two marginal families and removes the need to
-    # combine them by hand. Added 2026-09-04 alongside (not instead of) the marginal table —
+    # combine them by hand. Added 2026-09-04 alongside (not instead of) the marginal table:
     # the marginal table and the "even if counterintuitive" instruction are unchanged.
     joint = cohort_stats.get("conditional_income_joint", {})
     if joint:

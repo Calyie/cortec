@@ -1,5 +1,5 @@
 """
-membership_inference.py — an empirical membership-inference attack against CoRTeC's output.
+membership_inference.py: an empirical membership-inference attack against CoRTeC's output.
 
 **Why run this when the mechanism already has a proof.** Proposition 1 gives ε-differential
 privacy, which bounds any membership adversary's advantage information-theoretically: at ε = 2 no
@@ -8,8 +8,8 @@ attack cannot improve on a proof and cannot validate one. What it *can* do is tw
 having.
 
 First, it detects **implementation** failure. A proof covers the mechanism as written; an attack
-covers the code as run. If the release accidentally leaked a record — a suppression threshold not
-applied, a cohort of size one, a released histogram that is a delta on a single individual — the
+covers the code as run. If the release accidentally leaked a record: a suppression threshold not
+applied, a cohort of size one, a released histogram that is a delta on a single individual: the
 proof would still be true of the algorithm and false of the artifact. This is the same reason we
 verify the accounting numerically rather than trusting the derivation (§4.3).
 
@@ -21,7 +21,7 @@ useful than either alone.
 **The attacks.** Three, of increasing strength, all in the standard membership game: the adversary
 sees the synthetic dataset and must decide whether a candidate record was in the private training
 set. Members are drawn from the training split; non-members from the held-out split, which is
-disjoint and identically distributed — so the attack cannot succeed merely by recognising the data
+disjoint and identically distributed, so the attack cannot succeed merely by recognising the data
 distribution.
 
   1. **Nearest-neighbour distance.** The classic attack: a record that participated in training
@@ -35,7 +35,7 @@ distribution.
      strongest of the three and closest to the literature's state of the art for tabular data.
 
 **Reading the result.** The honest null is AUC = 0.5. Because the sample is finite, an AUC near
-0.5 is evidence of no *detectable* leakage rather than proof of none — so we report a bootstrap
+0.5 is evidence of no *detectable* leakage rather than proof of none, so we report a bootstrap
 confidence interval and check whether it contains 0.5, rather than eyeballing the point estimate.
 We also run every attack against a **positive control**: real training records passed off as
 "synthetic". An attack that cannot detect membership there is not a working attack, and reporting
@@ -121,8 +121,8 @@ def attack_lira(syn, mem, non, num, cat, seed=0, n_shadow=16):
     """A likelihood-ratio attack in the style of Carlini et al. (2022), adapted to synthetic data.
 
     The three attacks above are *global*: they score a record against the synthetic set as a whole.
-    LiRA is per-record — it asks whether this specific record looks more likely under a model fitted
-    to the synthetic data than under a model fitted to data that excludes it — and is the attack
+    LiRA is per-record: it asks whether this specific record looks more likely under a model fitted
+    to the synthetic data than under a model fitted to data that excludes it, and is the attack
     that exposed leakage in models the global attacks had cleared. Including it materially widens
     the class of adversary this evidence covers.
 
@@ -221,7 +221,7 @@ def main():
     bound = (np.exp(a.epsilon) - 1) / (np.exp(a.epsilon) + 1)
     W = 92
     print("=" * W)
-    print(f"MEMBERSHIP INFERENCE — {a.dataset}: {len(syn)} synthetic records from {len(files)} draw(s)")
+    print(f"MEMBERSHIP INFERENCE: {a.dataset}: {len(syn)} synthetic records from {len(files)} draw(s)")
     print(f"  {k} members (training split) vs {k} non-members (held-out split)")
     print(f"  theoretical bound at eps={a.epsilon}: adversary advantage <= {bound:.3f}")
     print("=" * W)
@@ -237,7 +237,7 @@ def main():
 
     # POSITIVE CONTROL: real training records presented as "synthetic". Any attack that cannot
     # detect membership here is broken, and its null result on CoRTeC would mean nothing.
-    print("\nPOSITIVE CONTROL — real training records passed off as synthetic")
+    print("\nPOSITIVE CONTROL: real training records passed off as synthetic")
     print("  (an attack that scores ~0.5 here is not working, and its null above is meaningless)")
     leak = train.iloc[rng.choice(len(train), min(len(syn), len(train)), replace=False)][use]
     leak = pd.concat([leak, mem.iloc[:min(200, len(mem))]], ignore_index=True)
@@ -252,7 +252,7 @@ def main():
     powered = [n for n, r in res_ctrl.items() if not r["contains_chance"]]
     print(f"strongest measured advantage against CoRTeC: {strongest:.4f}")
     print(f"theoretical bound at eps={a.epsilon}:          {bound:.4f}")
-    print(f"attacks demonstrated to work on the control:  {powered if powered else 'NONE — results are uninterpretable'}")
+    print(f"attacks demonstrated to work on the control:  {powered if powered else 'NONE, so the results are uninterpretable'}")
 
     json.dump({"dataset": a.dataset, "n_synthetic": len(syn), "n_candidates": k,
                "epsilon": a.epsilon, "theoretical_advantage_bound": bound,

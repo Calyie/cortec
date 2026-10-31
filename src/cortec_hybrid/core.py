@@ -1,8 +1,8 @@
 """
-cortec-hybrid — conditional-signal correction for a marginal DP synthesiser, with no LLM.
+cortec-hybrid: conditional-signal correction for a marginal DP synthesiser, with no LLM.
 
 **What this tool claims, precisely.** Marginal-based DP synthesisers (AIM, MST, PrivBayes) are
-excellent at the statistic they optimise — low-order marginals — and are evaluated on it in their
+excellent at the statistic they optimise, low-order marginals, and are evaluated on it in their
 own papers. They do not release a conditional target table: on UCI Adult at matched budget and
 sample size the reference AIM's seen-conditional error is 0.055 and MST's 0.140 against a real
 sample's 0.062 and CoRTeC's 0.027 (the paper's Table 3), while the reference AIM's downstream
@@ -26,7 +26,7 @@ weak conditional target structure and you need a calibrated rate. Measure before
 **A correction found while testing this package.** Rank-preserving assignment was assumed
 necessary for the correction to pay for itself. That is true
 only when the input synthetic data already carries within-cell structure. When its target is close
-to noise — precisely the case this tool targets — a ranking model fitted on that target learns the
+to noise, precisely the case this tool targets, a ranking model fitted on that target learns the
 noise, and ordering by it injects spurious structure that a downstream model mistakes for signal.
 That guard did not work, and the way it failed is the useful part. `_rank_scores` gated on whether
 the synthetic target is PREDICTABLE from the synthetic features (cross-validated AUC against
@@ -59,7 +59,7 @@ try:
 except ImportError as e:                                  # pragma: no cover
     raise ImportError(
         "cortec-hybrid reuses cortec's audited privacy accounting. Install the `cortec` "
-        "package (pip install cortec) — it is a pure-python dependency and pulls in no LLM client."
+        "package (pip install cortec). It is a pure-Python dependency and pulls in no language-model client."
     ) from e
 
 
@@ -73,7 +73,7 @@ class DomainTooLargeError(RuntimeError):
 
 
 class CorrectionError(ValueError):
-    """The correction was refused before any budget was spent; the message names the input or
+    """The correction was refused before any budget was spent. The message names the input or
     the setting to change. A ValueError, so existing handlers keep working."""
 
 
@@ -93,7 +93,7 @@ class ConditionalTable:
 # ── up-front feasibility check ──────────────────────────────────────────────────────
 
 def estimate_domain_size(schema: Schema) -> int:
-    """Product of per-column domain sizes after public binning — what drives inference cost."""
+    """Product of per-column domain sizes after public binning: what drives inference cost."""
     total = 1
     for c in schema.numerical:
         total *= max(len(schema.bin_edges(c)) - 1, 1)
@@ -116,7 +116,7 @@ def estimate_domain_size(schema: Schema) -> int:
 #   credit (full)          15  24,000   1.5e12     TIMEOUT  > 2,400 s
 #   credit  -BILL_AMT1-3   12  24,000   2.9e9      FIT   1,598 s
 #   credit  -PAY_AMT1-3    12  24,000   4.3e9      FIT   1,173 s      <- LARGER domain than above,
-#   credit  -3 demographics 12 24,000   —          TIMEOUT  > 2,400 s    and 425 s FASTER
+#   credit  -3 demographics 12 24,000   -          TIMEOUT  > 2,400 s    and 425 s FASTER
 #   credit  -all 6 amounts  9  24,000   8.4e6      FIT     414 s
 AIM_OBSERVATIONS = (
     ("titanic", 9, 1047, "FIT 56 s"),
@@ -169,7 +169,7 @@ def check_feasible(schema: Schema, *, n_rows: int | None = None,
         a timeout purely by going from 26,048 rows to 81,410;
       * **high-cardinality correlated numeric columns** -- finance has Adult's width, FEWER rows and
         a 30x smaller domain and still does not converge. Dropping any three columns does not
-        rescue it; dropping three *amount* columns does. A width-matched control (drop three
+        rescue it. Dropping three *amount* columns does. A width-matched control (drop three
         demographics instead) still times out, which is the only way to separate the two causes.
 
     Scope, stated because it bounds the rule: ten fits, one dataset family per cause, one AIM
@@ -211,16 +211,16 @@ def check_feasible(schema: Schema, *, n_rows: int | None = None,
     if n_rows is None:
         report.setdefault("notes", []).append(
             "n_rows was not supplied, so the row-count check was skipped. Row count is one of the "
-            "three factors that predicted convergence; pass n_rows=len(df) for the full check.")
+            "three factors that predicted convergence. Pass n_rows=len(df) for the full check.")
     if reasons:
         msg = (
             f"schema {schema.name!r} sits outside the region where AIM converged in our "
             f"measurements:\n"
             + "".join(f"  - {r}\n" for r in reasons)
-            + f"  (estimated domain {size:,.0f} states -- reported for reference only; domain size "
+            + f"  (estimated domain {size:,.0f} states, reported for reference only. Domain size "
               f"did NOT predict convergence in our measurements and is not used here.)\n"
-              f"  Options: drop or coarsen the high-cardinality numeric columns first -- that is "
-              f"what rescued the one failing schema we diagnosed -- reduce attributes, subsample "
+              f"  Options: drop or coarsen the high-cardinality numeric columns first (that is "
+              f"what rescued the one failing schema we diagnosed), reduce attributes, subsample "
               f"rows, or use MST, whose cost grew far more gently across the same schemas.\n"
               f"  This is a heuristic from ten fits under one implementation, not a theory. Pass "
               f"raise_on_fail=False to proceed and measure it yourself."
@@ -241,7 +241,7 @@ def release_conditional_table(schema: Schema, df: pd.DataFrame, columns: tuple[s
     """Release P(target | cell) under DP over a disjoint partition.
 
     The cells partition the data, so by parallel composition the whole table costs `epsilon`
-    however many cells it contains — accuracy is set by cell *support*, not cell count. This is
+    however many cells it contains: accuracy is set by cell *support*, not cell count. This is
     what makes a rich table affordable, and richness is what makes the correction work at all.
     """
     if n_min < 50:
@@ -259,7 +259,7 @@ def release_conditional_table(schema: Schema, df: pd.DataFrame, columns: tuple[s
                 f"is what the table conditions on. NO privacy budget was spent.")
         if c not in known:
             raise CorrectionError(
-                f"column '{c}' is not in the schema; the cells can be built over: "
+                f"column '{c}' is not in the schema. The cells can be built over: "
                 f"{', '.join(known)}. NO privacy budget was spent.")
     schema.validate(df, strict=True)     # before any budget is spent
     data = schema.coerce(df)
@@ -288,7 +288,7 @@ def release_conditional_table(schema: Schema, df: pd.DataFrame, columns: tuple[s
     cells: dict[str, float] = {}
     support: dict[str, int] = {}
     # `support` is PUBLISHED on the returned ConditionalTable. It was the exact count of private
-    # records per cell — unnoised and never charged — so the audit reported a clean epsilon while
+    # records per cell, unnoised and never charged, so the audit reported a clean epsilon while
     # the release carried the true cell sizes. Same defect as cortec's release.py. Cells partition
     # the data, so the counts are parallel composition: ONE epsilon for the whole group however
     # many cells there are. They are a separate GROUP from the rates because a record contributes
@@ -323,7 +323,7 @@ def release_conditional_table(schema: Schema, df: pd.DataFrame, columns: tuple[s
 
     if not cells:
         raise CorrectionError(
-            f"no cell reached n_min={n_min}; the table is empty and would correct nothing. "
+            f"no cell reached n_min={n_min}. The table is empty and would correct nothing. "
             f"Use fewer conditioning columns or lower n_min.")
     led.assert_within_budget()
     led.seal()
@@ -385,13 +385,13 @@ def relabel(schema: Schema, synthetic: pd.DataFrame, table: ConditionalTable, *,
         diabetes         MST 0.581 -> rank 0.528 (-0.053) -> i.i.d. 0.549 (-0.032)
         adult            MST 0.705 -> rank 0.788 (+0.083) -> i.i.d. 0.821 (+0.116)
 
-    i.i.d. beat ranking in **9 of 9 runs**. A single development run had suggested that i.i.d.
-    assignment "bought essentially nothing (+0.002 AUC)"; that reading did not survive replication.
+    i.i.d. gave higher utility than ranking in **9 of 9 runs**. A single development run had suggested that i.i.d.
+    assignment "bought essentially nothing (+0.002 AUC)". That reading did not survive replication.
 
     Why the guard did not catch it: `_rank_scores` gated on whether the synthetic target is
     PREDICTABLE from the synthetic features (CV AUC >= RANK_INFORMATIVENESS_FLOOR). A synthesiser
     generates its target AS a function of those features, so that score is near-perfect almost
-    always — renal_registry scores 0.981 while its real downstream AUC is 0.631. The gate measures
+    always: renal_registry scores 0.981 while its real downstream AUC is 0.631. The gate measures
     SELF-CONSISTENCY, not validity, and it is highest exactly when the synthesiser has confidently
     learned a wrong relationship. It therefore selected FOR the failure mode.
 
@@ -435,13 +435,13 @@ def _rank_scores(schema: Schema, df: pd.DataFrame,
     """Score each synthetic record by its propensity for the positive class, or return None if
     ranking would do more harm than good.
 
-    Fitted on the SYNTHETIC data only — it never sees a private record, which is what keeps this
+    Fitted on the SYNTHETIC data only: it never sees a private record, which is what keeps this
     step post-processing.
 
     The None case is the important one and it was found by testing rather than assumed. Ranking
     only helps when the input synthetic data already carries within-cell structure worth
-    preserving. When its target is close to noise — which is exactly the case for a synthesiser
-    whose conditional structure is weak, i.e. the case this tool is built for — a model fitted on
+    preserving. When its target is close to noise, which is exactly the case for a synthesiser
+    whose conditional structure is weak, i.e. the case this tool is built for, a model fitted on
     that target learns the noise, and ordering by it *injects* spurious within-cell structure that
     a downstream model then mistakes for signal. In our own fixture that cost 0.09 AUC against
     plain i.i.d. assignment. So the informativeness of the ranking is measured by cross-validation
@@ -483,8 +483,8 @@ def estimate_gain(schema: Schema, before: pd.DataFrame, after: pd.DataFrame,
     """Measure what the correction actually changed, using only released quantities.
 
     Reports conditional error against the DP table before and after, and the change in marginal
-    fidelity between the two synthetic sets — because a correction that fixes conditional
-    structure while wrecking marginals is not a win, and the user should see both.
+    fidelity between the two synthetic sets, because a correction that fixes conditional
+    structure while wrecking marginals is not an improvement, and the user should see both.
     """
     def cond_err(df):
         keys = _cell_keys(df, table.columns, schema)
@@ -517,7 +517,7 @@ def estimate_gain(schema: Schema, before: pd.DataFrame, after: pd.DataFrame,
     out["verdict"] = (
         "the correction materially improved conditional calibration"
         if out["worth_it"] else
-        "the correction changed little; the marginal synthesiser's conditional structure was "
+        "the correction changed little. The marginal synthesiser's conditional structure was "
         "already close to the released table, so consider keeping the budget instead")
     # `worth_it` is read as "should I use this?" and it does not answer that question. It is a
     # CALIBRATION criterion, and we measured the two coming apart: across 11 datasets the
@@ -527,12 +527,12 @@ def estimate_gain(schema: Schema, before: pd.DataFrame, after: pd.DataFrame,
     out["worth_it_measures"] = "conditional calibration against the released table, nothing else"
     out["worth_it_does_not_predict"] = (
         "downstream utility. Across 11 datasets this correction improved calibration in "
-        "essentially every case while downstream AUC moved in BOTH directions; of 9 runs flagged "
+        "essentially every case while downstream AUC moved in BOTH directions. Of 9 runs flagged "
         "worth_it, downstream AUC fell on 6 in one run and on 3 of 10 in a repeat, and the "
         "direction was not stable between runs. Three datasets were reliably negative (a renal "
         "registry, hospital readmission, cervical cancer): there the correction reliably improved "
         "calibration AND reliably reduced downstream AUC. Validate on your own held-out data "
-        "before adopting this; do not read worth_it as a recommendation.")
+        "before adopting this. Do not read worth_it as a recommendation.")
     return out
 
 

@@ -56,7 +56,7 @@ __all__ = ["transmission_bound", "bound_with_controls", "BoundResult", "BoundRep
 # Below this many synthetic rows in a cell, q_c is too coarse to mean much (with one row it can
 # only be 0 or 1). Such cells are reported, not silently trusted.
 MIN_SYNTH_ROWS_PER_CELL = 20
-TOLERANCE_RULE = ("derived from the release: the Laplace half-width plus half the largest gap between a released cell rate and the released base rate, so the permuted floor cannot pass at any sample size; reads released quantities only")
+TOLERANCE_RULE = ("derived from the release: the Laplace half-width plus half the largest gap between a released cell rate and the released base rate, so the permuted floor cannot pass at any sample size. Reads released quantities only")
 
 
 class BoundError(RuntimeError):
@@ -87,19 +87,19 @@ DP_CLAIM = {
 
 DP_CAVEATS = [
     "The privacy unit is one ROW. Under group privacy a person contributing k rows receives "
-    "k*epsilon; the per-person figure in this report is the declared maximum rows per person times "
+    "k*epsilon. The per-person figure in this report is the declared maximum rows per person times "
     "the row-level total. Reduce k before Stage A if a per-person guarantee is needed.",
     "Noise is sampled with a floating-point Laplace generator, which is vulnerable to the Mironov "
     "(2012) least-significant-bit attack. A deployment handling real PHI should use a discrete or "
-    "snapping sampler; this implementation does not, and that is a known gap.",
+    "snapping sampler. This implementation does not, and that is a known gap.",
     "The guarantee covers the released statistics and this bound's own query. It says nothing "
     "about the generator's pretraining data, which is outside the DP boundary entirely.",
     "This is a UTILITY TRANSMISSION BOUND computed under DP. It bounds how far the synthetic "
-    "conditional structure can differ from the private one; it does NOT attest to privacy, says "
+    "conditional structure can differ from the private one. It does NOT attest to privacy, says "
     "nothing about re-identification risk, and must never be presented as a privacy audit.",
     "Which cells enter the bound is decided by the release. With charge_suppression=True, the "
     "default, a cell was released only if its noised, charged support reached n_min, so the "
-    "selection is post-processing; with charge_suppression=False it read the exact counts. The "
+    "selection is post-processing. With charge_suppression=False it read the exact counts. The "
     "release's accounting record says which rule applied.",
     "Cells for which the synthetic data supplies no rows are scored at the trivial bound of 1.0, "
     "so a bound cannot be obtained by covering a convenient subset of the cells.",
@@ -253,7 +253,7 @@ def _pick_level(release: Release, level: int | None) -> dict:
     for lv in release.conditional_levels:
         if int(lv["level"]) == int(level):
             return lv
-    raise BoundError(f"level {level} is not in the release; released levels are "
+    raise BoundError(f"level {level} is not in the release. Released levels are "
                      f"{[lv['level'] for lv in release.conditional_levels]}")
 
 
@@ -284,7 +284,7 @@ def _noisy_private_rates(schema: Schema, release: Release, private_df: pd.DataFr
         m = (keys == cell).values
         n_c = int(m.sum())
         if n_c == 0:
-            raise BoundError(f"released cell {cell!r} holds no private rows in the data passed; the "
+            raise BoundError(f"released cell {cell!r} holds no private rows in the data passed. The "
                              f"private data does not match the release (wrong columns, bins or file)")
         # the rate over max(|c|, n_min), as the release takes its rates: the sensitivity is then at most
         # 1/n_min for EVERY cell, including one the noisy gate released below the floor (such a cell
@@ -374,9 +374,9 @@ def bound_with_controls(schema: Schema, release: Release, private_df: pd.DataFra
     term for it.
     `holdout_df` must be real data that was NOT used to build the release, so that the ceiling is a
     genuine real sample rather than the training set compared against its own subset. `seed`
-    controls only which hold-out rows form the ceiling and how the floor is permuted; it never
+    controls only which hold-out rows form the ceiling and how the floor is permuted. It never
     touches the DP noise. `max_rows_per_person` is read from the release's accounting record when
-    the release declared it; pass it here otherwise, because the report will not state a per-person
+    the release declared it. Pass it here otherwise, because the report will not state a per-person
     figure it was not given.
     """
     lv, cols, cells, eff, p_hat, n_priv, ledger = _noisy_private_rates(
@@ -405,7 +405,7 @@ def bound_with_controls(schema: Schema, release: Release, private_df: pd.DataFra
     discriminating = bool(ceil.within_bound and not floor.within_bound)
     if synth.n_cells_thin > 0:
         verdict, reason = None, (f"{synth.n_cells_thin} of {synth.n_cells} released cells hold fewer than "
-                                 f"{MIN_SYNTH_ROWS_PER_CELL} synthetic rows; no verdict is issued")
+                                 f"{MIN_SYNTH_ROWS_PER_CELL} synthetic rows. No verdict is issued")
     elif not discriminating:
         why = []
         if not ceil.within_bound:
@@ -414,7 +414,7 @@ def bound_with_controls(schema: Schema, release: Release, private_df: pd.DataFra
         if floor.within_bound:
             why.append(f"the permuted-target floor's worst bound {floor.worst_case_bound:.4f} lies within "
                        f"the tolerance {tolerance:.4f}")
-        verdict, reason = None, "the controls did not discriminate: " + " and ".join(why) + "; no verdict is issued"
+        verdict, reason = None, "the controls did not discriminate: " + " and ".join(why) + ". No verdict is issued"
     else:
         verdict, reason = ("within bound" if synth.within_bound else "outside tolerance"), None
 
@@ -424,7 +424,7 @@ def bound_with_controls(schema: Schema, release: Release, private_df: pd.DataFra
     if not isinstance(k_person, (int, np.integer)) or int(k_person) < 1:
         raise BoundError("max_rows_per_person is undeclared: the release did not record it and none "
                          "was passed. This report will not state a per-person guarantee it was not "
-                         "given; pass max_rows_per_person=1 if the data is one row per person.")
+                         "given. Pass max_rows_per_person=1 if the data is one row per person.")
     k_person = int(k_person)
     eps_release = float(audit.get("epsilon_accounted", release.epsilon_total))
     total = eps_release + float(epsilon_cert)

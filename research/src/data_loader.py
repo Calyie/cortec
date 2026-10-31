@@ -3,8 +3,8 @@ data_loader.py
 Loads and preprocesses the UCI Adult Income dataset for the CoRTeC viability test.
 
 Two representations are maintained throughout:
-    raw_df:     original strings + integers — used for LLM prompts
-    encoded_df: all-numeric label-encoded  — used for DP k-means and ML models
+    raw_df:     original strings + integers: used for LLM prompts
+    encoded_df: all-numeric label-encoded : used for DP k-means and ML models
 """
 
 from pathlib import Path
@@ -48,14 +48,14 @@ FEATURE_BOUNDS = {
 #
 # Releasing a histogram costs the SAME privacy budget as releasing a single mean: one person
 # contributes to exactly one bin, so the L1 sensitivity of the whole histogram is 1, however
-# many bins it has. Releasing mean and std separately cost two queries and — as measured on
-# 2026-09-04 — produced unusable std values at every realistic cohort size. The histogram
+# many bins it has. Releasing mean and std separately cost two queries and: as measured on
+# 2026-09-04: produced unusable std values at every realistic cohort size. The histogram
 # carries the whole shape instead, and mean/std can be derived from it for free by
 # post-processing. See the paper, Section 4.1 (histograms, not moments).
 #
 # The edges are chosen from the PUBLIC schema and general domain knowledge (e.g. capital gains
 # are zero for most people, so a bin boundary at 1 is worth having), never from the private
-# data — choosing them costs no privacy budget.
+# data: choosing them costs no privacy budget.
 PUBLIC_BINS = {
     "age":            [17, 25, 30, 35, 40, 45, 50, 55, 60, 70, 90],
     "fnlwgt":         [12285, 50000, 100000, 150000, 200000, 250000, 300000, 400000, 600000, 1490400],
@@ -91,14 +91,14 @@ def _read_adult_csv() -> pd.DataFrame:
         if len(df) >= 32000:
             print(f"  (using cached copy at {ADULT_CACHE}, {len(df)} rows)")
             return df
-        print(f"  cached copy at {ADULT_CACHE} looks truncated ({len(df)} rows) — re-downloading")
+        print(f"  cached copy at {ADULT_CACHE} looks truncated ({len(df)} rows): re-downloading")
 
     last_err = None
     for attempt in range(3):
         try:
             df = pd.read_csv(ADULT_URL, **read_kw)
             if len(df) < 32000:
-                raise ValueError(f"download returned only {len(df)} rows — expected ~32561")
+                raise ValueError(f"download returned only {len(df)} rows: expected ~32561")
             ADULT_CACHE.parent.mkdir(parents=True, exist_ok=True)
             df.to_csv(ADULT_CACHE, header=False, index=False)
             print(f"  downloaded {len(df)} rows; cached → {ADULT_CACHE}")
@@ -117,7 +117,7 @@ def load_adult(test_size: float = 0.20, random_state: int = 42,
 
     Parameters
     ----------
-    invert_grad_income : if True, run the COUNTERFACTUAL test — force advanced-degree holders
+    invert_grad_income : if True, run the COUNTERFACTUAL test: force advanced-degree holders
         (education_num >= 14: Masters/Prof-school/Doctorate) to income '<=50K'. This makes the private
         data's education→income relationship *contradict* the LLM's common-sense prior, so we can test
         whether CoRTeC follows the private DP statistics or silently substitutes its own world-knowledge.
@@ -144,7 +144,7 @@ def load_adult(test_size: float = 0.20, random_state: int = 42,
         before = (df.loc[grad, TARGET_COL] == ">50K").mean()
         df.loc[grad, TARGET_COL] = np.where(_inv_rng.random(int(grad.sum())) < rate, ">50K", "<=50K")
         print(f"  [INVERSION grad→{rate:.0%}] set {int(grad.sum())} advanced-degree rows (true rate {before:.0%}) "
-              f"— counterintuitive private truth.")
+              f"as a counterintuitive private truth.")
     if invert_hours_income:
         hrs = pd.to_numeric(df["hours_per_week"], errors="coerce") > 40
         before = (df.loc[hrs, TARGET_COL] == ">50K").mean()

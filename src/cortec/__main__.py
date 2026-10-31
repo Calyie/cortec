@@ -28,13 +28,13 @@ GROUPS = [                         # the other public names, by what they are
 
 
 def run(argv):
-    """the whole pipeline on your table; cortec run --help for the settings"""
+    """the whole pipeline on your table. cortec run --help for the settings"""
     from .run import main as run_main
     return run_main(argv)
 
 
 def decode(argv):
-    """decode a release with no language model (Private-PGM + the selection step); cortec decode --help"""
+    """decode a release with no language model (Private-PGM + the selection step). cortec decode --help"""
     from .decode import main as decode_main
     return decode_main(argv)
 

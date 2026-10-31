@@ -1,4 +1,4 @@
-"""select.py — return a generated pool to the released marginals before handing records over.
+"""select.py: return a generated pool to the released marginals before handing records over.
 
 The generator's marginal error is decoding error, not privacy noise: a frozen model asked for a
 batch of rows reproduces a released histogram only approximately, and its output then carries that
@@ -170,7 +170,7 @@ def _release_cell_matrix(schema: Schema, release: Release, pool: pd.DataFrame, n
 def refine_selection(schema: Schema, release: Release, pool: pd.DataFrame, chosen: np.ndarray, *,
                      seed: int | None = None, max_rounds: int = 40, w_pooled: float = 3.0) -> np.ndarray:
     """Swap rows in and out of `chosen` while the weighted L1 distance to the released cell counts
-    falls. The rake's fractional weights can only be approximated at integer resolution; this
+    falls. The rake's fractional weights can only be approximated at integer resolution. This
     closes the remainder. Reads only the release and the pool."""
     A, t, w = _release_cell_matrix(schema, release, pool, int(chosen.sum()), w_pooled)
     cur = A[chosen].sum(0); L = float((w * np.abs(cur - t)).sum())
@@ -200,7 +200,7 @@ def release_subbin_values(schema: Schema, release: Release, df: pd.DataFrame, *,
     value's position inside its bin is never released information. In a cohort that carries
     class-conditional blocks the class shape is the release's at bin resolution and whatever the
     generator does below it is prior (on NHANES it separated the classes about twice as far as the
-    data inside each bin and cost the linear student 0.044 AUC; paper, Appendix H.17): every
+    data inside each bin and cost the linear student 0.044 AUC. Paper, Appendix H.17): every
     numeric value there is redrawn uniformly inside its declared bin, intersected with the row's
     stratification band so cohort membership never moves. A cohort with only a pooled block keeps
     the generator's values: there they are the only carrier of the class signal. Post-processing.
@@ -253,7 +253,7 @@ MIN_POOL_COVER = 1.1   # each cohort's pool rows must reach this multiple of the
 def pool_coverage(schema: Schema, release: Release, pool: pd.DataFrame, n_rows: int) -> dict:
     """Rows the pool holds per released cohort against the rows that cohort owes at size n_rows.
     A generation run that stops early (spend cap, network) leaves its later cohorts unfilled, and
-    no selection can repair a cohort share from rows that do not exist; this is checked before
+    no selection can repair a cohort share from rows that do not exist. This is checked before
     selecting so the shortfall is named rather than silently produced."""
     cells = _cells(schema, pool, release)
     total = sum(float(c["cohort_size"]) for c in release.cohorts) or 1.0

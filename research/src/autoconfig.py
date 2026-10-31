@@ -1,4 +1,4 @@
-"""autoconfig.py — derive a CoRTeC configuration from a schema and a budget, privately.
+"""autoconfig.py: derive a CoRTeC configuration from a schema and a budget, privately.
 
 Every result in this project so far used a hand-tuned configuration: which columns the conditional
 table conditions on, how many levels it carries, the cohort stratification, `n_min`. Two problems
@@ -9,33 +9,33 @@ follow, and they are the same problem seen from two sides.
 an institution could have arrived at.
 
 **Operationally**, it means CoRTeC is not deployable without a statistician in the loop. The finance
-utility gap was entirely a configuration defect — the released hierarchy conditioned on MARRIAGE
-(MI 0.004) while omitting PAY_2 (0.049) — and nothing in the method warned us.
+utility gap was entirely a configuration defect: the released hierarchy conditioned on MARRIAGE
+(MI 0.004) while omitting PAY_2 (0.049), and nothing in the method warned us.
 
 This module removes both. The institution supplies a schema, a target, an ε and the number of
 records it wants; everything else is derived.
 
 **How the column ranking stays private.** We do not compute mutual information on the raw data.
-Each candidate column is scored from ONE noised contingency table of (its bands) x target — a
+Each candidate column is scored from ONE noised contingency table of (its bands) x target: a
 marginal table, not a conditional one. A record occupies exactly one cell of such a table, so its
 L1 sensitivity is 1 however many cells it has, the same argument that makes histogram bin count
 free (§4.2). Those tables are *not* disjoint across candidates (every record appears in all of
 them), so they compose SEQUENTIALLY: m candidates at epsilon/m each. Everything after the noised
-counts — the mutual-information computation, the coarsening and the ranking — is post-processing
+counts, the mutual-information computation, the coarsening and the ranking, is post-processing
 and free.
 
 **Ranking is by MARGINAL mutual information, and the obvious alternative was tried and reverted.**
-Greedy forward selection by CONDITIONAL MI — having chosen a set S, score each remaining candidate
-by I(c ; target | S) — was implemented and removed because it made autoconfig WORSE (diabetes TSTR
+Greedy forward selection by CONDITIONAL MI: having chosen a set S, score each remaining candidate
+by I(c ; target | S): was implemented and removed because it made autoconfig WORSE (diabetes TSTR
 0.613 -> 0.535). A budget sweep ruled out noise as the cause: on diabetes BOTH arms selected the
 same columns and scored identically at eps_sel 0.10 / 0.30 / 0.60, so that gap cannot be noise; on
 Adult the greedy arm's selection moved with the budget but every selection it made scored below the
 marginal arm at all three. The mechanism is a cardinality bias in the
-conditional-MI estimator — conditioning on S shatters the contingency table, and a high-cardinality
+conditional-MI estimator: conditioning on S shatters the contingency table, and a high-cardinality
 candidate scores well simply for having more cells (on Adult it selected `native_country`, 42
 levels), after which the richness rule stops early.
 
-Marginal MI has its own redundancy problem — on Adult it picks `marital_status` and `relationship`,
+Marginal MI has its own redundancy problem: on Adult it picks `marital_status` and `relationship`,
 two columns encoding almost the same fact, giving a ceiling of 0.770 against the hand-tuned 0.825.
 What fixes that here is not a different objective but explicit COARSENING (`_coarsen_map`,
 MAX_LEVELS_PER_COLUMN): wide columns are grouped into at most four bands by their noisy positive
@@ -182,7 +182,7 @@ def private_column_ranking(spec, train: pd.DataFrame, *, epsilon: float,
     """Rank columns by MARGINAL mutual information with the target, differentially privately.
 
     History, because the obvious reading of this function is the algorithm we removed. Greedy
-    forward selection by CONDITIONAL MI — score each remaining candidate by I(c ; target | S) —
+    forward selection by CONDITIONAL MI: score each remaining candidate by I(c ; target | S),
     was implemented and then REVERTED: it made autoconfig worse, not better (diabetes TSTR 0.613
     -> 0.535). A budget sweep showed the cause was not noise but a cardinality bias in the
     conditional-MI estimator: conditioning on S shatters the contingency table, and a
@@ -191,7 +191,7 @@ def private_column_ranking(spec, train: pd.DataFrame, *, epsilon: float,
     is what runs here.
 
     Accounting: one contingency table per candidate at epsilon/m, m = number of candidates. A
-    record occupies exactly one cell of a table, so L1 sensitivity is 1 regardless of cell count —
+    record occupies exactly one cell of a table, so L1 sensitivity is 1 regardless of cell count:
     the same argument that makes histogram bin count free (§4.2). The m tables are NOT disjoint
     (every record appears in every one), so they compose SEQUENTIALLY: m x (epsilon/m) = epsilon.
     Everything after the noised counts is post-processing.
@@ -224,7 +224,7 @@ def private_column_ranking(spec, train: pd.DataFrame, *, epsilon: float,
         # few hundred training rows spread over a dozen candidates each table receives a tiny
         # slice of epsilon, the Laplace scale exceeds the counts, and the "ranking" is of noise.
         # On one small dataset that produced a configuration scoring BELOW no conditioning at all
-        # (0.419 against a 0.486 base rate) — worse than useless, and silently so.
+        # (0.419 against a 0.486 base rate): worse than useless, and silently so.
         expected_cell = len(train) / max(1, len(levels) * len(y_levels))
         if expected_cell < NOISE_FLOOR_MULTIPLE * scale:
             continue
@@ -245,9 +245,9 @@ def choose_richness(spec, df: pd.DataFrame, ranked_cols: list[str], n_records: i
 
     Two DIFFERENT quantities constrain the table and both must hold:
 
-    * `n_records` — how many rows we intend to GENERATE. Too many cells relative to it and each
+    * `n_records`: how many rows we intend to GENERATE. Too many cells relative to it and each
       cell gets too few synthetic rows to be worth conditioning on.
-    * `n_min` over `len(df)` — how many PRIVATE records a cell must hold to be RELEASED at all.
+    * `n_min` over `len(df)`: how many PRIVATE records a cell must hold to be RELEASED at all.
       The release suppresses any cell below `n_min`, so a table sized only against `n_records`
       silently produces cells that are guaranteed to be suppressed.
 
@@ -262,7 +262,7 @@ def choose_richness(spec, df: pd.DataFrame, ranked_cols: list[str], n_records: i
     effective_n = max(1.0, n_records / float(COHORT_GROUPS))
     # Seed `best` with the ACTUAL cell count of the shallowest table, not 1. When the loop breaks
     # on its first iteration the function used to report `cells=1`, which reads as "no conditional
-    # structure" in every downstream note and audit — while `n_levels=1` meant one column with its
+    # structure" in every downstream note and audit: while `n_levels=1` meant one column with its
     # real level count (4 on retinopathy, 2 on heart_cleveland) was in fact being used.
     _first = max(1, len(_levels(spec, df, ranked_cols[0], coarsen))) if ranked_cols else 1
     best = (1, _first, float("inf"))
@@ -293,7 +293,7 @@ def _selection_fraction(spec, train: pd.DataFrame) -> tuple[float, str]:
     A fixed 5% is the wrong rule. Selection is meaningful only while a column's expected cell count
     exceeds the Laplace noise added to it, and that comparison depends on the dataset: with ~550
     training rows over a dozen candidates, 5% left each table eps ~0.008 and the ranking was of
-    noise — on one dataset it produced a configuration worse than no conditioning at all.
+    noise: on one dataset it produced a configuration worse than no conditioning at all.
 
     Requiring  n / (L * |Y|)  >=  NOISE_FLOOR_MULTIPLE * (m / eps_sel)  and solving for eps_sel:
 
@@ -301,7 +301,7 @@ def _selection_fraction(spec, train: pd.DataFrame) -> tuple[float, str]:
 
     where m is the candidate count, L a representative level count and |Y| the number of target
     classes. All three come from the declared schema, and n from the dataset size, so the rule
-    reads nothing private. Small datasets therefore spend MORE on selection — which is right, since
+    reads nothing private. Small datasets therefore spend MORE on selection, which is right, since
     a smaller release needs less budget to describe.
     """
     cols = [c for c in spec.column_names if c != spec.target_col]
@@ -341,10 +341,10 @@ def autoconfigure(spec, train: pd.DataFrame, *, epsilon_total: float, n_records:
                      f"consider generating more records rather than coarsening")
     if not ranking:
         notes.append("no column had cells large enough to survive the selection noise at this "
-                     "epsilon and sample size — conditioning on nothing, which is the safe "
+                     "epsilon and sample size, so conditioning on nothing, which is the safe "
                      "fallback; raise epsilon_selection or supply more records")
     if len(ranking) > 1 and ranking[0][1] <= 0:
-        notes.append("no column showed positive mutual information after noising — the target may "
+        notes.append("no column showed positive mutual information after noising: the target may "
                      "be weakly predictable, or epsilon_selection may be too small")
     return AutoConfig(conditional_columns=chosen,
                       coarsen={c: m for c, m in coarsen.items() if c in chosen},
@@ -389,7 +389,7 @@ def apply_to_spec(spec, train: pd.DataFrame, cfg: "AutoConfig"):
     """Return a copy of `spec` whose stratification and conditional levels are the derived ones.
 
     The cohort grid uses the first band (coarse, so cohorts stay populated) and the conditional
-    hierarchy nests the rest, coarse to fine — the same shape the hand-tuned specs declare, but
+    hierarchy nests the rest, coarse to fine: the same shape the hand-tuned specs declare, but
     derived rather than chosen by a human reading the data.
     """
     import copy
@@ -399,7 +399,7 @@ def apply_to_spec(spec, train: pd.DataFrame, cfg: "AutoConfig"):
     out.name = f"{spec.name}_auto"
 
     # The cohort grid must stay COARSE. Stratifying on a full 8-bin numerical band splits the data
-    # into eight cohorts, most of which fall under n_min and are suppressed — on one dataset that
+    # into eight cohorts, most of which fall under n_min and are suppressed: on one dataset that
     # left a conditional table with zero cells. Cohorts are a partition of the whole dataset, so
     # each must retain enough records to describe; the conditional table is where resolution
     # belongs, and it is nested underneath.

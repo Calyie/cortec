@@ -28,7 +28,7 @@ from .schema import Schema
 
 
 class DecodeError(RuntimeError):
-    """The release could not be decoded; the message names what to change."""
+    """The release could not be decoded. The message names what to change."""
 
 
 def _require_pgm():
@@ -61,7 +61,7 @@ def _epsilons(schema: Schema, release: Release) -> tuple[float, float | None, di
         if all(v for v in eps_lv.values()):
             return eps_q, eps_coh, eps_lv
     import warnings
-    warnings.warn("the release carries no usable audit block; the decoder assumes the package's "
+    warnings.warn("the release carries no usable audit block. The decoder assumes the package's "
                   "default budget split (0.2 conditional, 0.1 counts, the rest marginals)")
     e = float(release.epsilon_total)
     return 0.7 * e / nq, 0.05 * e, {li: 0.2 * e / max(len(levels), 1) for li in levels}
@@ -85,7 +85,7 @@ class ReleaseModel:
 
     def sample(self, n_rows: int, *, seed: int | None = None) -> pd.DataFrame:
         """`n_rows` records from the fitted table, values drawn uniformly inside their bins
-        (integers where the public bounds and edges are integral). No selection; see
+        (integers where the public bounds and edges are integral). No selection. See
         `decode_release` for the full path."""
         rng = np.random.default_rng(seed)
         idx = _sample_mrf(self.model, int(n_rows), rng)
@@ -112,7 +112,7 @@ def fit_release_model(schema: Schema, release: Release, *, iters: int = 3000, se
     """Fit the maximum-entropy table to exactly the released counts: cohort sizes, class
     balances, the per-cohort histograms (per class where the release carries class blocks) and
     the conditional cells, each at the noise scale its budget implies. Private-PGM's mirror
-    descent on the junction tree; a fit with a non-finite or collapsed marginal is rejected and
+    descent on the junction tree. A fit with a non-finite or collapsed marginal is rejected and
     retried from another seed, up to three times."""
     _require_pgm()
     import jax.numpy as jnp
@@ -161,7 +161,7 @@ def fit_release_model(schema: Schema, release: Release, *, iters: int = 3000, se
             else:
                 coh_index = np.array(names.index(k))
     if int((coh_index >= 0).sum()) == 0:
-        raise DecodeError("no released cohort maps onto the schema's stratification; the release "
+        raise DecodeError("no released cohort maps onto the schema's stratification. The release "
                           "and the schema disagree on the cohort rule")
     sizes = [float(c["cohort_size"]) for c in release.cohorts]
     known_total = float(sum(sizes))
@@ -304,7 +304,7 @@ def fit_release_model(schema: Schema, release: Release, *, iters: int = 3000, se
         if pr is None:
             model = m; break
     if model is None:
-        raise DecodeError("no valid maximum-entropy fit in three attempts; raise iters, or check that the "
+        raise DecodeError("no valid maximum-entropy fit in three attempts. Raise iters, or check that the "
                           "release's bins and cohorts match the schema")
 
     # consistency: the fitted per-cohort column shares against the released ones
@@ -412,7 +412,7 @@ def decode_release(schema: Schema, release: Release, n_rows: int, *, pool_factor
     """`n_rows` synthetic records decoded from `release` with no language model: the
     maximum-entropy table that fits the released counts, sampled at `pool_factor * n_rows`, and
     the selection step over that pool (`select=False` returns `n_rows` samples of the table as
-    they are). Post-processing of the release; repeatable at no privacy cost. Pass a fitted
+    they are). Post-processing of the release. Repeatable at no privacy cost. Pass a fitted
     `model` (from `fit_release_model`) to draw again without refitting."""
     from .select import select_to_release
     if n_rows < 1:
@@ -429,7 +429,7 @@ def decode_release(schema: Schema, release: Release, n_rows: int, *, pool_factor
 
 
 def main(argv: list[str] | None = None, prog: str = "cortec decode") -> int:
-    """Stage B without a language model: decode a release with Private-PGM and the selection step; cortec decode --help"""
+    """Stage B without a language model: decode a release with Private-PGM and the selection step. cortec decode --help"""
     import argparse
     from .report import emit, kv_block, note, install_guard
     from .run import load_schema
@@ -437,7 +437,7 @@ def main(argv: list[str] | None = None, prog: str = "cortec decode") -> int:
     ap = argparse.ArgumentParser(prog=prog, description=(
         "Decode a release with no language model: the maximum-entropy table that fits every released count "
         "(Private-PGM), sampled at a multiple of the requested size and raked to the released cells by the "
-        "selection step. Reads the release and the schema only; spends no privacy budget; needs cortec[pgm]."))
+        "selection step. Reads the release and the schema only. Spends no privacy budget. Needs cortec[pgm]."))
     ap.add_argument("--schema", required=True, help="a Python file that defines SCHEMA = Schema(...)")
     ap.add_argument("--release", required=True, help="the release (release.json written by cortec run or Release.to_json)")
     ap.add_argument("--n-rows", type=int, default=300, help="synthetic rows per draw (default 300)")
@@ -448,7 +448,7 @@ def main(argv: list[str] | None = None, prog: str = "cortec decode") -> int:
     ap.add_argument("--no-select", action="store_true", help="return samples of the fitted table without the selection step")
     ap.add_argument("--sub-bin", default="release", choices=("release", "generator"),
                     help="values below bin resolution: the release's own (default) or the sampler's")
-    ap.add_argument("--out", default=None, help="output folder; default results/<schema name>_decoded")
+    ap.add_argument("--out", default=None, help="output folder. Default results/<schema name>_decoded")
     a = ap.parse_args(argv)
     schema = load_schema(a.schema)
     release = Release.from_json(a.release)

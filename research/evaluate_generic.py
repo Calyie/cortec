@@ -1,5 +1,5 @@
 """
-evaluate_generic.py — the full metric suite, driven by a DatasetSpec.
+evaluate_generic.py: the full metric suite, driven by a DatasetSpec.
 
 Generalises the original Adult-only evaluator so the healthcare and financial datasets are
 scored on exactly the same quantities:
@@ -78,7 +78,7 @@ def _norm_categorical(s: pd.Series) -> pd.Series:
     Several ID-coded columns (admission_type_id, discharge_disposition_id, ...) hold integers
     stored as strings. A generator that emits them as floats writes "1.0" where the real data has
     "1", and every such column then scores total variation 1.000 against a distribution it in fact
-    matched almost exactly — Gemini Flash's 1-way TV read 0.188 instead of 0.035 for this reason
+    matched almost exactly: Gemini Flash's 1-way TV read 0.188 instead of 0.035 for this reason
     alone, which would have led us to reject a generator that is the most accurate we measured.
     Normalising here keeps the comparison about distributions rather than about formatting.
     """
@@ -155,7 +155,7 @@ def conditional_tv(spec, real, synth, cols=None, bands=None, min_n=30) -> float:
 
     `bands` groups by the spec's Band objects (the banded form the method is actually told
     about). `cols` groups by raw column values and is only appropriate for low-cardinality
-    columns — grouping raw on a numerical column like LIMIT_BAL (81 distinct values) shatters
+    columns: grouping raw on a numerical column like LIMIT_BAL (81 distinct values) shatters
     it into groups that all fall below min_n and makes the metric meaningless.
     """
     def _col_key(df, c):
@@ -163,7 +163,7 @@ def conditional_tv(spec, real, synth, cols=None, bands=None, min_n=30) -> float:
         # below min_n, which silently makes the metric meaningless (the docstring warned about it,
         # so numerical columns simply could not be used as held-out families). Bin it with the
         # spec's PUBLIC bin edges: public information, no privacy cost, and it makes the strongest
-        # columns usable — on NHANES waist_cm and bmi carry 5-10x the conditional signal of any
+        # columns usable: on NHANES waist_cm and bmi carry 5-10x the conditional signal of any
         # categorical column.
         if c in getattr(spec, "numerical_cols", []) and c in (getattr(spec, "public_bins", {}) or {}):
             edges = np.asarray(spec.public_bins[c], dtype=float)
@@ -234,7 +234,7 @@ def main():
     tr, te = tr.reset_index(drop=True), te.reset_index(drop=True)
     enc = _encoders(spec, tr); te_enc = encode(spec, te, enc)
 
-    # A "held-out" family stops being held out if the release conditions on one of its columns —
+    # A "held-out" family stops being held out if the release conditions on one of its columns:
     # the generator was then TOLD that relationship, and condHeld silently becomes a training
     # measurement rather than a generalisation one. autoconfig chooses conditional columns from the
     # data, so this can change without anyone editing a spec.
@@ -243,9 +243,9 @@ def main():
         _bad = _cond_cols & set(_fam)
         if _bad:
             print(f"  !! held-out family {_fam} overlaps RELEASED conditional column(s) "
-                  f"{sorted(_bad)} — condHeld for it is not a generalisation test")
+                  f"{sorted(_bad)}: condHeld for it is not a generalisation test")
     if not spec.heldout_groups:
-        print("  note: no held-out conditional families declared — condHeld will be nan, which is "
+        print("  note: no held-out conditional families declared, so condHeld will be nan, which is "
               "an ABSENT measurement, not a good score")
 
     conditions = json.load(open(a.spec_json))
@@ -259,12 +259,12 @@ def main():
         n_ref = n_ref or len(sets[lab][0])
 
     # Fidelity metrics are n-SENSITIVE: on diabetes a real sample scores 1-way TV 0.0181 at
-    # n=1000, 0.0145 at n=1525 and 0.0128 at n=2000 — a 30%-of-floor swing from sample size alone.
+    # n=1000, 0.0145 at n=1525 and 0.0128 at n=2000: a 30%-of-floor swing from sample size alone.
     # The floors below are built at n_ref (the FIRST condition's size), so any condition with a
     # materially different n is being compared against a floor that does not apply to it.
     _sizes = {lab: len(dfs[0]) for lab, dfs in sets.items()}
     if _sizes and (max(_sizes.values()) > 1.1 * min(_sizes.values())):
-        print("  !! conditions differ in size — fidelity is NOT comparable across them, and the "
+        print("  !! conditions differ in size: fidelity is NOT comparable across them, and the "
               "floors are built at n_ref only:")
         for lab, n in sorted(_sizes.items(), key=lambda kv: -kv[1]):
             print(f"       {lab:34s} n={n}")
@@ -285,7 +285,7 @@ def main():
         results[lab] = [score(spec, d, tr, te_enc, enc) for d in dfs]
 
     print("\n" + "=" * 116)
-    print(f"{spec.name.upper()} — fidelity AND utility  (n={n_ref}/draw; "
+    print(f"{spec.name.upper()}: fidelity AND utility  (n={n_ref}/draw; "
           f"real positive rate {spec.is_positive(tr).mean():.1%})")
     print("=" * 116)
     print(f"{'condition':32s} {'draws':>5s} {'1wayTV↓':>9s} {'2wayTV↓':>9s} {'condSeen↓':>10s} "
@@ -294,12 +294,12 @@ def main():
         m = lambda k: float(np.nanmean([r[k] for r in rows]))
         # TRTR is the UTILITY ceiling only. Its fidelity columns compare a sample of the training
         # set against the training set, and on every dataset with <= 4000 training rows the sample
-        # IS the whole training set — so the numbers were 0.000 by construction (6 of our 11
+        # IS the whole training set, so the numbers were 0.000 by construction (6 of our 11
         # datasets, NHANES included) and meant something different on the large ones. A
         # tautology must not be printed in the same column as a measurement; the real-sample
         # [FLOOR-n] row is the like-for-like real-data fidelity reference.
         if lab.startswith("TRTR"):
-            print(f"{lab:32s} {len(rows):>5d} {'—':>9s} {'—':>9s} {'—':>10s} {'—':>10s} "
+            print(f"{lab:32s} {len(rows):>5d} {'n/a':>9s} {'n/a':>9s} {'n/a':>10s} {'n/a':>10s} "
                   f"{m('tstr_LR'):>9.3f} {m('tstr_RF'):>9.3f} {m('tstr_GBM'):>10.3f}")
             continue
         print(f"{lab:32s} {len(rows):>5d} {m('tv_1way'):>9.3f} {m('tv_2way'):>9.3f} "

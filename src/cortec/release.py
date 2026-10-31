@@ -1,12 +1,12 @@
 """
-Stage A — the differentially private release. This is the only code in the package that reads
+Stage A: the differentially private release. This is the only code in the package that reads
 private data.
 
 The budget allocation is the substance of the method, so it is worth stating plainly what it does
 and why each choice is cheaper than the obvious alternative:
 
-  * **Cohorts come from a public rule, so forming them is free.** The alternative — clustering the
-    private data to find cohorts — spends budget and, in our measurements, produced degenerate
+  * **Cohorts come from a public rule, so forming them is free.** The alternative, clustering the
+    private data to find cohorts, spends budget and, in our measurements, produced degenerate
     cohorts of 3 and 8 records.
   * **Histograms, not moments.** A histogram has L1 sensitivity 1 whatever its bin count, so a
     whole distribution costs what a single count costs and *half* what a mean-and-standard-
@@ -15,7 +15,7 @@ and why each choice is cheaper than the obvious alternative:
     deviations larger than the attribute's entire range at every cohort size tested. Moments are
     recovered from the released histogram afterwards, for free.
   * **Cohorts are disjoint, so they compose in parallel.** The cost across cohorts is the maximum,
-    not the sum — independent of how many cohorts there are.
+    not the sum: independent of how many cohorts there are.
   * **Each conditional level is a partition, so it also composes in parallel.** A level costs one
     query's worth of epsilon however many cells it contains; accuracy is governed by cell
     *support*, not cell count. This is why conditional structure is cheap to release, which is the
@@ -44,14 +44,14 @@ DEFAULT_N_MIN = 150
 
 
 class ReleaseError(RuntimeError):
-    """Stage A could not release as asked; the message names the setting or the data to change."""
+    """Stage A could not release as asked. The message names the setting or the data to change."""
 
 
 @dataclass
 class Release:
     """The complete set of released statistics. Contains no private data.
 
-    Everything downstream — prompt construction, generation, evaluation — reads only this object,
+    Everything downstream (prompt construction, generation, evaluation) reads only this object,
     which is what makes generation post-processing.
     """
     schema_name: str
@@ -130,7 +130,7 @@ def _cohort_keys(schema: Schema, df: pd.DataFrame) -> pd.Series:
 
 def _cell_keys(df: pd.DataFrame, cols: tuple[str, ...], schema: Schema) -> pd.Series:
     """Cells of one conditional level. These partition the data, hence parallel composition."""
-    # The coarsest level conditions on nothing — one cell holding every record. It is a legitimate
+    # The coarsest level conditions on nothing: one cell holding every record. It is a legitimate
     # level (it releases the global rate) and `zip(*[])` yields nothing, so it needs its own case.
     if not cols:
         return pd.Series(["*"] * len(df), index=df.index)
@@ -217,7 +217,7 @@ def _numeric_entry(props, edges, bounds) -> dict:
     var = float((props * (centres - mean) ** 2).sum())
     return {"bin_edges": [float(e) for e in edges],
             "proportions": [round(float(p), 5) for p in props],
-            # derived from the released histogram — free post-processing, not extra queries
+            # derived from the released histogram: free post-processing, not extra queries
             "mean": round(mean, 3), "std": round(float(np.sqrt(max(var, 0.0))), 3),
             "bounds": list(bounds)}
 
@@ -240,11 +240,11 @@ def release_statistics(schema: Schema, df: pd.DataFrame, *, epsilon_total: float
     **The conditional hierarchy is derived by default.** Leave `schema.conditional` empty and the
     hierarchy is chosen for you (see `cortec.autoconfig`), spending a declared slice of
     `epsilon_total` on the selection and charging it to the same ledger. Declare `schema.conditional`
-    yourself and that is used instead, untouched — hand-tuning stays available for anyone who knows
+    yourself and that is used instead, untouched: hand-tuning stays available for anyone who knows
     their data, it simply is not what happens when you say nothing.
 
     Autoconfig is the default because the failure mode of a wrong hierarchy is silent. Nothing in
-    the output announces that the table conditioned on the least informative columns available; it
+    the output announces that the table conditioned on the least informative columns available. It
     just quietly carries less structure, and in our own study that cost real downstream utility.
 
     **Class-conditional histograms are released by default** (`class_conditional=True`). Where both
@@ -277,7 +277,7 @@ def release_statistics(schema: Schema, df: pd.DataFrame, *, epsilon_total: float
     if max_rows_per_person is None:
         _person_warning = (
             "PRIVACY UNIT UNDECLARED. The epsilon this release reports protects ONE ROW. If any "
-            "person contributes k rows, their guarantee is k x that epsilon -- on encounter-level "
+            "person contributes k rows, their guarantee is k x that epsilon. On encounter-level "
             "clinical data k is routinely 10-40, which makes the per-person guarantee vacuous. "
             "Pass max_rows_per_person=... (1 if one row per person) to have it computed, checked "
             "and recorded.")
@@ -292,8 +292,8 @@ def release_statistics(schema: Schema, df: pd.DataFrame, *, epsilon_total: float
                 f"meaning. CoRTeC's privacy unit is one row, so unaggregated longitudinal data "
                 f"degrades the guarantee by the maximum contribution count. Either aggregate to "
                 f"one row per person before Stage A (which makes k=1 and the guarantee exact), or "
-                f"lower epsilon_total, or -- if you intend to publish the row-level number with "
-                f"its group-privacy factor stated, as this paper's Diabetes 130 study does -- pass "
+                f"lower epsilon_total. If you intend to publish the row-level number with "
+                f"its group-privacy factor stated, pass "
                 f"acknowledge_vacuous_privacy_unit=True, which records the acknowledgement in the "
                 f"audit trail.")
         if _eps_person > VACUOUS_EPSILON_PER_PERSON:
@@ -352,13 +352,13 @@ def release_statistics(schema: Schema, df: pd.DataFrame, *, epsilon_total: float
     eps_marg = eps_available - eps_cond
     # Cohort sizes and per-cell supports are PUBLISHED in the release and used to allocate rows.
     # They were being emitted as exact counts of private records: unnoised, and never entered into
-    # the ledger, so `verify_privacy_accounting` could not see them either — it sums what it is
+    # the ledger, so `verify_privacy_accounting` could not see them either: it sums what it is
     # told about. Exact counts break the epsilon guarantee outright. Charge and noise them.
     # Cohorts partition the data and so do the cells within one level, so this is parallel
     # composition: one epsilon for the whole group regardless of how many counts are published.
     # Split across two GROUPS, not one. Cohort-size queries and cell-support queries each
-    # partition the data internally (parallel within a group), but they overlap EACH OTHER — a
-    # record sits in one cohort and one cell — so the two groups compose sequentially. Filing both
+    # partition the data internally (parallel within a group), but they overlap EACH OTHER: a
+    # record sits in one cohort and one cell, so the two groups compose sequentially. Filing both
     # in one group would let the parallel max() absorb one of them and under-charge, which is the
     # same mistake the suppression note above records.
     eps_counts = 0.05 * eps_available
@@ -513,7 +513,7 @@ def release_statistics(schema: Schema, df: pd.DataFrame, *, epsilon_total: float
                 kept[cell] = (int(max(n_min, round(_sup_noisy))), part)
             _kept.append(kept)
         # Split eps_cond only across levels that will ACTUALLY release a cell. Splitting across all
-        # declared levels wasted the share of every level whose cells all fall below n_min — 20-40%
+        # declared levels wasted the share of every level whose cells all fall below n_min: 20-40%
         # of the conditional budget on 6 of 11 datasets (shortfalls 0.199-0.350), making those
         # releases needlessly noisy, worst on small data. Which levels are viable is a function of
         # the gate decisions above, themselves post-processing of charged counts, so reading it
@@ -548,7 +548,7 @@ def release_statistics(schema: Schema, df: pd.DataFrame, *, epsilon_total: float
     # A level whose cells all fall below n_min releases NOTHING, and its share of eps_cond is then
     # never spent. With autoconfig deriving k columns the budget is split k+1 ways up front, so on
     # a small dataset most of it evaporates: heart_cleveland declared 2.0 and accounted 1.63,
-    # german_credit 1.71 — a noisier release than the caller paid for, worst exactly where noise
+    # german_credit 1.71: a noisier release than the caller paid for, worst exactly where noise
     # hurts most. The tool's exact-spend test never saw this because it uses a DECLARED schema,
     # which skips autoconfig entirely. Surface it rather than let the audit be read as fine print.
     _unspent = eps_cond - sum(
@@ -563,7 +563,7 @@ def release_statistics(schema: Schema, df: pd.DataFrame, *, epsilon_total: float
     # Is the conditional table SIGNAL or NOISE? The Laplace sd on a cell's rate is
     # sqrt(2) * (1/n_cell) / eps_level. If that is comparable to the spread of the released rates
     # themselves, the table carries more noise than structure and no generator can transmit real
-    # conditional signal from it — measured ratios: adult 0.04, nhanes 0.14, heart_cleveland 0.27,
+    # conditional signal from it. Measured ratios: adult 0.04, nhanes 0.14, heart_cleveland 0.27,
     # cervical_cancer 1.40, german_credit 1.78. Computed from RELEASED quantities only, so this
     # costs nothing and is available at release time rather than after a generation run.
     for _lv in levels:
@@ -577,7 +577,7 @@ def release_statistics(schema: Schema, df: pd.DataFrame, *, epsilon_total: float
         if _spread > 0 and _sd / _spread >= 1.0:
             report.emit(report.warn(f"level {_lv['level']}: noise on the released rates (sd~{_sd:.3f}) is at or "
                   f"above their entire spread ({_spread:.3f}). This table is noise-dominated and "
-                  f"cannot carry conditional structure — raise epsilon, coarsen to fewer cells, or "
+                  f"cannot carry conditional structure. Raise epsilon, coarsen to fewer cells, or "
                   f"accept that conditioning will not help on this dataset."))
 
     if not levels:

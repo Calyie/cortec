@@ -1,4 +1,4 @@
-"""datasets_regulated.py — six additional regulated-domain datasets, declared but NOT tuned.
+"""datasets_regulated.py: six additional regulated-domain datasets, declared but NOT tuned.
 
 These exist to test one specific claim: that `src/autoconfig.py` derives a working CoRTeC
 configuration from a schema and a budget, without the per-dataset engineering every result in this
@@ -35,7 +35,7 @@ def _lin(lo: float, hi: float, k: int = 8) -> list[float]:
 
 
 def _spec(name, desc, df_loader, num_bounds, cat_cols, target, pos, neg) -> DatasetSpec:
-    """Build a spec with NO conditional hierarchy — autoconfig must supply it."""
+    """Build a spec with NO conditional hierarchy: autoconfig must supply it."""
     return DatasetSpec(
         name=name, description=desc,
         numerical_cols=list(num_bounds), categorical_cols=list(cat_cols),

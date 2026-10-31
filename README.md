@@ -4,51 +4,52 @@
 
 ![The pipeline](paper/figures/fig01_pipeline.png)
 
-CoRTeC's contribution is a release: it spends a differential privacy budget once, on a small release of statistics built for a
-downstream classifier, shipped as an auditable artefact of counts that anyone can decode at no further privacy cost: inside cohorts formed by a public rule, one Laplace histogram per attribute
-and outcome class, a noisy class balance and cohort size, and a table of outcome rates over disjoint
-cells. A frozen language model then reads that release, and nothing else, and writes rows that carry
-exactly the per-bin counts it is asked for; a pool of such rows is raked and refined to the released
-cells. The model never sees a private record, so every draw is post-processing of the release: it
-spends no budget, can be repeated without limit, and can run on any model, including one reached
-through an interface the institution does not control.
+We propose CoRTeC, a way to share synthetic tabular data under differential privacy. CoRTeC spends the privacy budget
+once, on a small release of noisy counts built for training a classifier. For each cohort of the data the release holds
+the cohort's size, its class balance, a histogram of every attribute for each outcome class, and the outcome rate in a
+set of non-overlapping cells. A reviewer can check every number before the release leaves the institution.
+
+Everything after the release is post-processing, so it costs no further privacy. A maximum-entropy decoder turns the
+counts into rows with no language model at all. A frozen language model can do the same: it reads the release and
+nothing else, and writes rows that carry exactly the counts it is asked for. A selection step then matches any
+decoder's rows to the released counts. Because the model never sees a private record, generation can be repeated
+without limit, on any model, including one behind an interface the institution does not control.
 
 ## Documents
 
 | Document | What it is |
 |---|---|
 | [The paper](paper/CoRTeC_arxiv.pdf) | The mechanism, its privacy analysis, and the measurements with their controls (12 pages of main text, appendices A to G) |
-| [The deployment guide](paper/CoRTeC_deployment_guide.pdf) | The architecture, the parameters, the full prompt, a checklist, the controls mapped to standards, the failure modes with their guards, and the cost (7 pages) |
+| [The deployment guide](paper/CoRTeC_deployment_guide.pdf) | The architecture, the parameters, the full prompt, a checklist, the controls mapped to standards, the failure modes with their guards, and the cost (8 pages) |
 
 ## What the paper finds
 
-- **The release trains models close to a real sample of its size, with no language model.** At ε = 2,
-  on draws of 300 and 1,000 rows, the auto-configured release decoded by the maximum-entropy model and the selection step
-  (`cortec decode`) trains every student to within 0.02 AUC of a real sample of the same size on UCI Adult
-  over three splits; on NHANES and bank marketing the gap is larger, up to 0.07 AUC on the medical dataset
-  at n = 300. Across the three datasets the auto-configured release decoded with no model is level with or ahead of the
-  reference AIM on utility in five of six dataset-size cells, ahead on single columns on Adult and bank marketing,
-  and behind on pairs at n = 1,000 on Adult and at both sizes on NHANES; the fixed-rule release is ahead on the
-  conditionals it names on Adult.
-- **The language model adds plausibility driven by the column names.** It repairs the logical pairs
-  it recognises, invents dependences between near-independent columns, and loses its edge on pairs
-  and on utility when every name is replaced by a neutral token; without the release the same backbone
-  recites the public file into most of its one-shot output. The selection step, not the model, accounts
-  for most of the model-free margin over the plain decoder.
-- **What the release trades.** It spends the budget on the conditionals a deployment names, at a cost on
-  pairs the reference AIM does not pay: AIM is ahead on pairs at n = 1,000 on Adult and at both sizes on NHANES, on utility
-  on NHANES at n = 300 and against the fixed-rule release on Adult at n = 1,000, and on the seen conditionals
-  on NHANES at n = 300 and on bank marketing. Draws are at most 1,000 rows.
-- **What survives every control is the privacy architecture.** One release serves unlimited draws;
-  the backbone can be replaced at no privacy cost; the strongest membership attack on any CoRTeC arm reaches
-  an advantage of 0.02 to 0.05 against a permitted 0.762; no synthetic row copies a training row;
-  and the served backbone's memorised head of the Adult file never reaches a draw.
+- **The release on its own is enough to train useful models, with no language model.** At ε = 2, with 300 and
+  1,000 rows, the auto-configured release decoded by the maximum-entropy model and the selection step
+  (`cortec decode`) trains every student classifier to within 0.02 AUC of a real sample of the same size on UCI
+  Adult, over three splits. On NHANES and bank marketing the gap is larger, up to 0.07 AUC on the medical dataset at
+  300 rows. Across the three datasets, the release decoded without a model reaches the utility of the reference AIM
+  in five of six settings.
+- **What the language model adds comes from the column names.** It repairs pairs of columns it recognises and
+  invents links between columns that are nearly independent. It loses that advantage when every name is replaced by a
+  neutral token, and without the release it recites the public file. Most of the gain over the plain decoder comes
+  from the selection step, not from the model.
+- **What the release trades.** It spends the budget on the conditional rates a deployment names, at a cost on pairs
+  of columns. The reference AIM's adaptive workload fits pairs more closely at 1,000 rows on Adult and at both sizes on
+  NHANES. Its students score higher on NHANES at 300 rows, and higher than the fixed-rule release's on Adult at 1,000
+  rows. With the fixed rule, the release carries the conditional rates it names on Adult more closely than AIM's
+  draws. Draws are at most 1,000 rows. CoRTeC is meant to sit beside the marginal methods, so choose whichever fits
+  your deployment.
+- **The privacy architecture holds in every test.** One release serves unlimited draws, and the backbone can be
+  replaced at no privacy cost. The strongest membership attack on any CoRTeC arm reaches an advantage of 0.02 to 0.05,
+  against 0.762 permitted. No synthetic row copies a training row, and the part of the Adult file that the served
+  model has memorised never reaches a draw.
 
 ## Install
 
-Python 3.10 or later. The package is not on PyPI; install it from a clone of this repository. One
-install gives the two packages, `cortec` (Stages A, B and C) and `cortec_hybrid` (the model-free
-correction of a marginal synthesiser's output), and the two commands, `cortec` and `cortec-hybrid`.
+You need Python 3.10 or later. The package is not on PyPI, so install it from a clone of this repository. One
+install gives two packages and two commands. `cortec` covers Stages A, B and C. `cortec_hybrid` corrects a marginal
+synthesiser's output without a language model.
 
 ```bash
 git clone https://github.com/Calyie/cortec
@@ -63,7 +64,7 @@ python3 -m pytest tests -q     # offline; every test is named after the defect i
 
 ## Quick start
 
-The schema declares public knowledge only: the columns, their bounds, the bin edges and the target.
+The schema declares only public knowledge: the columns, their bounds, the bin edges and the target.
 
 ```python
 from cortec import Schema, release_statistics, Generator
@@ -84,26 +85,24 @@ gen = Generator(schema, backend="gemini", model="gemini-3.5-flash", reasoning="o
 synthetic = gen.generate_selected(release, n_rows=1000, pool_factor=3)   # Stage B: post-processing
 ```
 
-`cortec run --data private.csv --schema my_schema.py --backend gemini` runs the three stages on a
-table from the command line; `cortec decode --schema my_schema.py --release results/<name>/release.json`
-decodes the same release with no language model (Private-PGM plus the selection step, the paper's
-decoder-with-selection control; needs the `pgm` extra); and `cortec --help` lists what can be run. The setup guide,
-[`docs/setup.md`](docs/setup.md), goes through each step: where the model runs and the credentials,
-the data, the schema, the release and its audit, generation and selection, the utility bound, the
-evaluation against a real sample and a no-information floor, and the troubleshooting of every
-refusal. A self-hosted backbone behind an OpenAI-compatible server (the paper's Qwen3 arms ran that
-way through vLLM) is reached through `backend="openai"` with `OPENAI_BASE_URL` set.
+`cortec run --data private.csv --schema my_schema.py --backend gemini` runs the three stages on a table from the
+command line. `cortec decode --schema my_schema.py --release results/<name>/release.json` decodes the same release
+with no language model, using Private-PGM and the selection step; it needs the `pgm` extra. `cortec --help` lists
+everything you can run. The setup guide, [`docs/setup.md`](docs/setup.md), goes through each step: where the model
+runs and its credentials, the data, the schema, the release and its audit, generation and selection, the utility
+bound, the evaluation, and what to do about each refusal. To use a self-hosted model behind an OpenAI-compatible server
+(the paper's Qwen3 arms ran this way through vLLM), set `backend="openai"` and `OPENAI_BASE_URL`.
 
-**Where this should run.** For regulated data, the enterprise-hosted, tenant-isolated surface in
-your own cloud account (Vertex AI, Azure OpenAI or Bedrock) or a model on your own hardware. The
-vendors' public developer APIs are supported and are not recommended for regulated data: the weights
-are the same, the contract and the network path are not. The privacy argument does not depend on
-the endpoint, because the request carries only the release; the compliance argument does.
+**Where this should run.** For regulated data, use the enterprise-hosted, tenant-isolated surface in your own cloud
+account (Vertex AI, Azure OpenAI or Bedrock), or a model on your own hardware. The vendors' public developer APIs are
+supported but not recommended for regulated data. The weights are the same, but the contract and the network path
+are not. The privacy argument does not depend on the endpoint, because the request carries only the release. The
+compliance argument does.
 
 ## Reproducing a CoRTeC arm of the paper
 
-The research pipeline that produced every CoRTeC arm is under [`research/`](research/). Datasets are
-fetched from public sources on first use and cached under `research/data/`, which is not committed.
+The research pipeline that produced every CoRTeC arm is under [`research/`](research/). The datasets are downloaded
+from public sources the first time they are used and cached under `research/data/`, which is not committed.
 
 ```bash
 pip install -r research/requirements.txt
@@ -114,12 +113,12 @@ python3 run_dataset.py --dataset adult --stage generate --backend gemini --model
 python3 evaluate_generic.py --dataset adult --spec-json <arms.json> --seed 42
 ```
 
-A release already present in the output directory is reused rather than redrawn, so further draws
-cost no privacy budget. Released statistics cannot be regenerated bit for bit, because the noise
-source ignores any seed; the frozen auto-configurations under `research/results/autoconfig/` are
-reused by file for the same reason. The reference-AIM wrapper, the maximum-entropy decoder, the decoder-with-selection and one-shot
-controls, the anonymisation of releases and the scorers are under `research/controls/`; the synthetic draws, per-draw score files and
-stored releases of every arm are deposited with the paper's Zenodo record, DOI 10.5281/zenodo.22945315.
+A release already in the output directory is reused rather than drawn again, so further draws cost no privacy
+budget. Released statistics cannot be regenerated bit for bit, because the noise source ignores any seed. For the same
+reason the frozen auto-configurations under `research/results/autoconfig/` are reused by file. The reference-AIM
+wrapper, the maximum-entropy decoder, the decoder-with-selection and one-shot controls, the anonymisation of releases
+and the scorers are under `research/controls/`. The synthetic draws, the score files and the stored releases of every
+arm are deposited with the paper's Zenodo record, DOI 10.5281/zenodo.22945315.
 
 ## Repository layout
 
@@ -135,19 +134,19 @@ stored releases of every arm are deposited with the paper's Zenodo record, DOI 1
 
 ## Where the guarantee does not hold
 
-- **ε protects one row, not one person.** A person contributing `k` rows receives `k · ε`. Cap each
-  person's rows before Stage A; the library requires the per-person row bound and refuses a vacuous
-  one.
-- **Floating-point Laplace.** The library mechanism is vulnerable to the Mironov (2012) attack on
-  the low bits of the sampled noise.
-- **Pretraining provenance.** The guarantee says nothing about the model's training corpus; the
-  paper's memorisation tests and membership attacks are the measured evidence.
-- **Endpoint.** The paper's measurements used the public developer APIs and self-hosted backbones,
-  not the enterprise surfaces recommended above.
+- **ε protects one row, not one person.** A person who contributes `k` rows receives `k · ε`. Cap each person's rows
+  before Stage A. The library requires the number of rows per person and refuses a value that makes the guarantee
+  meaningless.
+- **Floating-point Laplace.** The library's noise is vulnerable to the Mironov (2012) attack on the low bits of the
+  sampled noise.
+- **Pretraining provenance.** The guarantee says nothing about the model's training corpus. The paper's memorisation
+  tests and membership attacks are the measured evidence.
+- **Endpoint.** The paper's measurements used the public developer APIs and self-hosted models, not the enterprise
+  surfaces recommended above.
 
 ## AI use
 
-Language models appear in this work as the objects of study: the backbones named in the paper's tables. Language-model assistants were also used in drafting and editing the text and the code in this repository. Every experiment was designed, run and checked by the author, and every number in the documents was produced by the described pipeline from stored result files.
+Language models appear in this work as the objects of study: the backbones named in the paper's tables. Language-model assistants were also used to draft and edit the text and the code in this repository. Every experiment was designed, run and checked by the author, and every number in the documents was produced by the described pipeline from stored result files.
 
 ## Citation and licence
 

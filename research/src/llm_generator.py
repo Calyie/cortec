@@ -1,8 +1,8 @@
 """
 llm_generator.py
 Calls a frozen LLM to generate synthetic tabular rows under two conditions:
-  - HEADER-ONLY    (Condition A — baseline)
-  - CoRTeC         (Condition B — conditioned on DP cohort statistics)
+  - HEADER-ONLY    (Condition A: baseline)
+  - CoRTeC         (Condition B: conditioned on DP cohort statistics)
 
 Supports five backends:
   --backend anthropic   the Anthropic API
@@ -134,7 +134,7 @@ def _released_band_coverage(cohort_stats_list: list[dict], spec) -> dict:
 def _cell_mass(cohort_stats: dict, cell_key: str, bands: tuple) -> float:
     """Released marginal mass of one conditional cell.
 
-    Product of each conditioning level's own released probability — categorical proportions read
+    Product of each conditioning level's own released probability: categorical proportions read
     straight off the release, numerical bands integrated over the released histogram. Assumes the
     conditioning columns are independent within the cohort, which is an approximation, but a far
     better one than "every cell is equally likely", which is what the uniform weighting asserted.
@@ -183,7 +183,7 @@ def split_cell_into_batches(n_rows: int, n_positive: int, rows_per_call: int) ->
     """Split one cell's (rows, positives) into per-call batches that sum EXACTLY to both.
 
     The positive count is a property of the CELL, but prompts are issued per BATCH and
-    `_generate_batched` repeats one prompt across batches — so handing every batch the cell's full
+    `_generate_batched` repeats one prompt across batches, so handing every batch the cell's full
     count multiplied it (a 40-row cell asking for 14 positives emitted 28). Each batch gets its
     proportional share, floored so the remainder stays satisfiable.
     """
@@ -248,7 +248,7 @@ class LLMSyntheticGenerator:
         # Reasoning models served through Ollama (gpt-oss, deepseek-r1, qwen3-thinking...) put
         # their chain of thought in a separate `thinking` field that still consumes num_predict.
         # gpt-oss:20b spent all 3072 tokens reasoning and returned content="" with
-        # done_reason="length" — it looked like a model that could not follow the CSV contract
+        # done_reason="length": it looked like a model that could not follow the CSV contract
         # when it simply ran out of budget. Budget for reasoning + output, and size the context
         # to hold prompt + both.
         self.ollama_num_predict = 8192
@@ -364,7 +364,7 @@ class LLMSyntheticGenerator:
             from google.genai import types as _gt
             # Without an explicit timeout the client waits on a hung request forever. One call
             # stalled a 1000-row run for 11 minutes with zero rows written while a direct probe of
-            # the same model answered in 1.7 s — the request was hung, not slow. Bound it so a bad
+            # the same model answered in 1.7 s: the request was hung, not slow. Bound it so a bad
             # connection fails and retries instead of blocking the whole run. (Milliseconds.)
             # Which SURFACE serves the model: the public developer API (what the paper's arms
             # used) or Gemini on Vertex AI inside a Google Cloud project -- the enterprise surface
@@ -433,7 +433,7 @@ class LLMSyntheticGenerator:
         Condition A: generate n_total rows using only the column schema.
         Returns a raw string DataFrame (same dtypes as raw_train).
         """
-        print(f"\n[Condition A] Header-only generation — {n_total} rows …")
+        print(f"\n[Condition A] Header-only generation: {n_total} rows …")
         if self.spec:
             from src.generic_pipeline import build_header_only_prompt as _hp
             prompt = _hp(self.spec, n_rows=self.rows_per_call)
@@ -445,7 +445,7 @@ class LLMSyntheticGenerator:
     def _positives_for_cell(rate: float, n_rows: int, rng) -> int:
         """Stochastic rounding: floor(rate*n), plus one more with probability the fractional part.
 
-        Deterministic rounding biases every small cell the same way — round-half-up turns a released
+        Deterministic rounding biases every small cell the same way: round-half-up turns a released
         0.554 over one row into 1.000 every time, which is precisely the saturation this path exists
         to remove. Stochastic rounding keeps the expected count equal to rate*n, so the error is
         bounded by a single row and averages out across cells and draws instead of accumulating.
@@ -468,7 +468,7 @@ class LLMSyntheticGenerator:
         nan_cells = int(combined.isna().sum().sum()) if len(combined) else 0
         print(f"  !! {n} batch(es) were missing columns {getattr(self, '_missing_cols_seen', [])}; "
               f"{nan_cells} NaN cells in the assembled output. These are filled with each "
-              f"column's LOWER BOUND downstream and will bias that column — treat the affected "
+              f"column's LOWER BOUND downstream and will bias that column: treat the affected "
               f"marginals as unreliable.", flush=True)
 
     def generate_cortec_by_cell(self, cohort_stats_list: list[dict], n_total: int = 200,
@@ -479,7 +479,7 @@ class LLMSyntheticGenerator:
         rates. That saturates: on the constructed registry of §9 it preserved the ORDERING of a
         planted relationship while overstating its spread (0.741 emitted against a released 0.340
         for the strongest group, 0.009 against 0.075 for the weakest). This path instead asks, per
-        released cell, for "exactly k of n records" — a quantity the model can satisfy exactly.
+        released cell, for "exactly k of n records": a quantity the model can satisfy exactly.
         """
         rng = np.random.default_rng(seed)
         cells: list[tuple[dict, str, float, float]] = []
@@ -498,7 +498,7 @@ class LLMSyntheticGenerator:
             _bands = _level_bands(self.spec, cs)
             for key, rate in table.items():
                 cells.append((cs, key, float(rate), base * _cell_mass(cs, key, _bands)))
-        # which columns the finest conditional level pins — these are stated in the GROUP line and
+        # which columns the finest conditional level pins: these are stated in the GROUP line and
         # must not also appear as free distributions in the prompt
         try:
             _lv = cohort_stats_list[0].get("conditional_target_levels") or {}
@@ -508,7 +508,7 @@ class LLMSyntheticGenerator:
         except Exception:
             cond_bands, cond_cols = (), ()
         if not cells:
-            print("  no released conditional cells — falling back to cohort-level generation", flush=True)
+            print("  no released conditional cells: falling back to cohort-level generation", flush=True)
             return self.generate_cortec(cohort_stats_list, n_total=n_total)
 
         # COVERAGE GUARD -- gated PER CONDITIONING COLUMN, not on aggregate cell mass.
@@ -563,10 +563,10 @@ class LLMSyntheticGenerator:
         if _per_cell < MIN_ROWS_PER_CELL:
             print(f"\n  !! cell-wise generation with {n_total} rows across {len(cells)} cells is "
                   f"{_per_cell:.1f} rows per cell. Below ~{MIN_ROWS_PER_CELL} the model is asked "
-                  f"for one or two rows at a time and parsing collapses — a 7B model aborted at 0% "
+                  f"for one or two rows at a time and parsing collapses: a 7B model aborted at 0% "
                   f"parse in exactly this regime. Raise n_total to >= {int(MIN_ROWS_PER_CELL*len(cells))}, "
                   f"or use a coarser conditional level.", flush=True)
-        print(f"\n[Condition B] CoRTeC cell-wise generation — {n_total} rows across "
+        print(f"\n[Condition B] CoRTeC cell-wise generation: {n_total} rows across "
               f"{len(cells)} released cells (exact counts, stochastic rounding)", flush=True)
         frames = []
         for (cs, key, rate, _), n_rows in zip(cells, alloc):
@@ -576,7 +576,7 @@ class LLMSyntheticGenerator:
             from src.generic_pipeline import build_cell_prompt
             # The positive count is a property of the CELL, but the prompt is issued per BATCH.
             # Building one prompt for min(rows_per_call, n_rows) and letting _generate_batched
-            # repeat it multiplies the positives by the batch count — a 40-row cell asking for 14
+            # repeat it multiplies the positives by the batch count: a 40-row cell asking for 14
             # positives emitted 28. Split the cell into batches here and hand each batch its own
             # share of the count, so the totals are exactly n_rows and npos however the cell splits.
             parts = []
@@ -640,13 +640,13 @@ class LLMSyntheticGenerator:
         release and the seed, so the resumed rows complete the same targets.
         """
         _cond = label_prefix or "CoRTeC"
-        print(f"\n[Condition B] {_cond} generation — {n_total} rows across "
+        print(f"\n[Condition B] {_cond} generation: {n_total} rows across "
               f"{len(cohort_stats_list)} cohorts …")
 
         # Allocate rows PROPORTIONAL to each cohort's released size. The old code gave every
         # cohort an equal share regardless of size, which over-represented a 2%-of-population
         # cohort by 12x and made the synthetic set a sample from a deliberately wrong mixture
-        # of the private population — the thing 1-way/2-way TV distance measures.
+        # of the private population: the thing 1-way/2-way TV distance measures.
         # Cohort sizes are already in the released statistics, so using them is post-processing.
         sizes = np.array([max(cs.get("cohort_size", 1), 1) for cs in cohort_stats_list], dtype=float)
         weights = sizes / sizes.sum()
@@ -784,7 +784,7 @@ class LLMSyntheticGenerator:
             if _stop is not None and _stop.is_set():
                 break           # another cohort's thread tripped the spend guard; stop before a new call
             attempts += 1
-            # what this particular call asks the model for — the yield guard scores against this,
+            # what this particular call asks the model for: the yield guard scores against this,
             # never against rows_per_call (see _checkpoint)
             still_needed = n_rows - sum(len(f) for f in frames)
             b = min(self.rows_per_call, max(int(still_needed), 1))
@@ -816,7 +816,7 @@ class LLMSyntheticGenerator:
                 print(f"  [{label}] call {attempts}: got {len(df)} valid rows "
                       f"(total {sum(len(f) for f in frames)})")
               else:
-                print(f"  [{label}] call {attempts}: parse failed — retrying …")
+                print(f"  [{label}] call {attempts}: parse failed, retrying …")
                 # Keep the raw text when asked, so a parse failure can be read rather than guessed at
                 # (a vendor returning prose, a markdown table, a refusal or an empty body all print the
                 # same line above). Off unless CORTEC_PARSE_FAILURE_LOG names a file.
@@ -866,7 +866,7 @@ class LLMSyntheticGenerator:
         self._window_ok = 0
         if self.budget_usd is not None and spend >= self.budget_usd:
             raise self.GenerationAborted(
-                f"ABORTED — spend cap reached: ${spend:.2f} of ${self.budget_usd:.2f} after "
+                f"ABORTED: spend cap reached: ${spend:.2f} of ${self.budget_usd:.2f} after "
                 f"{self._n_calls} calls ({self._total_rows} rows). Raise --budget-usd to continue."
             )
         # Yield must be measured against what each call actually ASKED FOR, not against
@@ -876,7 +876,7 @@ class LLMSyntheticGenerator:
         requested = max(self._total_rows_requested, 1)
         yield_rate = self._total_rows / requested
         # A yield ratio needs a denominator big enough to be worth acting on. Cohorts are
-        # generated smallest-first on some datasets, so at call 2 the denominator can be 13 rows —
+        # generated smallest-first on some datasets, so at call 2 the denominator can be 13 rows:
         # one unlucky response then reads as a systematic schema failure and aborts a healthy run.
         # The parse-rate guard below still fires at call 2; it is the one that catches API and
         # schema errors early. This guard is about rows being silently dropped, which is a
@@ -888,13 +888,13 @@ class LLMSyntheticGenerator:
                 f"ABORTED at call {self._n_calls}: {self._total_rows} usable rows returned "
                 f"against {requested} requested ({yield_rate:.0%} yield, threshold "
                 f"{self.MIN_YIELD_RATE:.0%}). Calls are SUCCEEDING but most rows are being "
-                f"dropped — check schema/parsing before spending more credits."
+                f"dropped: check schema/parsing before spending more credits."
             )
         if rate < self.MIN_PARSE_RATE and self._n_calls >= self.MIN_CALLS_BEFORE_ABORT:
             raise self.GenerationAborted(
                 f"ABORTED at call {self._n_calls}: only {rate:.0%} of the last {self.CHECK_EVERY} "
                 f"calls produced usable rows (threshold {self.MIN_PARSE_RATE:.0%}). "
-                f"Last API error: {self._last_api_error or 'none — parsing, not the API'}. "
+                f"Last API error: {self._last_api_error or 'none: parsing, not the API'}. "
                 f"Fix the cause before spending more credits."
             )
 
@@ -931,7 +931,7 @@ class LLMSyntheticGenerator:
                     print(f"  rate limit persisted through {attempt} waits; counting it as an API error")
                     if self._consecutive_api_errors >= self.MAX_CONSECUTIVE_API_ERRORS:
                         raise self.GenerationAborted(
-                            f"ABORTED — {self._consecutive_api_errors} consecutive API errors. Last: {str(rl)[:300]}")
+                            f"ABORTED: {self._consecutive_api_errors} consecutive API errors. Last: {str(rl)[:300]}")
                     return ""
                 print(f"  rate limited (wait {attempt + 1}/{self.RATE_LIMIT_RETRIES}, {delay:.0f}s): {str(rl)[:140]}")
                 time.sleep(delay)
@@ -968,11 +968,11 @@ class LLMSyntheticGenerator:
         for marker in self._FATAL_MARKERS:
             if marker in low:
                 raise self.GenerationAborted(
-                    f"ABORTED — the API rejected the call for a reason that will not resolve by "
+                    f"ABORTED: the API rejected the call for a reason that will not resolve by "
                     f"retrying ({marker}): {msg[:300]}. Resume once this is cleared.")
         if self._consecutive_api_errors >= self.MAX_CONSECUTIVE_API_ERRORS:
             raise self.GenerationAborted(
-                f"ABORTED — {self._consecutive_api_errors} consecutive API errors. Last: {msg[:300]}")
+                f"ABORTED: {self._consecutive_api_errors} consecutive API errors. Last: {msg[:300]}")
         return ""
 
     def _call_openai(self, user_prompt: str) -> str:
@@ -1016,7 +1016,7 @@ class LLMSyntheticGenerator:
                 self._tok_think += thoughts
             self._consecutive_api_errors = 0
             # .text is None when the response carried no text part (e.g. a safety block or a
-            # response that spent its budget on thoughts) — return "" so the caller's parse
+            # response that spent its budget on thoughts): return "" so the caller's parse
             # failure path and yield guard handle it, exactly as for the other backends.
             return r.text or ""
         except Exception as e:
@@ -1040,7 +1040,7 @@ class LLMSyntheticGenerator:
                     response = stream.get_final_message()
             else:
                 response = self._client.messages.create(**kw)
-            # Reasoning models (e.g. Fable 5) return ThinkingBlock(s) before the TextBlock — grab the text only.
+            # Reasoning models (e.g. Fable 5) return ThinkingBlock(s) before the TextBlock: grab the text only.
             u = getattr(response, "usage", None)
             if u is not None:
                 self._tok_in += getattr(u, "input_tokens", 0) or 0
@@ -1070,18 +1070,18 @@ class LLMSyntheticGenerator:
             self._consecutive_api_errors += 1
             print(f"  Anthropic API error ({self._consecutive_api_errors} in a row): {msg[:300]}")
             low = str(e).lower()
-            # Credit/quota/auth problems will not fix themselves — stop immediately rather than
+            # Credit/quota/auth problems will not fix themselves: stop immediately rather than
             # hammering the API. Usage-limit errors are surfaced so the run can be resumed later.
             for marker in ("credit", "quota", "billing", "authentication", "permission",
                            "invalid_api_key", "usage limit"):
                 if marker in low:
                     raise self.GenerationAborted(
-                        f"ABORTED — the API rejected the call for a reason that will not resolve "
+                        f"ABORTED: the API rejected the call for a reason that will not resolve "
                         f"by retrying ({marker}): {msg[:300]}. Resume once this is cleared."
                     )
             if self._consecutive_api_errors >= self.MAX_CONSECUTIVE_API_ERRORS:
                 raise self.GenerationAborted(
-                    f"ABORTED — {self._consecutive_api_errors} consecutive API errors. "
+                    f"ABORTED: {self._consecutive_api_errors} consecutive API errors. "
                     f"Last: {msg[:300]}"
                 )
             return ""
@@ -1097,7 +1097,7 @@ class LLMSyntheticGenerator:
                 "stream": False,
                 # num_ctx MUST be set explicitly. Ollama defaults to a 4096-token context, but
                 # a CoRTeC prompt is ~1150 tokens and num_predict asks for 3072 more, so the
-                # default silently truncates — and the DP conditional table sits ~70% through
+                # default silently truncates, and the DP conditional table sits ~70% through
                 # the prompt, exactly where truncation bites. That would make a backend look
                 # like it "ignores the DP statistics" when it was simply never shown them.
                 # Found 2026-09-04 while interpreting the qwen2.5:7b misalignment result.
@@ -1110,7 +1110,7 @@ class LLMSyntheticGenerator:
                 payload["think"] = self.ollama_think
             hdrs = {"Host": self._ollama_host_override} if self._ollama_host_override else None
             # A reverse proxy in front of Ollama (e.g. `tailscale serve`) can impose its own
-            # request timeout — measured at ~60 s on one GPU pod, where a 25-row call
+            # request timeout: measured at ~60 s on one GPU pod, where a 25-row call
             # (58 s) returned 502 while a 15-row call (35 s) succeeded. A transient 5xx from the
             # proxy is not a reason to fail the whole run, so retry briefly with backoff. Keep
             # rows_per_call small enough that a single call stays well under the proxy timeout.
@@ -1130,7 +1130,7 @@ class LLMSyntheticGenerator:
                                     headers={"Host": self._ollama_host_override})
                 if r.status_code == 403:
                     raise self.GenerationAborted(
-                        "ABORTED — Ollama returns 403 both with and without a loopback Host "
+                        "ABORTED: Ollama returns 403 both with and without a loopback Host "
                         "header. The server is bound to 127.0.0.1 and its host check is active. "
                         "Fix on the server: OLLAMA_HOST=0.0.0.0:11434, then restart Ollama.")
             r.raise_for_status()
@@ -1147,13 +1147,13 @@ class LLMSyntheticGenerator:
             self._tok_out += int(d.get("eval_count", 0) or 0)
             if not content.strip() and msg.get("thinking"):
                 print(f"  [ollama] empty content but {len(msg['thinking'])} chars of reasoning "
-                      f"(done_reason={d.get('done_reason')}, eval_count={d.get('eval_count')}) — "
+                      f"(done_reason={d.get('done_reason')}, eval_count={d.get('eval_count')}): "
                       f"the reasoning budget was exhausted before any output; raise "
                       f"ollama_num_predict (currently {self.ollama_num_predict}).")
             return content
         except Exception as e:
             # Record it. The Anthropic and Gemini paths both set `_last_api_error`; this one did
-            # not, so the abort diagnostic reported "none — parsing, not the API" while the log
+            # not, so the abort diagnostic reported "none: parsing, not the API" while the log
             # right above it read "Ollama error: timed out". That misattribution sent three
             # separate investigations at the parser instead of the transport.
             self._last_api_error = f"{type(e).__name__}: {e}"
@@ -1186,7 +1186,7 @@ class LLMSyntheticGenerator:
         """
         Rule-based mock that generates plausible Adult-like rows.
         Used for pipeline testing without any LLM calls or API costs.
-        The mock ignores the prompt — it generates from fixed Adult-like priors.
+        The mock ignores the prompt: it generates from fixed Adult-like priors.
         Real LLMs should do better than this mock on CoRTeC prompts if the
         hypothesis holds.
         """
@@ -1272,7 +1272,7 @@ class LLMSyntheticGenerator:
             # keep_default_na=False is essential: pandas' default NA strings include
             # 'None', 'NA' and 'nan', which are LEGITIMATE CATEGORY VALUES in real datasets
             # (e.g. A1Cresult='None' means the test was not ordered). Without this, those
-            # cells became NaN and the dropna() below deleted the whole row — silently
+            # cells became NaN and the dropna() below deleted the whole row: silently
             # destroying 83% of generated rows on the diabetes dataset (2026-09-04).
             df = pd.read_csv(
                 io.StringIO(csv_text),
@@ -1298,7 +1298,7 @@ class LLMSyntheticGenerator:
             return None  # too many columns missing
         # A batch missing SOME columns is still accepted (throwing away usable rows is worse), but
         # it must not pass silently: concatenating it with a complete batch introduces NaN in the
-        # missing columns, and `evaluate_generic.encode` fills NaN numerics with the LOWER BOUND —
+        # missing columns, and `evaluate_generic.encode` fills NaN numerics with the LOWER BOUND:
         # so those rows quietly become minimum-valued records that bias every numeric marginal.
         # Count it here and report at assembly.
         _missing = [c for c in cols if c not in df.columns]
@@ -1337,7 +1337,7 @@ class LLMSyntheticGenerator:
             df = df[~bad]
 
         # Drop only rows with a genuinely unusable NUMERIC cell. Categorical cells are kept
-        # verbatim — an unexpected category is a fidelity error to be measured, not a reason
+        # verbatim: an unexpected category is a fidelity error to be measured, not a reason
         # to silently discard the row.
         numeric_present = [c for c in self._numcols if c in df.columns]
         df = df.dropna(subset=numeric_present) if numeric_present else df

@@ -1,9 +1,9 @@
-"""autoconfig.py — derive a conditional hierarchy from a schema, privately. On by default.
+"""autoconfig.py: derive a conditional hierarchy from a schema, privately. On by default.
 
 A CoRTeC deployment has to decide which columns the conditional table conditions on and how fine
 that table should be. Choosing those by inspecting the data is what a research study does; it is
 not something a deploying institution can legitimately do, and in our own study getting it wrong
-cost real utility — a hierarchy conditioned on two demographic attributes carrying 0.009 and 0.004
+cost real utility: a hierarchy conditioned on two demographic attributes carrying 0.009 and 0.004
 of mutual information while omitting two payment attributes carrying 0.057 and 0.042.
 
 So the tool derives it. `Schema.conditional` left empty means "derive"; supplying it means "I know
@@ -11,7 +11,7 @@ what I want, use mine". Autoconfig is the default because the failure mode of ha
 nothing in the output says the hierarchy was the wrong one.
 
 The derivation spends a small, declared share of the budget on noised (column x target) contingency
-tables — L1 sensitivity 1 each — and everything after the noised counts is post-processing. Wide
+tables, L1 sensitivity 1 each, and everything after the noised counts is post-processing. Wide
 columns are coarsened by their noisy positive rate, which is post-processing of tables already
 released. Richness comes from public cardinalities and the requested record count.
 """
@@ -54,7 +54,7 @@ def _derive_stratification(schema, private, col: str, coarsen: dict) -> list:
                  for i in range(len(pts) - 1)]
         return [(col, bands)] if len(bands) >= 2 else []
     # Categorical stratification would have to group declared levels into COHORT_GROUPS buckets,
-    # and `Schema.stratify` has no representation for that — `_cohort_keys` groups a categorical
+    # and `Schema.stratify` has no representation for that: `_cohort_keys` groups a categorical
     # column by RAW value, which gave 14 cohorts on Adult's `education` against the 3 the research
     # pipeline derives. Rather than add a half-supported representation, stratify on the
     # highest-ranked NUMERIC column, where declared bin edges give exactly the banding needed.
@@ -80,7 +80,7 @@ class DerivedConfig:
     # Cohort stratification, in Schema.stratify form. This was MISSING: the tool derived a
     # conditional hierarchy but never a stratification, so a caller using autoconfig as documented
     # got ONE global cohort while the research pipeline derives COHORT_GROUPS of them. Per-cohort
-    # marginals are a core element of the method, and they were collapsing to global marginals —
+    # marginals are a core element of the method, and they were collapsing to global marginals:
     # the shipped default was structurally weaker than the configuration our results validate.
     stratify: list = field(default_factory=list)
 
@@ -178,7 +178,7 @@ def derive(schema, private: pd.DataFrame, *, epsilon_total: float, n_records: in
 
     if not scored:
         notes.append("no column's cells survived the selection noise at this epsilon and sample "
-                     "size; conditioning on nothing, which is the safe fallback")
+                     "size. The release conditions on nothing, which is the safe fallback")
         return DerivedConfig((), [()], {}, eps_sel, 1, notes)
 
     effective_n = max(1.0, n_records / float(COHORT_GROUPS))
@@ -194,7 +194,7 @@ def derive(schema, private: pd.DataFrame, *, epsilon_total: float, n_records: in
     k = best[0]
     chosen = tuple(c for c, _ in scored[:k])
     # Stratify ONLY when the data can support it. Splitting into COHORT_GROUPS cohorts that each
-    # fall below n_min releases nothing at all — a 240-row frame split three ways has ~80 per
+    # fall below n_min releases nothing at all: a 240-row frame split three ways has ~80 per
     # cohort against n_min=150, and the whole release fails. The research pipeline reaches the
     # same place from the other direction: its small-dataset specs declare no stratification.
     # This uses only len(private), which the CALLER supplied; cohort sizes remain private and are

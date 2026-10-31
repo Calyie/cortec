@@ -189,14 +189,14 @@ def kv_block(pairs, *, indent: int = 2, decimals: int = 3, enabled: bool | None 
 
 
 def note(text: str, *, enabled: bool | None = None) -> str:
-    """A grey line; a long sentence is wrapped to the page width (an aligned line is not)."""
+    """A grey line. A long sentence is wrapped to the page width (an aligned line is not)."""
     if len(text) > WIDTH - 2 and "  " not in text.strip():
         return "\n".join(paint(f"  {w}", "reference", enabled=enabled) for w in wrap(text))
     return paint(f"  {text}", "reference", enabled=enabled)
 
 
 def warn(text: str, *, enabled: bool | None = None) -> str:
-    """The `!!` prefix is the one the package has always printed; colour is added, text is not changed."""
+    """The `!!` prefix is the one the package has always printed. Colour is added, text is not changed."""
     return paint(f"  !! {text}", "warning", enabled=enabled)
 
 
@@ -265,7 +265,7 @@ def emit_progress_done() -> None:
 def ticker(text, *, enabled: bool = True, interval: float = 0.5):
     """A live progress line while a blocking call runs, so a model call of a minute or more does
     not look like a frozen screen: `text(elapsed_seconds)` is redrawn on stderr every `interval`
-    seconds until the block ends. Terminal only, like `emit_progress`; nothing is written when
+    seconds until the block ends. Terminal only, like `emit_progress`. Nothing is written when
     stderr is not a terminal or `enabled` is false.
 
         with ticker(lambda t: f"waiting {t:.0f}s"):
@@ -329,7 +329,7 @@ def render_refusal(exc: BaseException, *, tool: str | None = None,
         for w in textwrap.wrap(para, WIDTH - 4) or [""]:
             lines.append(paint("    " + w, "refusal", enabled=enabled))
     lines.append("")
-    reading = ("The tool stopped on purpose; this is a refusal, not a fault in the tool. "
+    reading = ("The tool stopped on purpose. This is a refusal, not a fault in the tool. "
                "Change the input or the setting the reason names and run again.")
     lines.extend(note(w, enabled=enabled) for w in textwrap.wrap(reading, WIDTH - 2))
     return "\n".join(lines)
@@ -338,7 +338,7 @@ def render_refusal(exc: BaseException, *, tool: str | None = None,
 @contextmanager
 def guard(*, exit_code: int = REFUSAL_EXIT_CODE):
     """Wrap a run so a refusal by either package prints in the standard layout and exits with
-    `exit_code`; any other exception keeps its traceback. `with guard(): ...`"""
+    `exit_code`. Any other exception keeps its traceback. `with guard(): ...`"""
     try:
         yield
     except tuple(REFUSAL_TYPES) as e:
@@ -350,7 +350,7 @@ def guard(*, exit_code: int = REFUSAL_EXIT_CODE):
 def install_guard(*, exit_code: int = REFUSAL_EXIT_CODE) -> None:
     """The same as `guard()` for a whole script: one call at the top installs an exception hook
     that renders a registered refusal and exits, and hands every other exception to the default
-    hook unchanged. Interactive shells and notebooks ignore the hook; use `guard()` there."""
+    hook unchanged. Interactive shells and notebooks ignore the hook. Use `guard()` there."""
     previous = sys.excepthook
 
     def hook(exc_type, exc, tb):
@@ -576,7 +576,7 @@ class RunRecord:
         return path
 
     def write_csv(self, stem: str) -> dict:
-        """`<stem>.csv` holds the named values; each table goes to `<stem>_<table>.csv`."""
+        """`<stem>.csv` holds the named values. Each table goes to `<stem>_<table>.csv`."""
         files = {}
         path = f"{stem}.csv"
         with open(path, "w", newline="") as f:
@@ -593,7 +593,7 @@ class RunRecord:
 
     def save(self, directory: str, stem: str | None = None, *, figure: bool = True) -> dict:
         """Write every export under `directory` and return {name: path}. The figure is written
-        when matplotlib is installed and the record has one; otherwise it is skipped, and the
+        when matplotlib is installed and the record has one. Otherwise it is skipped, and the
         record says so in `files`."""
         os.makedirs(directory, exist_ok=True)
         stem = stem or _slug(f"{self.stage}_{self.title}")
@@ -721,7 +721,7 @@ def record_results(*, evaluation: RunRecord | None = None, bound: RunRecord | No
             subtitle="Does the synthetic table carry the real data's single-column distributions? Mean "
                      "total-variation distance from the holdout over every column, on the schema's bins.",
             note=f"reading: {text}. The permuted floor matches the real sample here because permuting "
-                 "the target leaves every marginal unchanged; the floor is informative for downstream utility."))
+                 "the target leaves every marginal unchanged. The floor is informative for downstream utility."))
         # downstream utility
         rows = []
         for st in ("LR", "RF", "GBM"):
@@ -742,13 +742,13 @@ def record_results(*, evaluation: RunRecord | None = None, bound: RunRecord | No
             rows,
             subtitle="Does a model trained on the synthetic table perform as one trained on real data of "
                      "the same size? Train on the table, test on the real holdout: AUC of logistic "
-                     "regression (LR), a random forest (RF) and gradient boosting (GBM); higher is better.",
+                     "regression (LR), a random forest (RF) and gradient boosting (GBM). Higher is better.",
             note=f"reading: {reading}. Share = (synthetic - permuted) / (real sample - permuted): the part "
                  "of a real sample's utility above the no-information floor that the synthetic table reaches."))
         absent = get(syn, "absent categories")
         if absent:
             warnings.append(f"{absent} declared categorical value(s) never appear in the synthetic table "
-                            "(see the evaluation's warnings); no aggregate measure above reports that")
+                            "(see the evaluation's warnings). No aggregate measure above reports that")
     # the headline, and the one-line readings of the values block
     verdict, role = None, "ok"
     if classes:
@@ -759,7 +759,7 @@ def record_results(*, evaluation: RunRecord | None = None, bound: RunRecord | No
             worst = max(g2, key=lambda x: abs(x[3] or 0)) if g2 else None
             verdict = (f"In this draw the gap to a real sample of the same size is {g1[2]:+.3f} on marginal fidelity "
                        f"(1-way TV)" + (f" and at most {abs(worst[3]):.3f} AUC on downstream utility ({worst[0]})" if worst else "")
-                       + "; read each gap against the permuted floor in the tables below.")
+                       + ". Read each gap against the permuted floor in the tables below.")
             values.append(("marginal fidelity", g1[1]))
             values.append(("downstream utility",
                            "; ".join(f"{st} gap {d:+.3f}" for st, c, t, d in g2 if d is not None) or "not scored"))
@@ -773,7 +773,7 @@ def record_results(*, evaluation: RunRecord | None = None, bound: RunRecord | No
                 parts.append("downstream utility (" + ", ".join(f"{st} below the range by {d:.3f}" for st, d in g2_worse) + ")")
             if parts:
                 verdict = ("In this draw the synthetic table reads outside the range of real samples of the same "
-                           "size on " + " and on ".join(parts) + "; the other measures read within or beyond it.")
+                           "size on " + " and on ".join(parts) + ", and the other measures read within or beyond it.")
                 role = "warning"
             else:
                 verdict = ("In this draw the synthetic table reads within or beyond the range of real samples "
@@ -783,7 +783,7 @@ def record_results(*, evaluation: RunRecord | None = None, bound: RunRecord | No
                 values.append(("downstream utility",
                                ", ".join(st for st, _ in g2_worse) + " below the real-sample range (by "
                                + ", ".join(f"{d:.3f}" for _, d in g2_worse) + ")"
-                               + ("; the other students within it" if len(g2_worse) < len(g2) else "")))
+                               + (", and the other students are within it" if len(g2_worse) < len(g2) else "")))
             else:
                 values.append(("downstream utility", "every student within or beyond the real-sample range"))
     else:
@@ -811,7 +811,7 @@ def record_results(*, evaluation: RunRecord | None = None, bound: RunRecord | No
         text = f"epsilon {fmt(eps_a)} for the release"
         if eps_c is not None:
             text += f" + {fmt(eps_c)} for the bound = {fmt(per_row)} per row"
-        values.append(("privacy spent", text + "; generation and evaluation spent none"))
+        values.append(("privacy spent", text + ", and generation and evaluation spent none"))
     # cost
     if generation is not None:
         g = dict(generation.values)
@@ -826,7 +826,7 @@ def record_results(*, evaluation: RunRecord | None = None, bound: RunRecord | No
     notes += ["Read every number against the two references: a real sample of the same size is the "
               "ceiling a synthetic table can reach at this size, and the same sample with its target "
               "permuted is the floor of no information.",
-              "One draw at one size is a signal, not a claim; replicate (three draws) before treating a "
+              "One draw at one size is a signal, not a claim. Replicate (three draws) before treating a "
               "difference as stable."]
     eps = {"per_row": per_row} if per_row is not None else {}
     return RunRecord(tool="cortec", stage="Results", title="marginal fidelity and downstream utility against real references",
@@ -866,17 +866,17 @@ def record_release(release, *, n_private_rows: int | None = None) -> RunRecord:
             rows.append([c["cohort_name"], c["cohort_size"], cb.get(keys[0]) if keys else None,
                          "yes" if c.get("by_class") else "no"])
         tables.append(ResultTable("cohorts", ["cohort", "released size", "positive rate", "class-conditional"],
-                                  rows, note="sizes and rates are noised; the positive rate is the first declared label's"))
+                                  rows, note="sizes and rates are noised. The positive rate is the first declared label's"))
     if finest.get("cells"):
         rows = [[cell, d["rate"], d["support"]] for cell, d in finest["cells"].items()]
         tables.append(ResultTable(f"conditional table, level {finest.get('level', len(levels) - 1)}",
                                   ["cell", "rate", "support"], rows,
-                                  note="rate is P(positive | cell) with Laplace noise; support is the noised cell size"))
+                                  note="rate is P(positive | cell) with Laplace noise. Support is the noised cell size"))
     groups = a.get("groups", {})
     if groups:
         rows = [[g, d.get("n_queries"), d.get("n_partitions"), d.get("group_total")] for g, d in groups.items()]
         tables.append(ResultTable("privacy accounting", ["group", "queries", "partitions", "epsilon"], rows,
-                                  note="groups compose sequentially; partitions within a group in parallel"))
+                                  note="groups compose sequentially. Partitions within a group in parallel"))
     warnings = list(a.get("warnings", []))
     rec = RunRecord(tool="cortec", stage="Stage A", title="Release", schema=release.schema_name,
                     values=values, tables=tables, warnings=warnings,
@@ -947,7 +947,7 @@ def record_bound(report, *, schema: str = "") -> RunRecord:
                     ["condition", "cells", "covered", "uncovered", "thin", "mean bound",
                      "worst bound", "within tolerance"], rows, reference_rows=ref,
                     note=f"tolerance {float(report.tolerance):.4f}"
-                         f"{' (derived from the release)' if _derived else ' (given)'}; the bound holds over every "
+                         f"{' (derived from the release)' if _derived else ' (given)'}. The bound holds over every "
                          f"cell with probability at least {1 - report.synthetic.alpha:.0%}")
     values = [("level", report.synthetic.level),
               ("columns", ", ".join(report.synthetic.columns) or "global"),
@@ -977,13 +977,13 @@ def record_bound(report, *, schema: str = "") -> RunRecord:
         _why = getattr(report, "verdict_reason", None) or "the test did not discriminate"
         verdict = f"no verdict: {_why}"
         role = "warning"
-        notes.insert(0, "A no verdict means the test could not decide; it is neither a pass nor a fail for "
+        notes.insert(0, "A no verdict means the test could not decide. It is neither a pass nor a fail for "
                         "the synthetic table. The bound is informative only when every released cell holds "
                         "at least 20 synthetic rows, the real-sample ceiling clears the tolerance and the "
                         "permuted floor does not.")
     warnings = []
     if c.get("epsilon_per_person_vacuous"):
-        warnings.append("the per-person epsilon is vacuous; no per-person privacy claim may be made from this report")
+        warnings.append("the per-person epsilon is vacuous. No per-person privacy claim may be made from this report")
     eps = {"release": c.get("epsilon_release"), "bound": c.get("epsilon_transmission_bound"),
            "per_row": c.get("epsilon_total_per_row"), "per_person": c.get("epsilon_per_person")}
     values += [("epsilon per row (release + bound)", eps["per_row"]),
@@ -1014,7 +1014,7 @@ def record_correction(gain: dict, table, *, schema: str = "", n_rows: int | None
         values += [("positive rate before", positive_rate_before), ("positive rate after", positive_rate_after)]
     rows = [[cell, table.cells[cell], table.support.get(cell)] for cell in table.cells]
     t = ResultTable("released conditional table", ["cell", "rate", "support"], rows,
-                    note="rate is P(positive | cell) with Laplace noise; support is the noised cell size")
+                    note="rate is P(positive | cell) with Laplace noise. Support is the noised cell size")
     warnings = list(a.get("warnings", []))
     return RunRecord(tool="cortec-hybrid", stage="Correction", title="Relabel the target column",
                      schema=schema, values=values, tables=[t], warnings=warnings,

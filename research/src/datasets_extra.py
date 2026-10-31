@@ -1,5 +1,5 @@
 """
-datasets_extra.py — healthcare and financial datasets, as proxies for the regulated-industry
+datasets_extra.py: healthcare and financial datasets, as proxies for the regulated-industry
 settings CoRTeC is actually aimed at.
 
 UCI Adult, a public census dataset where the LLM's prior happens to align with the truth, is
@@ -8,7 +8,7 @@ precisely NOT the target use case. These two datasets are the closest publicly a
   diabetes   Diabetes 130-US Hospitals, 1999-2008 (UCI 296). 101,766 real hospital encounters
              across 130 US hospitals: admission source, length of stay, lab and procedure
              counts, medication changes, A1C and glucose results, discharge disposition.
-             This is genuine hospital administrative/clinical data — the nearest public proxy
+             This is genuine hospital administrative/clinical data: the nearest public proxy
              to MIMIC-III, which is still blocked on credentialing. Target: readmitted within
              30 days, the standard prediction task on it and a real payer/provider metric.
 
@@ -20,7 +20,7 @@ precisely NOT the target use case. These two datasets are the closest publicly a
 Both have imbalanced binary targets like Adult (11.2% and 22.1% positive vs Adult's 24.1%),
 so the class-balance regime is comparable and the metrics stay interpretable.
 
-IMPORTANT — bounds and bin edges here are PUBLIC choices. They come from the datasets'
+IMPORTANT: bounds and bin edges here are PUBLIC choices. They come from the datasets'
 published documentation and from general domain knowledge (a hospital stay is 1-14 days; a
 credit limit is a round number in a known range), never from inspecting the private values.
 `DatasetSpec.validate` enforces that the declared bounds actually cover the data.
@@ -41,7 +41,7 @@ CREDIT_URL = "https://archive.ics.uci.edu/static/public/350/default+of+credit+ca
 
 
 def _cached(name: str, fetch, min_rows: int = 1001) -> pd.DataFrame:
-    """Download once, validate, then reuse — the same protection as the Adult cache."""
+    """Download once, validate, then reuse: the same protection as the Adult cache."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     p = DATA_DIR / name
     # `min_rows` guards against a truncated download being cached and silently used. It defaults
@@ -53,11 +53,11 @@ def _cached(name: str, fetch, min_rows: int = 1001) -> pd.DataFrame:
         if len(df) >= min_rows:
             print(f"  (using cached copy at {p}, {len(df)} rows)")
             return df
-        print(f"  cached copy at {p} looks truncated ({len(df)} rows) — refetching")
+        print(f"  cached copy at {p} looks truncated ({len(df)} rows): refetching")
     df = fetch()
     if len(df) < min_rows:
-        raise RuntimeError(f"{name}: fetched only {len(df)} rows, expected >= {min_rows} "
-                           f"— refusing to cache (pass min_rows= if this dataset is genuinely small)")
+        raise RuntimeError(f"{name}: fetched only {len(df)} rows, expected >= {min_rows}"
+                           f". Refusing to cache (pass min_rows= if this dataset is genuinely small)")
     df.to_csv(p, index=False)
     print(f"  fetched {len(df)} rows; cached → {p}")
     return df
@@ -100,7 +100,7 @@ def _load_diabetes() -> pd.DataFrame:
     # literal "nan" and catching it in .replace() is pandas-version dependent: 2.x produces the
     # string "nan" (so the mapping fires), 3.0's str dtype preserves NA (so it does not), and the
     # dropna() below then silently deletes the 83% of encounters where A1C was not ordered.
-    # That produced a real, published-number-changing corruption — see the deployment guide, Section 7.
+    # That produced a real, published-number-changing corruption, see the deployment guide, Section 7.
     for c in DIAB_CAT:
         s = df[c].astype("object")
         s = s.where(pd.notna(s), "NotMeasured")
@@ -114,7 +114,7 @@ def _load_diabetes() -> pd.DataFrame:
     if not 0.70 <= a1c <= 0.95:
         raise AssertionError(
             f"diabetes loader: A1Cresult 'NotMeasured' share is {a1c:.1%}, expected ~83%. "
-            "The missing-value mapping is not firing — check pandas' astype(str) NA rendering.")
+            "The missing-value mapping is not firing. Check pandas' astype(str) NA rendering.")
     df = df[df["gender"].isin(["Male", "Female"])]
     # Binary target: readmitted within 30 days vs not. '>30' and 'NO' both count as not-<30,
     # which is the standard formulation of this task.
@@ -214,7 +214,7 @@ def credit_spec() -> DatasetSpec:
     # legitimate a priori choice rather than selection on private values. §6.11.1 measured that
     # the original hierarchy conditioned on MARRIAGE (mutual information with the target 0.004)
     # while omitting PAY_2 (0.057), and that the unconditioned columns actively degraded a
-    # downstream model. `credit_payhist` swaps the two at identical epsilon — levels compose
+    # downstream model. `credit_payhist` swaps the two at identical epsilon: levels compose
     # sequentially, so substituting one for another changes no cost.
     pay2 = Band("PAY_2", groups={"paid_duly": ["-2", "-1"], "revolving": ["0"],
                                  "late_1m": ["1"],
@@ -242,17 +242,17 @@ def credit_spec() -> DatasetSpec:
 # ── AIM's own benchmark: titanic ────────────────────────────────────────────────────
 # AIM (McKenna et al., VLDB 2022) Table 3 evaluates on six datasets; of those we had only
 # tested `adult`. `titanic` is the most valuable of the remaining five for this project:
-#   * AIM's `target` workload on titanic uses `Survived` — the same label-centred workload
+#   * AIM's `target` workload on titanic uses `Survived`: the same label-centred workload
 #     shape our conditional machinery targets;
 #   * its total domain is ~9e7, tiny, so **AIM actually fits on it in seconds**, where AIM has
 #     failed to complete in 2-3 h on diabetes and credit (development runs). This is the
-#     dataset that can finally give us a real CoRTeC-vs-AIM head-to-head on a second dataset;
+#     dataset that can finally give us CoRTeC and AIM side by side on a second dataset;
 #   * at 1,309 records it is a genuine SMALL-DATA DP regime, which is realistic for the
 #     regulated settings CoRTeC targets (rare-disease cohorts, small institutions).
 # Source: Frank E. Harrell Jr's titanic3, which is exactly AIM's reference [17].
 # NOTE: AIM's exact preprocessing is not published (their "full paper" reference is a
 # self-citation), so this is OUR 9-dimensional preprocessing of the same source. We never quote
-# AIM's published numbers — we run AIM ourselves on this identical data — so the comparison is
+# AIM's published numbers, we run AIM ourselves on this identical data, so the comparison is
 # internally valid even though the preprocessing will not match theirs row for row.
 TITANIC_URL = "https://hbiostat.org/data/repo/titanic3.csv"
 TITAN_NUM = ["age", "fare", "sibsp", "parch"]
@@ -344,7 +344,7 @@ def credit_payhist_spec() -> DatasetSpec:
     """Credit, with the conditional hierarchy ordered by expected predictive strength.
 
     Identical to `credit_spec()` in every respect except the conditional levels: PAY_2 takes the
-    place MARRIAGE held. This is the change §6.11.1 proposes, isolated so the comparison is clean —
+    place MARRIAGE held. This is the change §6.11.1 proposes, isolated so the comparison is clean:
     same columns, same bounds, same bins, same stratification, same epsilon, same number of levels
     and therefore the same per-level budget.
     """

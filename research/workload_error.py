@@ -1,5 +1,5 @@
 """
-workload_error.py — AIM's own utility metric, so CoRTeC can be compared on AIM's home turf.
+workload_error.py: AIM's own utility metric, so CoRTeC can also be read on the measure AIM is built for.
 
 Everything this project has measured so far (1-way / 2-way TV) is NOT the metric AIM is
 designed for or evaluated on. AIM (McKenna et al., VLDB 2022, §6) evaluates workloads of
@@ -12,7 +12,7 @@ i.e. the mean over the workload of the L1 distance between the true and syntheti
 COUNT vectors, normalised by the dataset size. With both sides normalised to distributions
 (which is what dividing by |D| does when |D_hat| = |D|), that L1 distance is exactly 2x the
 total-variation distance, so this is directly comparable to the TV numbers used elsewhere in
-the project — but computed over 3-way marginals rather than 1- and 2-way.
+the project, but computed over 3-way marginals rather than 1- and 2-way.
 
 Their three workloads:
   all-3way  every 3-way marginal.

@@ -6,7 +6,7 @@ Two ideas carry the privacy argument and are enforced here rather than left to a
 1. **Everything in a `Schema` is public.** Column names, domain bounds, bin edges, the
    stratification rule and the conditional cell definitions are all assumed public knowledge, as
    in every marginal-based DP synthesiser. Nothing in this file may be derived from the private
-   data, so `Schema.from_dataframe()` deliberately does NOT exist — a schema inferred from private
+   data, so `Schema.from_dataframe()` deliberately does NOT exist: a schema inferred from private
    values would leak through its own bounds. Bounds must be declared by the user from what they
    already know about their domain.
 
@@ -53,13 +53,13 @@ class Schema:
     target            name of the binary target column
     positive, negative  the two target label values
     bins              {column: [edges]} public histogram edges for numeric columns
-    stratify          list of (column, [Band, ...]) forming the cohort grid; the cross product of
+    stratify          list of (column, [Band, ...]) forming the cohort grid. The cross product of
                       these bands is the partition. Cohorts are a function of public bounds only.
     conditional       list of column tuples defining conditional-table levels, coarse to fine
     coarsen           {column: {declared level: group label}} grouping a high-cardinality
                       categorical into a few classes for conditioning. The map is over DECLARED
                       levels, which are public, so applying it reads no private value. Autoconfig
-                      derives one; a caller may also supply it.
+                      derives one. A caller may also supply it.
     """
     name: str
     numerical: dict[str, tuple[float, float]]
@@ -113,7 +113,7 @@ class Schema:
                 if bs[0].lo > lo or bs[-1].hi < hi or any(a.hi != b.lo for a, b in zip(bs, bs[1:])):
                     raise SchemaError(
                         f"stratify bands for {col!r} must tile its declared domain [{lo}, {hi}] with "
-                        f"no gap; got {[(b.name, b.lo, b.hi) for b in bs]}")
+                        f"no gap. Got {[(b.name, b.lo, b.hi) for b in bs]}")
         for level in self.conditional:
             for col in level:
                 if col not in self.numerical and col not in self.categorical:
@@ -149,7 +149,7 @@ class Schema:
         return self.numerical_cols + self.categorical_cols + [self.target]
 
     def bin_edges(self, col: str) -> np.ndarray:
-        """Public bin edges for a numeric column; a sane default if none were declared."""
+        """Public bin edges for a numeric column. A sane default if none were declared."""
         if col in self.bins:
             return np.asarray(self.bins[col], dtype=float)
         lo, hi = self.numerical[col]
@@ -188,7 +188,7 @@ class Schema:
                 problems.append(f"target {self.target!r} contains none of the declared labels")
             elif len(seen & declared) == 1:
                 problems.append(
-                    f"target {self.target!r} has only one class present; nothing can be learned "
+                    f"target {self.target!r} has only one class present. Nothing can be learned "
                     f"or generated from a constant target"
                 )
 

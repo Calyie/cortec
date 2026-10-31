@@ -209,8 +209,8 @@ def test_release_fails_loudly_when_no_cohort_has_support():
 
 
 def test_empty_conditional_table_is_refused_rather_than_shipped():
-    """An empty conditional table means the output is unconditioned — the exact failure the
-    method exists to avoid — so it must never be rendered into a prompt."""
+    """An empty conditional table means the output is unconditioned: the exact failure the
+    method exists to avoid, so it must never be rendered into a prompt."""
     with pytest.raises(PromptIntegrityError, match="only channel"):
         render_cohort_prompt(
             cohort_name="c", n_rows=5, numeric_block="x", categorical_block="x",
@@ -315,7 +315,7 @@ def test_end_to_end_release_never_exceeds_the_declared_budget():
 
 
 def test_generation_is_free_and_repeatable():
-    """Unlimited draws from one release, at no further privacy cost — the central claim."""
+    """Unlimited draws from one release, at no further privacy cost: the central claim."""
     s = demo_schema()
     rel = release_statistics(s, demo_frame(), epsilon_total=2.0, n_min=150, seed=7)
     spent = rel.audit["epsilon_accounted"]
@@ -331,7 +331,7 @@ def test_release_spends_exactly_the_declared_budget_not_merely_less():
 
     Regression: the suppression query reads every record, so it is not disjoint from the
     per-cohort queries. Filing it in the 'marginals' group put it inside the parallel max(),
-    where a larger cohort cost absorbed it — the release then reported 1.90 against a declared
+    where a larger cohort cost absorbed it: the release then reported 1.90 against a declared
     2.00 and still passed every 'within_budget' assertion.
     """
     s = demo_schema()
@@ -520,7 +520,7 @@ def test_published_counts_are_noised_not_exact_private_counts():
         ))
 
     assert any(r[0] != runs[0][0] for r in runs), (
-        "cohort_size is identical across seeds, so it is not noised — the release is publishing "
+        "cohort_size is identical across seeds, so it is not noised: the release is publishing "
         "exact counts of private records")
     assert any(r[1] != runs[0][1] for r in runs), (
         "cell support is identical across seeds, so it is not noised")
@@ -556,7 +556,7 @@ def test_published_counts_are_charged_to_the_ledger():
     Cohort counts and cell counts each partition the data (parallel within a group) but overlap
     each other and across levels (a record is in one cohort, and in one cell of every level), so
     they must be filed as separate groups that compose sequentially. Filing them together lets the
-    parallel max() absorb one and under-charge — a false privacy claim.
+    parallel max() absorb one and under-charge: a false privacy claim.
     """
     rel = release_statistics(demo_schema(), demo_frame(), epsilon_total=2.0, n_min=150, seed=11)
     groups = rel.audit["groups"]
@@ -622,7 +622,7 @@ def test_no_unnoised_private_quantity_survives_in_the_release():
             suspects.append((k, v0))
 
     assert not suspects, (
-        "these numeric release fields are identical across 5 seeds, so they are not noised — "
+        "these numeric release fields are identical across 5 seeds, so they are not noised: "
         "each is either an unnoised private quantity or a public value that belongs in "
         f"_PUBLIC_NUMERIC: {suspects[:10]}")
 
@@ -661,7 +661,7 @@ def test_autoconfig_path_reports_unspent_conditional_budget(capsys):
     if spent < 2.0 - 1e-9:
         out = capsys.readouterr().out
         assert "was NOT spent" in out, (
-            f"accounted only {spent:.3f} of 2.0 and said nothing — an unspent budget makes the "
+            f"accounted only {spent:.3f} of 2.0 and said nothing: an unspent budget makes the "
             f"release noisier than declared and must be reported, not left in the audit")
 
 
@@ -1136,7 +1136,7 @@ def test_seeding_a_release_is_loudly_flagged_as_voiding_the_guarantee():
         seeded = release_statistics(sc, df, epsilon_total=2.0, n_min=150, seed=42)
     assert "SEEDED" in buf.getvalue().upper(), "a seeded release must warn on stdout"
     assert seeded.audit.get("guarantee_void") is True, (
-        "the voided guarantee must be recorded in the AUDIT, not only printed — the release is "
+        "the voided guarantee must be recorded in the AUDIT, not only printed: the release is "
         "read later from JSON by someone who never saw the console")
     assert any("epsilon" in w.lower() for w in seeded.audit.get("warnings", []))
 
@@ -1163,7 +1163,7 @@ def test_unseeded_release_is_the_default_and_is_not_reproducible():
     b = release_statistics(sc, df, epsilon_total=2.0, n_min=150)
     assert (a.cohorts[0]["numerical"]["age"]["proportions"]
             != b.cohorts[0]["numerical"]["age"]["proportions"]), (
-        "two default releases of the same data are identical — the noise source is seeded "
+        "two default releases of the same data are identical: the noise source is seeded "
         "somewhere and the guarantee is void")
 
 
@@ -1464,7 +1464,7 @@ def test_the_coverage_guard_understands_coarsened_cell_keys():
     Cell keys carry the COARSENED label (`disposition=g0`) while a cohort's categorical block is
     keyed on raw levels (`disposition=1`). The guard compared the two directly, matched nothing on
     every coarsened column, computed 0% coverage and refused a release whose groups were entirely
-    covered — making cell-wise generation impossible on any auto-configured release with a
+    covered, making cell-wise generation impossible on any auto-configured release with a
     high-cardinality categorical.
 
     Two things had to change: the guard aggregates the released proportions by group, and the

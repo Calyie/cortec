@@ -1,21 +1,20 @@
 # cortec-hybrid
 
-Conditional-signal correction for marginal DP synthesisers (AIM, MST, PrivBayes). No LLM is
-required; the heaviest dependency is scikit-learn.
+A correction of the target column for marginal DP synthesisers such as AIM, MST and PrivBayes. It
+needs no language model, and its heaviest dependency is scikit-learn.
 
-**It does not generate synthetic data.** The name is misleading, and this is the clarification that
-matters most. `cortec-hybrid` contains no synthesiser. It never calls AIM, MST or anything else, it
-will not produce a synthetic dataset for you, and it has no dependency on smartnoise-synth. It is a
-post-processor: it releases a DP conditional target table from your private data and rewrites only
-the target column of synthetic data you already generated, so that each cell's rate matches the
-table. Every feature column comes out identical to what you put in; the tool reports the feature
-marginal shift, which is zero, and the test suite asserts that the columns are equal.
+**It does not generate synthetic data.** The name can mislead, so this is the most important point.
+`cortec-hybrid` contains no synthesiser. It never calls AIM, MST or anything else, it will not
+produce a synthetic dataset for you, and it does not depend on smartnoise-synth. It is a
+post-processor. It releases a DP conditional target table from your private data, and rewrites only
+the target column of synthetic data you have already generated, so that each cell's rate matches the
+table. Every feature column comes out exactly as you put it in. The tool reports the shift in the
+feature marginals, which is zero, and the test suite checks that the columns are equal.
 
-If you are not already running a marginal synthesiser, you do not need this tool: `cortec decode`
-(in the `cortec` package) decodes a CoRTeC release with no language
-model through the same estimator AIM and MST use, with every column carried by the release and one
-budget spent once; the hybrid is for an institution that keeps AIM or MST and wants the named
-conditionals added to its output.
+If you do not already run a marginal synthesiser, you do not need this tool. `cortec decode`, in the
+`cortec` package, decodes a CoRTeC release with no language model, through the same estimator AIM and
+MST use. Every column is then carried by the release, and the budget is spent once. The hybrid is for
+an institution that keeps AIM or MST and wants the named conditional rates added to its output.
 
 ```
 your private data ──► DP conditional table ──┐
@@ -35,8 +34,8 @@ your AIM/MST output ────────────────────
 
 ## 1. Install
 
-`cortec-hybrid` reuses `cortec`'s audited privacy accounting, so install `cortec` first (its
-`Schema` and `PrivacyLedger` are all it needs; no vendor SDK is required). Python 3.10 or later;
+`cortec-hybrid` reuses `cortec`'s audited privacy accounting, so install `cortec` first. It needs
+only `cortec`'s `Schema` and `PrivacyLedger`, and no vendor SDK. You need Python 3.10 or later, and
 the packages are not on PyPI:
 
 ```bash
@@ -49,11 +48,11 @@ cortec-hybrid --help                         # the help page: what you can run, 
                                              #   (or python3 -m cortec_hybrid --help)
 ```
 
-**Run it.** Installing the package puts the `cortec-hybrid` command on PATH, and `cortec-hybrid
-run` runs the correction from any directory: the private table, the synthetic table to correct,
-the schema file (`SCHEMA = Schema(...)`, as in step 4 of the setup guide, `docs/setup.md`) and the cell columns.
-With `--holdout` it also scores the table before and after beside a real sample and a permuted
-floor, which is the number `worth_it` does not give.
+**Run it.** Installing the package puts the `cortec-hybrid` command on your PATH, and
+`cortec-hybrid run` runs the correction from any directory. It takes the private table, the
+synthetic table to correct, the schema file (`SCHEMA = Schema(...)`, as in step 4 of the setup
+guide, `docs/setup.md`) and the cell columns. With `--holdout` it also scores the table before and
+after, beside a real sample and a shuffled floor. That is the number `worth_it` does not give.
 
 ```bash
 cortec-hybrid run --data private.csv --synthetic synthetic.csv \
@@ -102,18 +101,18 @@ print(gain["verdict"])
 | `n_min` | `150` | cells with fewer private records are not released; the floor is 50 |
 | `seed` | `None` | tests only: a seeded release is reproducible and carries no guarantee |
 
-When the correction is refused (no cell reaches `n_min`, a column the schema does not declare,
-a vacuous privacy unit), it raises `CorrectionError` before any budget is spent. `cortec`'s
-`install_guard()` or `with guard():` prints the refusal in the standard layout and exits with
-status 2 instead of showing a traceback (section 10 of the setup guide, `setup.md`); `cortec-hybrid
---help` prints this package's help page.
+When the correction is refused, it raises `CorrectionError` before any budget is spent. Reasons
+include no cell reaching `n_min`, a column the schema does not declare, or a meaningless privacy
+unit. `cortec`'s `install_guard()` or `with guard():` prints the refusal in the standard layout and
+exits with status 2 instead of showing a traceback (section 10 of the setup guide, `setup.md`).
+`cortec-hybrid --help` prints this package's help page.
 
 `correct()` is four steps, each available on its own:
 
 1. `check_feasible(schema, n_rows=...)` refuses a schema AIM is unlikely to converge on (section 5).
 2. `release_conditional_table(schema, private_df, columns, epsilon=..., n_min=...,
-   max_rows_per_person=...)` spends the budget and returns a `ConditionalTable` with `cells`
-   (rate per cell), `support` (noised size per cell), `epsilon` and `audit`. Store it; it contains
+   max_rows_per_person=...)` spends the budget and returns a `ConditionalTable` with `cells` (the
+   rate per cell), `support` (the noised size per cell), `epsilon` and `audit`. Store it. It contains
    no private record.
 3. `relabel(schema, synthetic_df, table)` rewrites the target column so each cell matches its
    released rate, with stochastic rounding of the count and i.i.d. assignment within the cell. It
@@ -136,10 +135,10 @@ status 2 instead of showing a traceback (section 10 of the setup guide, `setup.m
 `cortec-hybrid terms` prints what each word in the printed output means (conditional error,
 feature marginal shift, worth it, ceiling, floor, TSTR); `cortec-hybrid <term>` prints one.
 
-`cortec`'s output standard applies here too: `show(correct(...))` prints the result as a stage
-header, the named values, the released table, the warnings and the verdict, and returns a record
-whose `save()` writes JSON, Markdown, CSV and a before-and-after figure. Section 11 of `cortec`'s
-setup guide and `result-format.md` (in the same folder) describe the layout and the record.
+`cortec`'s output standard applies here too. `show(correct(...))` prints the result as a stage
+header, the named values, the released table, the warnings and the verdict. It returns a record whose
+`save()` writes JSON, Markdown, CSV and a before-and-after figure. Section 11 of `cortec`'s setup
+guide and `result-format.md`, in the same folder, describe the layout and the record.
 
 ```python
 from cortec import show
@@ -149,32 +148,36 @@ rec = show(correct(schema, private_df, synthetic_df, columns=("admission_type",)
 rec.save("results", "correction")
 ```
 
-**Read `worth_it` for what it is.** It is a calibration criterion, meaning that conditional error
-against the released table fell by more than 0.02, and it does not predict downstream utility. We
-measured the two coming apart. Across 11 datasets the correction improved calibration in essentially
-every case while downstream AUC moved in both directions, and of 9 runs flagged `worth_it` the
-downstream AUC fell on 6 in one run and on 3 of 10 in a repeat. Three datasets, a renal registry,
-hospital readmission and cervical cancer, were reliably negative: calibration reliably improved and
-downstream AUC reliably dropped. `worth_it_does_not_predict` says exactly this. Validate on your
-own held-out data before adopting the correction, and keep your budget if the gain is small.
+**Read `worth_it` for what it is.** It is a calibration criterion: it means that conditional error
+against the released table fell by more than 0.02. It does not predict downstream utility, and we
+measured the two coming apart. Across 11 datasets the correction improved calibration in nearly every
+case, while downstream AUC moved in both directions. Of 9 runs flagged `worth_it`, the downstream AUC
+fell on 6 in one run, and on 3 of 10 in a repeat. Three datasets, a renal registry, hospital
+readmission and cervical cancer, were reliably negative: calibration improved and downstream AUC
+dropped every time. `worth_it_does_not_predict` says exactly this. Check the correction on your own
+held-out data before adopting it, and keep your budget if the gain is small.
 
-**What to expect.** Marginal-based DP synthesisers are excellent at the statistic they optimise,
-and they are evaluated on it in their own papers. They do not release a conditional target table:
-on UCI Adult at ε = 2 and n = 300 the reference AIM's seen-conditional error is 0.055 and the
-reference MST's 0.140 against a real sample's 0.062 (the paper's Table 3), while the reference
-AIM's downstream utility is at the real sample's level and ahead of the fixed-rule CoRTeC release's
-at n = 1,000, and level with or behind the auto-configured release decoded with no model and the selection step (`cortec decode`). The
-measurements in this section were made during development against AIM and MST at a library's
-defaults, whose sampler was later found defective (the paper's Appendix D); the large utility gap
-those rows showed was the sampler's, and the paper reports the reference implementations instead. This tool spends a small, separately accounted slice of budget on the one thing
-those mechanisms do not target, a conditional target table `P(y | cell)` over a disjoint partition,
-and relabels the output to match it. Because the cells partition the data, the whole table costs one
-query's worth of ε however many cells it holds: accuracy is set by cell support, not cell count,
-which is what makes a rich table affordable. It is not "CoRTeC without the LLM", and it is not a
-general improvement over its inputs. A coarse 12-cell table, the obvious implementation, fixes
-calibration and adds little utility in our runs (+0.025 AUC on AIM and +0.037 on MST, on Adult);
-the large gain arrived only with a richer table, against the library-default rows. Use it in one specific situation: your
-marginal synthesiser's output has weak conditional target structure and you need a calibrated rate.
+**What to expect.** Marginal DP synthesisers are excellent at the statistic they optimise, and their
+own papers evaluate them on it. They do not release a conditional target table. On UCI Adult at
+ε = 2 and n = 300, the reference AIM's seen-conditional error is 0.055 and the reference MST's 0.140,
+against a real sample's 0.062 (the paper's Table 3). The reference AIM's downstream utility is at the
+real sample's level. It scores higher than the fixed-rule CoRTeC release at n = 1,000, and level with or
+below the auto-configured release decoded with no model and the selection step (`cortec decode`).
+The measurements in this section were made during development against AIM and MST at a library's
+defaults, whose sampler was later found to be defective (the paper's Appendix D). The large utility
+gap those rows showed came from the sampler, and the paper reports the reference implementations
+instead.
+
+This tool spends a small, separately accounted part of the budget on the one thing those mechanisms
+do not target: a conditional target table `P(y | cell)` over a partition of the data. It then
+relabels the output to match the table. Because the cells partition the data, the whole table costs
+one query's worth of ε however many cells it holds. Accuracy depends on how many records each cell
+holds, not on how many cells there are, which is what makes a rich table affordable. It is not
+"CoRTeC without the language model", and it is not a general improvement over its input. A coarse
+12-cell table, the obvious design, fixes calibration but adds little utility in our runs (+0.025 AUC
+on AIM and +0.037 on MST, on Adult). The large gain came only with a richer table, and against the
+library-default rows. Use the tool in one specific situation: your marginal synthesiser's output has
+weak conditional target structure, and you need a calibrated rate.
 
 ## 5. Before you run: the feasibility check
 
@@ -193,9 +196,9 @@ demonstrated by a controlled flip:
 - **row count**: the same schema at the same domain moves from a 26-minute fit to a timeout purely
   by going from 26,048 to 81,410 rows;
 - **high-cardinality correlated numeric columns**: one dataset has Adult's width, fewer rows and a
-  30× smaller domain, and it still fails. Dropping any three columns does not rescue it; dropping
-  three amount columns does. A width-matched control (dropping three demographics instead) still
-  times out, which is the only way to separate those two causes.
+  30× smaller domain, and it still fails. Dropping any three columns does not help, but dropping three
+  amount columns does. A width-matched control, which drops three demographic columns instead, still
+  times out. That is the only way to separate the two causes.
 
 The report includes the full observation table it is derived from, and the estimated domain size,
 reported for reference and explicitly not used to decide. This is a heuristic from ten fits under
@@ -210,10 +213,10 @@ charged, in their own group, beside the rates. Validation runs before any budget
 `n_min` has a hard floor of 50 because a rate over fewer records is dominated by its own Laplace
 noise.
 
-**ε protects one ROW, and this tool is the one most likely to be pointed at data where that is not
-one person.** It corrects a synthesiser you already run, so it gets aimed at the table your
-institution already has, including encounter-level clinical data, where one patient contributes
-many rows. Under group privacy a person contributing `k` rows receives `k · ε`: on a real hospital
+**ε protects one ROW, and this tool is the one most likely to be used on data where a row is not a
+person.** It corrects a synthesiser you already run, so it tends to be pointed at the table your
+institution already has, including encounter-level clinical data, where one patient contributes many
+rows. Under group privacy, a person who contributes `k` rows receives `k · ε`. On a real hospital
 dataset whose heaviest patient has 40 encounters, a declared ε of 2.0 is an ε of 80 for that
 patient, which carries no meaningful guarantee.
 
@@ -242,10 +245,11 @@ target, was assumed necessary for this correction to pay for itself. Testing thi
 package disproved that in one regime, and the code changed as a result: `preserve_ranking=False` is
 the default of `relabel()`.
 
-Rank preservation only helps when the input synthetic data already carries within-cell structure.
-When its target is close to noise, precisely the case this tool targets, a ranking model fitted on
-that target learns the noise, and ordering by it injects spurious structure that a downstream model
-mistakes for signal. On the renal registry that cost 0.068 AUC against plain i.i.d. assignment (0.546 against 0.614 in the table below).
+Rank preservation helps only when the input synthetic data already carries structure within each
+cell. When its target is close to noise, which is exactly the case this tool targets, a ranking
+model fitted on that target learns the noise. Ordering by it then adds false structure that a
+downstream model mistakes for signal. On the renal registry that cost 0.068 AUC against plain random
+assignment (0.546 against 0.614 in the table below).
 
 The guard we first wrote for this did not work, and why is worth knowing. `_rank_scores` gated on
 whether the synthetic target is predictable from the synthetic features (cross-validated AUC

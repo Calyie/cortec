@@ -1,8 +1,8 @@
-"""cortec-hybrid — conditional-signal correction for marginal DP synthesisers, no LLM required.
+"""cortec-hybrid: a correction of the target column for marginal DP synthesisers. No language model is required.
 
 Narrow by design: it corrects the one axis marginal methods leave weakest (conditional target
 structure) using a small, separately accounted slice of privacy budget. It is not a general
-improvement over its inputs — measure with estimate_gain() and keep the budget if the gain is small.
+improvement over its inputs: measure with estimate_gain() and keep the budget if the gain is small.
 """
 from cortec.report import register_refusal
 from .core import (ConditionalTable, CorrectionError, DomainTooLargeError, check_feasible, correct,

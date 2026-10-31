@@ -35,14 +35,14 @@ def load_schema(path: str):
         sys.exit(f"schema file not found: {path} (looked from {os.getcwd()})")
     spec = importlib.util.spec_from_file_location("user_schema", path)
     if spec is None or spec.loader is None:
-        sys.exit(f"cannot import {path}; it must be a Python file that defines SCHEMA = Schema(...)")
+        sys.exit(f"cannot import {path}. It must be a Python file that defines SCHEMA = Schema(...)")
     folder = os.path.dirname(os.path.abspath(path))
     if folder not in sys.path:               # so the schema file can import a sibling module
         sys.path.insert(0, folder)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     if not hasattr(module, "SCHEMA"):
-        sys.exit(f"{path} must define SCHEMA = Schema(...); see docs/setup.md step 4")
+        sys.exit(f"{path} must define SCHEMA = Schema(...). See docs/setup.md step 4")
     return module.SCHEMA
 
 
@@ -53,7 +53,7 @@ def read_table(path: str, columns: list[str]) -> pd.DataFrame:
     df = pd.read_csv(path, keep_default_na=False)
     missing = [c for c in columns if c not in df.columns]
     if missing:
-        sys.exit(f"{path} lacks the schema's column(s) {missing}; it has {list(df.columns)}")
+        sys.exit(f"{path} lacks the schema's column(s) {missing}. It has {list(df.columns)}")
     return df[columns]
 
 
@@ -73,45 +73,45 @@ def parser(prog: str = "cortec run") -> argparse.ArgumentParser:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--data", required=True, help="the private table (CSV), one row per person")
     ap.add_argument("--schema", required=True, help="a Python file that defines SCHEMA = Schema(...)")
-    ap.add_argument("--holdout", help="real rows not used for the release (CSV); default: one fifth of --data")
+    ap.add_argument("--holdout", help="real rows not used for the release (CSV). Default: one fifth of --data")
     ap.add_argument("--backend", default="mock", help="mock (offline, default), anthropic, openai, gemini, ollama")
-    ap.add_argument("--model", default="claude-fable-5", help="the model name; must pass the capability gate")
+    ap.add_argument("--model", default="claude-fable-5", help="the model name. Must pass the capability gate")
     ap.add_argument("--surface", default="public", help="public (default), bedrock, azure or vertex (docs/setup.md step 2)")
     ap.add_argument("--surface-model", default=None, help="the identifier the enterprise surface expects")
     ap.add_argument("--effort", default=None, choices=("low", "medium", "high"),
-                    help="the thinking level for a reasoning model served by Ollama (gpt-oss); default: the model's")
+                    help="the thinking level for a reasoning model served by Ollama (gpt-oss). Default: the model's")
     ap.add_argument("--max-output-tokens", type=int, default=None,
-                    help="output budget per call, reasoning included (default 8192); a reasoning model that "
+                    help="output budget per call, reasoning included (default 8192). A reasoning model that "
                          "spends its budget before writing any CSV needs more")
     ap.add_argument("--no-quota-by-class", action="store_true",
                     help="state the exact counts as totals only, not per outcome (the totals-only "
-                         "prompt); by default each outcome's rows per bin are stated as well, so the "
+                         "prompt). By default each outcome's rows per bin are stated as well, so the "
                          "class-specific marginals are enforced whichever model generates")
     ap.add_argument("--allow-unvalidated", action="store_true",
-                    help="run a model the capability gate has not measured; the output says so")
+                    help="run a model the capability gate has not measured. The output says so")
     ap.add_argument("--request-timeout", type=float, default=None,
-                    help="seconds to wait for one model call (default 120); a reasoning model served "
+                    help="seconds to wait for one model call (default 120). A reasoning model served "
                          "locally can need several minutes per call")
     ap.add_argument("--n-rows", type=int, default=300, help="synthetic rows to produce (default 300)")
     ap.add_argument("--pool-factor", type=int, default=1,
                     help="1 (default): generate exactly n rows; 3: generate 3n and select the n that match "
                          "the release best, the setup guide's recommendation, at three times the spend")
     ap.add_argument("--budget-usd", type=float, default=None,
-                    help="spend cap; the run stops when it is reached and keeps the rows completed")
+                    help="spend cap. The run stops when it is reached and keeps the rows completed")
     ap.add_argument("--epsilon-total", type=float, default=2.0, help="the Stage A budget (default 2.0)")
     ap.add_argument("--n-min", type=int, default=150, help="cohorts and cells below this size are suppressed")
     ap.add_argument("--max-rows-per-person", type=int, default=1, help="the privacy unit (default 1)")
     ap.add_argument("--epsilon-cert", type=float, default=1.0, help="the Stage C budget (default 1.0)")
     ap.add_argument("--tolerance", default="auto",
                     help="the Stage C tolerance: 'auto' (default) derives it from the release, or a number")
-    ap.add_argument("--out", default=None, help="output folder; default results/<schema name>_<backend>")
+    ap.add_argument("--out", default=None, help="output folder. Default results/<schema name>_<backend>")
     ap.add_argument("--no-evaluate", action="store_true", help="skip the evaluation (needs scikit-learn)")
     ap.add_argument("--reference-draws", type=int, default=5,
-                    help="real samples (each with a permuted copy) the evaluation scores as references; "
+                    help="real samples (each with a permuted copy) the evaluation scores as references. "
                          "their range is what the results panel reads each synthetic number against "
                          "(default 5; 1 scores one sample)")
     ap.add_argument("--exports", choices=("json", "all"), default="json",
-                    help="json (default): one record per stage, complete; all: also the Markdown, "
+                    help="json (default): one record per stage, complete. All: also the Markdown, "
                          "CSV and figure renderings of each record")
     return ap
 
@@ -155,7 +155,7 @@ def main(argv: list[str] | None = None, prog: str = "cortec run") -> int:
         ("privacy budget", f"epsilon {fmt(a.epsilon_total)} for the release (Stage A) + {fmt(a.epsilon_cert)} for "
                            f"the bound (Stage C) = {fmt(a.epsilon_total + a.epsilon_cert)} per row; "
                            f"n_min {a.n_min}"),
-        ("synthetic rows", pool + (f"; spend cap ${a.budget_usd:.2f}" if a.budget_usd else "")),
+        ("synthetic rows", pool + (f". Spend cap ${a.budget_usd:.2f}" if a.budget_usd else "")),
         ("stages", "A release" + (" (reused)" if reuse else "") + ", B generate, C bound"
                    + (", evaluation, results" if not a.no_evaluate else ", results (evaluation skipped)")),
         ("output", outdir)]))
@@ -169,10 +169,10 @@ def main(argv: list[str] | None = None, prog: str = "cortec run") -> int:
     if reuse:
         stored = open(fingerprint_path, encoding="utf-8").read() if os.path.exists(fingerprint_path) else None
         if stored is not None and stored != repr(schema):
-            sys.exit(f"{release_path} was made from a different schema than {a.schema}; a release "
+            sys.exit(f"{release_path} was made from a different schema than {a.schema}. A release "
                      f"belongs to its schema. Use another --out for this schema.")
         release = Release.from_json(release_path)
-        emit(note(f"Stage A: reusing {release_path}. A release is made once; re-running it would spend "
+        emit(note(f"Stage A: reusing {release_path}. A release is made once. Re-running it would spend "
                   f"the budget again. Use another --out for a new release."))
     else:
         release = release_statistics(schema, train, epsilon_total=a.epsilon_total, n_min=a.n_min,

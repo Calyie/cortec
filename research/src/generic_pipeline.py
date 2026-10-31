@@ -1,5 +1,5 @@
 """
-generic_pipeline.py — Stage A and the prompt builders, driven by a DatasetSpec.
+generic_pipeline.py: Stage A and the prompt builders, driven by a DatasetSpec.
 
 Stage A and the prompt builders of the original Adult-only pipeline, generalised over a
 DatasetSpec. The mechanism decisions, described in Section 4 of the paper:
@@ -10,7 +10,7 @@ DatasetSpec. The mechanism decisions, described in Section 4 of the paper:
     count), with mean/std derived from it as free post-processing;
   * the conditional target table is released for each level of the spec, and the levels are NOT
     disjoint from one another, so the conditional budget is SPLIT across the levels released;
-  * every released categorical proportion is shown in the prompt, not just the top few — the
+  * every released categorical proportion is shown in the prompt, not just the top few: the
     truncation to 4 categories accounted for essentially all of CoRTeC's fidelity gap.
 
 The Adult-specific modules are left untouched so existing Adult results stay reproducible;
@@ -60,7 +60,7 @@ def release_statistics(spec: DatasetSpec, raw_train: pd.DataFrame, *, epsilon_st
                        class_conditional: bool = True) -> list[dict]:
     """Stage A for any dataset. Returns one dict per surviving cohort."""
     # Two guards ported from the reference implementation (tools/cortec). Both catch failures that
-    # are otherwise SILENT — the release looks populated and is not, and nothing downstream says so.
+    # are otherwise SILENT: the release looks populated and is not, and nothing downstream says so.
     if n_min < 50:
         raise ValueError(
             f"n_min={n_min} is below the safe floor of 50. A conditional rate over fewer than ~50 "
@@ -108,7 +108,7 @@ def release_statistics(spec: DatasetSpec, raw_train: pd.DataFrame, *, epsilon_st
         n_c = len(idx)
         _n_noisy = Laplace(epsilon=eps_counts, sensitivity=1.0).randomise(float(n_c))
         if _n_noisy < n_min:
-            print(f"  cohort {sname!r}: noised size {_n_noisy:.0f} below n_min={n_min} — not released")
+            print(f"  cohort {sname!r}: noised size {_n_noisy:.0f} below n_min={n_min}: not released")
             continue
         sub = raw_train.loc[idx]
         _n_pub = int(max(n_min, round(_n_noisy)))
@@ -293,7 +293,7 @@ def release_statistics(spec: DatasetSpec, raw_train: pd.DataFrame, *, epsilon_st
     # generator would produce unconditioned output while every log line still reads normally. This
     # happened on one dataset (autoconfig sized the table by total n while cohorts partition the
     # data) and was caught only by inspecting cell counts by hand.
-    # The FINEST table specifically — not the max across levels. A coarse level can be non-empty
+    # The FINEST table specifically: not the max across levels. A coarse level can be non-empty
     # while the finest one is empty, and it is the finest table the generator conditions on.
     _finest = len(cond_tables.get(finest, {}) or {})
     if _finest == 0:
@@ -642,7 +642,7 @@ def build_cortec_prompt(spec: DatasetSpec, cohort_stats: dict, n_rows: int = 25,
 def _readable_cell(cell_key: str, cond_bands: tuple = (), cohort_stats: dict | None = None) -> str:
     """Turn a cell key into something a model can actually act on.
 
-    Cell keys are built from band LABELS — 'patient_age_b0|ambulance'. A label is an internal
+    Cell keys are built from band LABELS: 'patient_age_b0|ambulance'. A label is an internal
     identifier: nothing in the prompt told the model that `patient_age_b0` means 18-45, so it was
     being asked to condition on a token it could not interpret, and the emitted age distribution
     drifted accordingly. Translate each part back to the constraint it encodes.
@@ -702,7 +702,7 @@ def build_cell_prompt(spec, cohort_stats: dict, cell_key: str, n_rows: int,
     Asking a model to hit a *rate* saturates: §8's calibration defect showed released rates at or
     above ~0.24 pulled toward 1.0, because a cell receiving a couple of rows can only emit 0 or 1
     and the model resolves the ambiguity by rounding up. Asking for "exactly k of n records" removes
-    the ambiguity — the quantity requested is one the model can satisfy exactly — and moved
+    the ambiguity, the quantity requested is one the model can satisfy exactly, and moved
     magnitude error from 0.253 to 0.037 in the reference implementation.
 
     The count itself is produced by stochastic rounding upstream, so its expectation equals the
@@ -722,7 +722,7 @@ def build_cell_prompt(spec, cohort_stats: dict, cell_key: str, n_rows: int,
              ""]
 
     # A column named in the GROUP is already pinned for every record in this cell. Also printing
-    # its cohort-wide distribution contradicts the GROUP outright — an ambulance-only cell was
+    # its cohort-wide distribution contradicts the GROUP outright: an ambulance-only cell was
     # being told "transport_mode: self 43%, family 29%, ambulance 13%" in the same prompt.
     _fixed = {c for c in cond_cols if c}
     by_class = cohort_stats.get("by_class") or {}
@@ -746,7 +746,7 @@ def build_cell_prompt(spec, cohort_stats: dict, cell_key: str, n_rows: int,
         # The released DP histogram is the channel that carries SHAPE. A prompt that sends only
         # mean and std makes the model emit a smooth continuous spread, giving
         # 90% non-integer ages against integer-valued real data and a worse 1-way TV than the
-        # rate-based path it replaced. Mean and std do not determine a distribution — send the bins.
+        # rate-based path it replaced. Mean and std do not determine a distribution: send the bins.
         lines += ["NUMERICAL FEATURES — approximate distribution for this cohort.",
                   "Match the SHAPE below, not just the average: the percentages are the share of "
                   "rows that must fall in each range."]

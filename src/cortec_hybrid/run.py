@@ -29,12 +29,12 @@ def parser(prog: str = "cortec-hybrid run") -> argparse.ArgumentParser:
     ap.add_argument("--schema", required=True, help="a Python file that defines SCHEMA = Schema(...)")
     ap.add_argument("--columns", required=True, help="the cell columns, comma-separated (e.g. age,sex)")
     ap.add_argument("--epsilon", type=float, default=0.5, help="the budget for the table (default 0.5)")
-    ap.add_argument("--n-min", type=int, default=150, help="cells below this size are not released; floor 50")
+    ap.add_argument("--n-min", type=int, default=150, help="cells below this size are not released. Floor 50")
     ap.add_argument("--max-rows-per-person", type=int, default=1, help="the privacy unit (default 1)")
-    ap.add_argument("--holdout", help="real rows not in --data (CSV); enables the before/after evaluation")
-    ap.add_argument("--out", default=None, help="output folder; default: the synthetic table's folder")
+    ap.add_argument("--holdout", help="real rows not in --data (CSV). Enables the before/after evaluation")
+    ap.add_argument("--out", default=None, help="output folder. Default: the synthetic table's folder")
     ap.add_argument("--exports", choices=("json", "all"), default="json",
-                    help="json (default): one record per step, complete; all: also the Markdown, "
+                    help="json (default): one record per step, complete. All: also the Markdown, "
                          "CSV and figure renderings of each record")
     return ap
 
@@ -82,7 +82,7 @@ def main(argv: list[str] | None = None, prog: str = "cortec-hybrid run") -> int:
             rec_e.show()
             files_e = save_record(rec_e, out, "evaluation", a.exports)
     else:
-        emit(note("no --holdout given: the before/after evaluation was skipped; worth_it alone does "
+        emit(note("no --holdout given: the before/after evaluation was skipped. worth_it alone does "
                   "not say whether downstream utility improved"))
 
     emit("")

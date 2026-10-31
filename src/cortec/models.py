@@ -2,7 +2,7 @@
 Model capability gating.
 
 CoRTeC degrades *silently*. A model too weak to track the released conditional structure does not
-error — it produces well-formed, plausible rows that simply ignore the statistics, which is
+error: it produces well-formed, plausible rows that simply ignore the statistics, which is
 indistinguishable from success unless you measure transmission directly. In the measurements
 behind this tool, a 7B model scored a transmission slope of 0.21 (a faithful generator scores
 ~1.0), while emitting perfectly valid CSV throughout.
@@ -12,8 +12,8 @@ the failure mode they prevent is a false privacy-preserving-data-generation clai
 looks fine and carries none of your data's structure.
 
 Two facts shape the policy:
-  * scale matters — within one family, magnitude error fell monotonically from 7B to 72B;
-  * scale is not sufficient — at comparable size, models from different families differed by 2x,
+  * scale matters: within one family, magnitude error fell monotonically from 7B to 72B;
+  * scale is not sufficient: at comparable size, models from different families differed by 2x,
     with a 24B model beating a 32B one.
 
 Because family matters and this list cannot enumerate every model, an unknown model is not
@@ -63,17 +63,17 @@ class ModelProfile:
 # 0% / 50% / 100% and regressing generated rate on the rate actually shown to the model.
 PROFILES: list[ModelProfile] = [
     ModelProfile(r"claude.*(fable|opus|sonnet)", Tier.VALIDATED, 0.009, 0.995,
-                 "frontier API model; most accurate measured"),
+                 "frontier API model. Most accurate measured"),
     # Measured 2026-09-10 on the SAME transmission sweep as every other row here (diabetes,
     # number_inpatient forced to 0/50/100%, 3 rates x 75 rows): shown 0.004/0.505/0.995 ->
-    # generated 0.000/0.521/1.000, slope 1.009, MAE 0.008. Added only after running that sweep —
+    # generated 0.000/0.521/1.000, slope 1.009, MAE 0.008. Added only after running that sweep:
     # a magnitude-error figure of 0.002 from the cell-wise registry test exists, which
     # is a DIFFERENT experiment and is not interchangeable with this metric.
     # FLASH ONLY. A pattern of `gemini.*(flash|pro)` would silently vouch for gemini-*-pro, which
-    # has NOT been run through this sweep — asserting a tier for an unmeasured sibling is the exact
+    # has NOT been run through this sweep: asserting a tier for an unmeasured sibling is the exact
     # error this table exists to prevent. Measure pro before adding it.
     ModelProfile(r"gemini.*flash", Tier.VALIDATED, 0.008, 1.009,
-                 "frontier API model; measured on the same sweep as the rest of this table"),
+                 "frontier API model. Measured on the same sweep as the rest of this table"),
     # These two were deliberately absent while tiers were assigned from the transmission sweep:
     # they were never scored on it. That ordering is now inverted -- full-dataset generation is
     # the axis this tool runs and the axis the recommendation is built on -- so a model measured
@@ -93,21 +93,21 @@ PROFILES: list[ModelProfile] = [
     # control's identical 0.238), and is worse than the control on 1-way TV. None of these models
     # has a reasoning mode, which is the likely mechanism.
     ModelProfile(r"llama3\.3.*70b", Tier.SWEEP_ONLY, 0.020, 0.988,
-                 "self-hostable; passes the transmission sweep but on full-dataset generation is "
+                 "self-hostable. Passes the transmission sweep but on full-dataset generation is "
                  "close to indistinguishable from an unconditioned prompt"),
     ModelProfile(r"qwen2\.5.*72b", Tier.SWEEP_ONLY, 0.030, 1.011,
-                 "self-hostable; sweep-only, same caveat as llama3.3:70b"),
+                 "self-hostable. Sweep-only, same caveat as llama3.3:70b"),
     ModelProfile(r"mistral-small.*24b", Tier.ADEQUATE, 0.049, 0.877,
-                 "beats larger models from other families; magnitude approximate"),
+                 "does better than larger models from other families. Magnitude approximate"),
     ModelProfile(r"gemma2.*27b", Tier.ADEQUATE, 0.067, 0.890, "magnitude approximate"),
     ModelProfile(r"gpt-oss.*20b", Tier.ADEQUATE, 0.078, 0.913,
                  "reasoning model: budget output tokens generously, see generate.py"),
     ModelProfile(r"qwen2\.5.*32b", Tier.ADEQUATE, 0.098, 1.014,
-                 "slope is near 1 but midpoints are badly off; judge on magnitude error"),
+                 "slope is near 1 but midpoints are badly off. Judge on magnitude error"),
     ModelProfile(r"qwen2\.5.*14b", Tier.ADEQUATE, 0.105, 1.011,
                  "slope near 1 but generated 81% for a 50% target"),
     ModelProfile(r"qwen2\.5.*7b", Tier.INSUFFICIENT, 0.406, 0.208,
-                 "does not track the released statistics; output is effectively unconditioned"),
+                 "does not track the released statistics. Output is effectively unconditioned"),
     # Measured 2026-10 on full-dataset generation (one Adult release and one NHANES release decoded
     # through vLLM, three draws at n = 300 and 1,000, the same prompts and flags as every other
     # backbone; the paper's Appendix E.4). Not scored on the transmission sweep, so the two sweep
@@ -123,12 +123,12 @@ PROFILES: list[ModelProfile] = [
                  "total variation 0.049 and seen-conditional error 0.031 on Adult at n = 300. Not "
                  "scored on the transmission sweep."),
     ModelProfile(r"qwen3.*14b", Tier.VALIDATED, None, None,
-                 "validated on full-dataset generation (served through vLLM; the paper's primary "
+                 "validated on full-dataset generation (served through vLLM, the paper's primary "
                  "open backbone): 1-way total variation 0.046 and seen-conditional error 0.027 on "
                  "Adult at n = 300. Not scored on the transmission sweep."),
     ModelProfile(r"qwen3.*8b", Tier.ADEQUATE, None, None,
                  "measured on full-dataset generation: 1-way total variation 0.068 on Adult at "
-                 "n = 300, and it writes range labels into numerical columns at times; check the "
+                 "n = 300, and it writes range labels into numerical columns at times. Check the "
                  "parse and repair counts in gen.stats. Not scored on the transmission sweep."),
 ]
 
@@ -143,7 +143,7 @@ def profile_for(model: str) -> ModelProfile:
         if re.search(p.pattern, model, flags=re.IGNORECASE):
             return p
     return ModelProfile(r"", Tier.UNKNOWN, None, None,
-                        "not in the measured set; transmission is unverified on any dataset")
+                        "not in the measured set. Transmission is unverified on any dataset")
 
 
 def _small_model_hint(model: str) -> str | None:
@@ -178,14 +178,14 @@ def check_model(model: str, *, allow_unvalidated: bool = False,
     if p.tier is Tier.SWEEP_ONLY and not acknowledge_insufficient:
         raise ModelCapabilityError(
             f"{model!r} passes the transmission sweep but FAILS full-dataset generation.\n"
-            f"  sweep: magnitude error {p.magnitude_error}, slope {p.slope} — inside the frontier "
+            f"  sweep: magnitude error {p.magnitude_error}, slope {p.slope}, inside the frontier "
             f"band, the sweep-only reading this table does not accept as validation.\n"
             f"  full-dataset generation, 3 draws: it closes 12% of the conditional-error gap to an "
             f"UNCONDITIONED prompt, closes nothing at all on 2-way total variation, and is worse "
             f"than that control on 1-way total variation.\n"
             f"  {p.note}\n"
             f"  On the metrics this method exists to improve, its output is close to "
-            f"indistinguishable from asking a model for plausible records with no conditioning — "
+            f"indistinguishable from asking a model for plausible records with no conditioning, "
             f"and no output check reveals that. Use a validated model "
             f"({', '.join(validated_models())}), or pass acknowledge_insufficient=True if you are "
             f"deliberately reproducing the finding."
@@ -237,7 +237,7 @@ MEASURED_ON_GENERATION_ONLY: dict[str, str] = {
     "gpt-5": ("measured on full-dataset generation at DEFAULT reasoning: conditional error 0.045, "
               "inside the 0.041-0.047 band of the frontier models we validated, and below what a "
               "real 300-record sample achieves (0.062). At reasoning_effort='minimal' the same "
-              "model scored 0.173 -- worse than a no-information control. Not scored on the "
+              "model scored 0.173, worse than a no-information control. Not scored on the "
               "transmission sweep, so its PROFILES entry carries no magnitude error."),
     "gemini-3.1-pro": ("measured on full-dataset generation with reasoning on: conditional error "
                        "0.041, the lowest of any generator we measured. Not scored on the "
@@ -265,15 +265,15 @@ def generation_evidence_for(model: str) -> str | None:
 # Conditional error on full-dataset generation, against a real 300-record sample (0.062) and a
 # permuted-target no-information floor (0.152).
 RECOMMENDED: dict[str, str] = {
-    "gemini-3.1-pro":  "0.041 — lowest of any generator measured; reasoning on",
+    "gemini-3.1-pro":  "0.041, the lowest of any generator measured. Reasoning on",
     "gpt-5":           "0.045 at DEFAULT reasoning. At reasoning_effort='minimal' the same model "
-                       "scores 0.173, past the no-information floor — set effort explicitly",
-    "claude-fable-5":  "0.046; reasoning on",
+                       "scores 0.173, past the no-information floor. Set the effort explicitly",
+    "claude-fable-5":  "0.046. Reasoning on",
     "claude-opus-5":   "0.046, reached with reasoning verifiably NOT firing",
-    "gemini-3.5-flash": "0.008 on the transmission sweep; the cost-efficient option of the set "
+    "gemini-3.5-flash": "0.008 on the transmission sweep. The cost-efficient option of the set "
                         "(the name is served by Gemini 3.6 Flash since 2026-10-08: 1-way total "
                         "variation 0.027 and seen-conditional error 0.013 on Adult at n = 300)",
-    "qwen3-14b":       "0.027 seen-conditional error on Adult at n = 300, served through vLLM; "
+    "qwen3-14b":       "0.027 seen-conditional error on Adult at n = 300, served through vLLM. "
                         "the paper's primary open backbone",
     "qwen3-32b":       "0.031 seen-conditional error on Adult at n = 300 (4-bit AWQ), served "
                         "through vLLM",
@@ -296,7 +296,7 @@ def recommended_table() -> str:
     lines = ["Recommended generators (conditional error on full-dataset generation;",
              " real sample at matched n = 0.062, no-information floor = 0.152):"]
     lines += [f"  {k:<{w}}  {v}" for k, v in RECOMMENDED.items()]
-    lines.append("  An unlisted model is refused unless you pass allow_unvalidated=True; "
+    lines.append("  An unlisted model is refused unless you pass allow_unvalidated=True. "
                  "if you do, verify transmission on your own data first.")
     return "\n".join(lines)
 
@@ -308,7 +308,7 @@ def warnings_for(model: str) -> list[str]:
     if p.tier is Tier.ADEQUATE:
         out.append(
             f"{model} is ADEQUATE, not validated: measured magnitude error "
-            f"{p.magnitude_error:.3f}. Direction of relationships is reliable; absolute rates "
+            f"{p.magnitude_error:.3f}. Direction of relationships is reliable. Absolute rates "
             f"carry error of roughly this size. Do not use it for a regulated rate without "
             f"verifying transmission on your own data."
         )

@@ -1,8 +1,8 @@
-"""datasets_auto.py — register auto-configured variants of existing datasets.
+"""datasets_auto.py: register auto-configured variants of existing datasets.
 
 `run_dataset.py` resolves a spec by name, so a derived configuration has to be registered under a
 name before the normal pipeline can generate from it. Each `<name>_auto` spec is the base spec with
-its stratification and conditional hierarchy replaced by what `src/autoconfig.py` derived — nothing
+its stratification and conditional hierarchy replaced by what `src/autoconfig.py` derived: nothing
 else changes, so a comparison against the hand-tuned run isolates the configuration.
 
 The derivation spends privacy budget (`epsilon_selection`) on a query over the private data, so it
@@ -10,7 +10,7 @@ CANNOT be re-run casually and it cannot be seeded: a DP mechanism with a fixed p
 deterministic, its output distribution is a point mass, and the budget buys nothing. Deriving with a
 hardcoded seed (`AUTO_SEED = 0`) is exactly that failure.
 
-The configuration is therefore treated the same way as the DP release itself — **derived once and
+The configuration is therefore treated the same way as the DP release itself: **derived once and
 persisted as an artefact**. `get_spec("<name>_auto")` loads the stored configuration when one
 exists and only derives (and saves) a fresh one when it does not. That keeps a run reproducible
 against the configuration it actually used, without pretending the derivation is repeatable.
@@ -37,7 +37,7 @@ AUTO_N_RECORDS = 1000
 
 
 # 0 = the n_min-BLIND richness rule, i.e. size the conditional table against n_records only.
-# This looks wrong (it selects tables whose cells the release will suppress — NHANES released 4 of
+# This looks wrong (it selects tables whose cells the release will suppress: NHANES released 4 of
 # 27 cells, 77% coverage) and the n_min-aware alternative was built to "fix" it. The NHANES
 # ablation says do NOT adopt that fix as the default: the coarser, fully-covered table lost on
 # EVERY clinical metric and was worse than the shuffled-target floor on held-out relationships.

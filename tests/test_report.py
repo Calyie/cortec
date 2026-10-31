@@ -312,7 +312,7 @@ def test_results_panel_reads_each_goal_against_the_real_sample_range():
     v = dict(r.values)
     assert v["marginal fidelity"].startswith("within the real-sample range")
     assert v["downstream utility"].startswith("LR below the real-sample range (by 0.029)")
-    assert "the other students within it" in v["downstream utility"]
+    assert "the other students are within it" in v["downstream utility"]
     # a panel inside the range on every measure reads ok, and says so once
     ev = _evaluation([0.040, 0.750, 0.700, 0.700, 0], [0.042, 0.758, 0.718, 0.713, 0],
                      [0.042, 0.498, 0.538, 0.495, 0], SPREAD)

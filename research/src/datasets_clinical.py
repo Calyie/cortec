@@ -1,8 +1,8 @@
-"""datasets_clinical.py — two genuinely clinical sources, both obtainable without an application.
+"""datasets_clinical.py: two genuinely clinical sources, both obtainable without an application.
 
 Limitation 11 recorded MIMIC-III as unavailable: its credentialing (CITI training plus a data-use
 agreement) is a real barrier, and Diabetes 130 was carrying the paper's clinical validation alone.
-Diabetes 130 is hospital *administrative* data — encounters, billing categories, discharge codes —
+Diabetes 130 is hospital *administrative* data: encounters, billing categories, discharge codes,
 so a second source covering a different clinical modality strengthens the claim rather than merely
 repeating it.
 
@@ -12,14 +12,14 @@ repeating it.
               diabetes, which makes this an undiagnosed-diabetes screening task on genuine
               laboratory values rather than on billing codes.
 
-  mimic3_demo MIMIC-III Clinical Database Demo v1.4 (PhysioNet). 100 ICU patients, OPEN access —
+  mimic3_demo MIMIC-III Clinical Database Demo v1.4 (PhysioNet). 100 ICU patients, OPEN access:
               the demo subset carries no credentialing requirement. Far too small to synthesise
               under DP (roughly 80 training records), so it is included as a STRUCTURAL check
               only: it exercises the pipeline against the real MIMIC-III schema and content so the
               paper can say that honestly, rather than claiming a result the sample cannot support.
 
-Bounds and bin edges below are public clinical knowledge — adult age ranges, the WHO BMI
-categories, standard blood-pressure bands, the ADA HbA1c threshold — not quantiles of these files.
+Bounds and bin edges below are public clinical knowledge: adult age ranges, the WHO BMI
+categories, standard blood-pressure bands, the ADA HbA1c threshold: not quantiles of these files.
 """
 from __future__ import annotations
 
@@ -81,7 +81,7 @@ def nhanes_spec() -> DatasetSpec:
         # ADA diagnostic threshold: HbA1c >= 6.5% indicates diabetes.
         a1c = pd.to_numeric(raw["LBXGH"], errors="coerce")
         df["diabetes"] = np.where(a1c >= 6.5, "YES", "NO")
-        # A participant with NO HbA1c measurement is not a negative — their status is unknown, and
+        # A participant with NO HbA1c measurement is not a negative: their status is unknown, and
         # `NaN >= 6.5` is False, so the comparison above silently labels them "NO". The final
         # dropna() cannot catch it either, because the column now holds a non-null string. That
         # put 135 fabricated negatives into 3,884 records (3.5%) and diluted the reported base
@@ -110,14 +110,14 @@ def nhanes_spec() -> DatasetSpec:
         conditional_levels=[[]],
         # Held-out conditional families: relationships the release does NOT carry, used to test
         # whether the generator transmits structure beyond what it was told. These were empty, so
-        # `condHeld` printed nan on NHANES — our PRIMARY healthcare dataset — where it reads like a
+        # `condHeld` printed nan on NHANES, our PRIMARY healthcare dataset, where it reads like a
         # measurement but is an absent one. Chosen from columns autoconfig is unlikely to select
         # (it ranks by mutual information with the target, and these rank low); the evaluator now
         # warns if a family overlaps the released conditional columns.
         # Chosen for SIGNAL, not convenience: a held-out family with no conditional target
         # variation makes the floors coincide and the diagnostic powerless. Measured weighted
         # spread of P(diabetes|level) on the training split: waist_cm 0.208, bmi 0.165,
-        # education 0.163 — against sex 0.017 and income_bracket 0.028, which were the first
+        # education 0.163: against sex 0.017 and income_bracket 0.028, which were the first
         # (bad) choice. None of these is selected by autoconfig under either richness rule.
         heldout_groups=[["waist_cm"], ["bmi"], ["education"]],
         loader=load)

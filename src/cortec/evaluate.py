@@ -6,7 +6,7 @@ and the same sample with its target column permuted, the floor of data that carr
 information. Fidelity and utility are reported together in one table, because a method can score
 well on one and poorly on the other.
 
-Measures, as in the paper's head-to-head tables:
+Measures, as in the paper's tables:
 
     1-way TV   mean over columns of the total-variation distance between the table's binned
                marginals and the holdout's, on the schema's public bins (lower is better)
@@ -106,7 +106,7 @@ def evaluate(schema: Schema, tables: dict[str, pd.DataFrame], *, train: pd.DataF
              reference_draws: int = 5) -> RunRecord:
     """Score every table in `tables` (name -> DataFrame) beside a real sample of `train` and its
     permuted-target floor, both of size `n` (default: the first table's size). `holdout` is real
-    data that was not used to build the release. Returns the standard record; its first table is
+    data that was not used to build the release. Returns the standard record. Its first table is
     the paper's fidelity-and-utility layout with the two reference rows marked.
 
     `reference_draws` real samples are drawn (seeds `seed`, `seed + 1`, ...), each with its
@@ -188,6 +188,6 @@ def evaluate(schema: Schema, tables: dict[str, pd.DataFrame], *, train: pd.DataF
                  if miss and label in names]
     rec = RunRecord(tool="cortec", stage="Evaluation", title="Fidelity and utility beside real references",
                     schema=schema.name, values=values, tables=tables_out, warnings=warnings_,
-                    notes=["A single run at one size is a signal, not a claim; replicate before "
+                    notes=["A single run at one size is a signal, not a claim. Replicate before "
                            "treating a difference as stable."])
     return rec

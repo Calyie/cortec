@@ -10,7 +10,7 @@ collapses CoRTeC's behaviour back to that of an unconditioned model:
     reconciles the released statistics against its own prior and emits the prior.
 
 In the research that produced this tool, removing the conditional table changed a faithful
-transmission (slope ~1.0) into a flat line — the same output an unconditioned prompt gives. A tool
+transmission (slope ~1.0) into a flat line: the same output an unconditioned prompt gives. A tool
 that exposes the template as an editable string is a tool that can be silently broken by a
 well-meaning user, and the breakage is invisible: the pipeline still runs, still produces
 plausible rows, and is simply no longer conditioned on the data.
@@ -77,8 +77,8 @@ Rules:
 """
 
 # NOTE for anyone exposing this: it is the UNMATCHED header-only control, i.e. a standalone prompt,
-# not CoRTeC's prompt with the released arrays deleted. the two were measured and they differ —
-# TSTR-LR 0.824 unmatched against 0.792 matched on Adult, outside a +/-0.001 draw spread — so the
+# not CoRTeC's prompt with the released arrays deleted. the two were measured and they differ:
+# TSTR-LR 0.824 unmatched against 0.792 matched on Adult, outside a +/-0.001 draw spread, so the
 # choice of control is a measurable decision, not a formatting one. This template is retained for
 # the locked-prompt inventory and is not wired into generation.
 HEADER_ONLY_TEMPLATE = """\

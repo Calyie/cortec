@@ -1,5 +1,5 @@
 """
-Stage B — generation. Reads only a `Release`; never touches private data, so it is post-processing
+Stage B: generation. Reads only a `Release`; never touches private data, so it is post-processing
 and costs no privacy budget. Any number of datasets may be drawn from one release.
 
 Most of this file is guardrails rather than generation, and that is deliberate. Each check below
@@ -141,7 +141,7 @@ def batch_quotas(schema: Schema, cohort: dict, n_rows: int, rng, by_class: bool 
     """Exact per-column counts for one batch, apportioned from the released histograms: the number
     of positives from the class balance and, for every column, rows per bin or per category.
     Where the release carries class blocks the positives' counts come from the positive block and
-    the negatives' from the negative block; the batch total per column is their sum. Reads only the
+    the negatives' from the negative block. The batch total per column is their sum. Reads only the
     release, so handing the counts to the generator is post-processing. Measured on Claude Fable 5:
     a 25-row batch given these counts reproduced every one of 96 to 98 count lines exactly, where
     the plain prompt matched 59 to 72 of them."""
@@ -187,7 +187,7 @@ def batch_quotas(schema: Schema, cohort: dict, n_rows: int, rng, by_class: bool 
 
 
 def cohort_quota_targets(schema: Schema, cohort: dict, n_rows: int, rng, by_class: bool = False) -> dict:
-    """Integer targets for a whole cohort's n_rows (see batch_quotas); batches then ask for what
+    """Integer targets for a whole cohort's n_rows (see batch_quotas). Batches then ask for what
     the cohort still owes, so a batch returning more or fewer valid rows than asked cannot break
     the cohort's totals. With `by_class` the targets are also kept per outcome."""
     q = batch_quotas(schema, cohort, n_rows, rng, by_class=by_class)
@@ -409,7 +409,7 @@ def positives_for_cell(rate: float, n_rows: int, rng) -> int:
     """How many of `n_rows` should carry the positive label, given a released `rate`.
 
     Uses **stochastic rounding**: floor(rate*n) plus one more with probability equal to the
-    fractional part. Deterministic rounding would bias every small cell in the same direction —
+    fractional part. Deterministic rounding would bias every small cell in the same direction:
     round-half-up turns a released 0.554 over 1 row into 1.000 every single time, which is exactly
     the saturation this path exists to remove. Stochastic rounding leaves the expected rate equal
     to the released rate, so the error is bounded by one row and averages out across draws rather
@@ -517,7 +517,7 @@ _FATAL_MARKERS = (
 
 class RateLimitedError(RuntimeError):
     """The vendor asked us to wait (429 / resource exhausted / overloaded). Waited out with
-    backoff by `Generator._call`; it never counts as a failed call unless it persists."""
+    backoff by `Generator._call`. It never counts as a failed call unless it persists."""
 
 
 _RATE_LIMIT_MARKERS = ("429", "resource_exhausted", "resource exhausted", "rate limit", "rate_limit",
@@ -538,7 +538,7 @@ def _classify_api_error(vendor: str, e: Exception) -> Exception:
                 f"{vendor} refused the call for a reason that will not resolve by retrying "
                 f"({marker!r}): {str(e)[:300]}\n"
                 f"  Nothing further was attempted and no budget was spent retrying. Clear the "
-                f"account condition and re-run; the DP release is unchanged, so resuming costs "
+                f"account condition and re-run. The DP release is unchanged, so resuming costs "
                 f"no additional privacy budget."
             )
     return e
@@ -657,7 +657,7 @@ class Generator:
         # exercised against the SDKs' real client classes with the transport mocked (see tests);
         # they have NOT been run against a live enterprise account, and the README says so.
         if surface not in SURFACES:
-            raise GenerationError(f"unknown surface {surface!r}; expected one of {sorted(SURFACES)}")
+            raise GenerationError(f"unknown surface {surface!r}. Expected one of {sorted(SURFACES)}")
         if SURFACES[surface] and SURFACES[surface] != backend:
             raise GenerationError(
                 f"surface={surface!r} serves the {SURFACES[surface]!r} backend, not {backend!r}. "
@@ -668,7 +668,7 @@ class Generator:
             self.stats.warnings.append(
                 f"surface='public': {backend} is being reached through the vendor's PUBLIC developer "
                 f"API. That is the surface the paper's measurements used and it is NOT the "
-                f"recommended deployment for regulated data -- the weights are the same, the "
+                f"recommended deployment for regulated data. The weights are the same, the "
                 f"contractual envelope (BAA, residency, private networking, no training on inputs) "
                 f"is not. Use surface='bedrock' | 'azure' | 'vertex' inside your own account.")
 
@@ -713,7 +713,7 @@ class Generator:
             if surface == "vertex" and not os.environ.get("GOOGLE_CLOUD_PROJECT"):
                 raise GenerationError(
                     "surface='vertex' needs GOOGLE_CLOUD_PROJECT in the environment (and "
-                    "GOOGLE_CLOUD_LOCATION, default 'global'); credentials come from Application "
+                    "GOOGLE_CLOUD_LOCATION, default 'global'). Credentials come from Application "
                     "Default Credentials.")
             genai = _sdk("google.genai", "gemini")
             from google.genai import types as _gt
@@ -728,7 +728,7 @@ class Generator:
                 if not project:
                     raise GenerationError(
                         "surface='vertex' needs GOOGLE_CLOUD_PROJECT (and GOOGLE_CLOUD_LOCATION, "
-                        "default 'global') in the environment; credentials come from "
+                        "default 'global') in the environment. Credentials come from "
                         "Application Default Credentials.")
                 # The current Gemini models are served on Vertex from the `global` location; a
                 # regional default returned 404 for every region tried, so `global` is the default
@@ -744,7 +744,7 @@ class Generator:
             if bound is not None and getattr(bound, "timeout", None) is not None:
                 if getattr(bound.timeout, "read", 1) is None:
                     raise GenerationError(
-                        "the Gemini client did not accept a request timeout; a hung call would "
+                        "the Gemini client did not accept a request timeout. A hung call would "
                         "block forever. Upgrade google-genai or pass request_timeout explicitly.")
         elif backend == "ollama":
             import httpx
@@ -754,7 +754,7 @@ class Generator:
             self._host_override = None
         elif backend != "mock":
             raise GenerationError(
-                f"unknown backend {backend!r}; expected one of "
+                f"unknown backend {backend!r}. Expected one of "
                 f"'anthropic', 'openai', 'gemini', 'ollama', 'mock'")
 
     # ── prompt safety ───────────────────────────────────────────────────────────────
@@ -838,7 +838,7 @@ class Generator:
                         f"{self.model} declined to answer (stop_reason=refusal). This is not a "
                         f"token-budget problem and raising max_output_tokens will not fix it. It "
                         f"usually means a cell asked for very few rows, or the schema resembles "
-                        f"personal records closely enough to trip a safety filter; the prompt "
+                        f"personal records closely enough to trip a safety filter. The prompt "
                         f"carries only DP-released statistics, never a private record. Try a "
                         f"coarser conditional level so each cell asks for more rows, or a "
                         f"different generator."
@@ -846,13 +846,13 @@ class Generator:
                 raise EmptyContentError(
                     f"{self.model} returned no text content (stop_reason={stop}). For a reasoning "
                     f"model this usually means the output budget went entirely to hidden "
-                    f"reasoning; raise max_output_tokens."
+                    f"reasoning. Raise max_output_tokens."
                 )
             return text
 
         if self.backend == "openai":
             kw: dict = {}
-            # This vendor's "low" is NOT low — only "minimal" reaches zero reasoning tokens. We
+            # This vendor's "low" is NOT low: only "minimal" reaches zero reasoning tokens. We
             # therefore name the suppressed setting explicitly and leave the default alone when
             # reasoning is wanted, rather than passing a value that silently half-suppresses it.
             if self.reasoning == "suppressed":
@@ -884,7 +884,7 @@ class Generator:
             cfg: dict = {"system_instruction": prompts.system_prompt()}
             if self.reasoning == "suppressed":
                 # This vendor rejects a budget of 0 outright ("only works in thinking mode"), and
-                # in our measurements did not honour a small budget either — so suppression here
+                # in our measurements did not honour a small budget either, so suppression here
                 # is best-effort and is reported as such rather than assumed.
                 cfg["thinking_config"] = _gt.ThinkingConfig(thinking_budget=128)
             try:
@@ -947,7 +947,7 @@ class Generator:
             raise EmptyContentError(
                 f"{self.model} returned empty content (done_reason="
                 f"{d.get('done_reason')!r}, {thinking} chars of hidden reasoning). The output "
-                f"budget was consumed before any CSV was produced; raise max_output_tokens."
+                f"budget was consumed before any CSV was produced. Raise max_output_tokens."
             )
         return content
 
@@ -1174,7 +1174,7 @@ class Generator:
             raise GenerationError(
                 f"{s.rows} usable rows returned against {s.rows_requested} requested "
                 f"({s.yield_rate:.0%} yield, threshold {self.MIN_YIELD_RATE:.0%}). Calls are "
-                f"SUCCEEDING but rows are being dropped — check the schema before spending more.")
+                f"SUCCEEDING but rows are being dropped. Check the schema before spending more.")
 
     # ── main entry point ────────────────────────────────────────────────────────────
 
@@ -1193,7 +1193,7 @@ class Generator:
                 f"count that missed the 'exactly k' requested by more than one row "
                 f"({s.positives_emitted} emitted against {s.positives_requested} requested in total). "
                 f"The model is ASKED for the count, not forced to it, so verify the per-cell rates of "
-                f"this output against the release before relying on them; the tool never relabels "
+                f"this output against the release before relying on them. The tool never relabels "
                 f"rows to hide the miss.")
         if self.reasoning != "on" or not s.calls:
             return
@@ -1204,11 +1204,11 @@ class Generator:
                 f"engage. Measured effect of running without it: conditional error 3.8x worse, to "
                 f"below a no-information control. Verify conditional fidelity before relying on "
                 f"this output. (Some vendors do not report the count at all, in which case this "
-                f"warning is not evidence of a problem -- check the vendor's usage fields.)")
+                f"warning is not evidence of a problem. Check the vendor's usage fields.)")
         elif s.calls_without_reasoning:
             s.warnings.append(
                 f"reasoning was intermittent: {s.calls_without_reasoning} of {s.calls} calls "
-                f"showed no reasoning -- no reported tokens AND no reasoning block. Those calls "
+                f"showed no reasoning: no reported tokens AND no reasoning block. Those calls "
                 f"carry the suppressed configuration's fidelity, so check conditional fidelity "
                 f"before relying on this output.")
         if s.calls_reasoning_unmeasured:
@@ -1216,7 +1216,7 @@ class Generator:
                 f"reasoning could NOT be verified on {s.calls_reasoning_unmeasured} of {s.calls} "
                 f"calls: this backend returned no reasoning-token count and no reasoning block, "
                 f"so those calls are unmeasured rather than known-bad. Do not read this as "
-                f"reasoning being off -- and do not read it as reasoning being on. If you need "
+                f"reasoning being off, and do not read it as reasoning being on. If you need "
                 f"the guarantee, verify conditional fidelity against a held-out sample directly.")
 
     def generate_selected(self, release: Release, n_rows: int, *, pool_factor: int = 3,
@@ -1224,15 +1224,15 @@ class Generator:
                           sub_bin: str = "release") -> pd.DataFrame:
         """Generate `pool_factor * n_rows` records cohort-wise, then return the `n_rows` of them
         whose cell counts match the release (see `cortec.select`). The pool is post-processing of
-        the release, so the selection costs no privacy budget; it costs `pool_factor` times the
+        the release, so the selection costs no privacy budget. It costs `pool_factor` times the
         generation spend. Measured during development (design notes, section 4; Adult, three pools): a random 300
-        of the pool carries 1-way marginal error 0.050 against real data; the selected 300 carry
+        of the pool carries 1-way marginal error 0.050 against real data. The selected 300 carry
         0.026, below a 300-record real sample's 0.043 and at MST's level, with the three
         downstream students unchanged or up by at most 0.017 AUC.
 
         `sub_bin="release"` (default) then makes every numeric value's position inside its bin
         the release's own in the cohorts that carry class-conditional blocks
-        (`cortec.select.release_subbin_values`); `sub_bin="generator"` keeps the generator's."""
+        (`cortec.select.release_subbin_values`). `sub_bin="generator"` keeps the generator's."""
         from .select import select_to_release, release_subbin_values
         if pool_factor < 1:
             raise GenerationError("pool_factor must be at least 1")
@@ -1311,12 +1311,12 @@ class Generator:
             self.stats.warnings.append(
                 f"budget cap reached: ${self.stats.spend_usd:.2f} of ${self.budget_usd:.2f} after "
                 f"{self.stats.calls} calls. This output holds the {self.stats.rows} rows completed "
-                f"within the budget, not the {total} requested; raise budget_usd, or use a cheaper "
+                f"within the budget, not the {total} requested. Raise budget_usd, or use a cheaper "
                 f"validated model, for the full request.")
         if not frames:
             raise GenerationError(
                 f"the budget of ${self.budget_usd:.2f} was spent (${self.stats.spend_usd:.2f} over "
-                f"{self.stats.calls} calls) before any usable rows were produced; raise budget_usd"
+                f"{self.stats.calls} calls) before any usable rows were produced. Raise budget_usd"
                 if self.stats.budget_capped else "no usable rows were generated")
         self._assert_reasoning_fired()
         return pd.concat(frames, ignore_index=True)
@@ -1331,7 +1331,7 @@ class Generator:
         That caps how finely any single cell's rate can be expressed: on UCI Adult with 12 rows per
         call, `education = Masters` receives 0.65 rows per call and can only emit 0% or 100%, so a
         released rate of 0.554 rounds to 1.000 on every call. Measured end to end this produced
-        MAE 0.253 with slope 1.64 — an apparent "rates above 0.24 saturate" threshold that was
+        MAE 0.253 with slope 1.64: an apparent "rates above 0.24 saturate" threshold that was
         really "cells rarer than one row per call cannot express their rate".
 
         Generating per cell removes the coupling. Each call covers exactly one cell, the row count
@@ -1339,7 +1339,7 @@ class Generator:
         a probability, so the model has no discretion over the target column at all. Residual error
         is bounded by the stochastic rounding of one row.
 
-        Costs more calls than `generate()` for the same output size; that is the trade.
+        Costs more calls than `generate()` for the same output size. That is the trade.
         """
         if not release.conditional_levels:
             raise GenerationError("cell-wise generation needs a released conditional table")
@@ -1428,7 +1428,7 @@ class Generator:
         alloc = _largest_remainder(support / support.sum(), n_rows)
         total = int(sum(alloc))
         # Cell-wise generation needs n_rows >> len(cells). At 75 rows over 54 cells every cell gets
-        # 1-2 rows, the prompt asks for a single record at a time, and parsing collapses — a 7B
+        # 1-2 rows, the prompt asks for a single record at a time, and parsing collapses: a 7B
         # model aborted at 0% parse in exactly this regime. Warn rather than let the run fail
         # halfway with an abort that looks like a model-capability result.
         _per = n_rows / max(len(cells), 1)
@@ -1518,12 +1518,12 @@ class Generator:
             self.stats.warnings.append(
                 f"budget cap reached: ${self.stats.spend_usd:.2f} of ${self.budget_usd:.2f} after "
                 f"{self.stats.calls} calls. This output holds the {self.stats.rows} rows completed "
-                f"within the budget, not the {total} requested; raise budget_usd, or use a cheaper "
+                f"within the budget, not the {total} requested. Raise budget_usd, or use a cheaper "
                 f"validated model, for the full request.")
         if not frames:
             raise GenerationError(
                 f"the budget of ${self.budget_usd:.2f} was spent (${self.stats.spend_usd:.2f} over "
-                f"{self.stats.calls} calls) before any usable rows were produced; raise budget_usd"
+                f"{self.stats.calls} calls) before any usable rows were produced. Raise budget_usd"
                 if self.stats.budget_capped else "no usable rows were generated")
         self._assert_reasoning_fired()
         return pd.concat(frames, ignore_index=True)

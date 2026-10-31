@@ -95,18 +95,18 @@ def _is_refusal(cls) -> bool:
 # Standard vocabulary (differential privacy, Laplace noise, AUC, the three classifiers) is not
 # repeated. `cortec terms` prints the list; `cortec <term>` prints one entry.
 TERMS_CORTEC = [
-    ("epsilon", "the differential-privacy budget; smaller is stronger. `epsilon declared` is what "
-                "you asked for and `epsilon accounted` what the ledger charged; the two are equal "
+    ("epsilon", "the differential-privacy budget. Smaller is stronger. `epsilon declared` is what "
+                "you asked for and `epsilon accounted` what the ledger charged. The two are equal "
                 "when the run is within budget"),
     ("privacy unit", "what one epsilon protects: one row, or one person when `max_rows_per_person` "
-                     "is declared; a person who contributes k rows receives k times epsilon"),
-    ("n_min", "the smallest cohort or cell that is released; smaller ones are suppressed, because "
+                     "is declared. A person who contributes k rows receives k times epsilon"),
+    ("n_min", "the smallest cohort or cell that is released. Smaller ones are suppressed, because "
               "a rate over fewer records is mostly its own noise"),
-    ("cohort", "a group of records formed by a public rule over one column (a band of age, say); "
+    ("cohort", "a group of records formed by a public rule over one column (a band of age, say). "
                "each cohort has its own released histograms"),
     ("conditional table, level, cell", "P(target | cell): the target rate in each cell of a "
                                        "partition of the records by one or more columns. Level 0 "
-                                       "is the coarsest partition; the finest level has the most "
+                                       "is the coarsest partition. The finest level has the most "
                                        "cells"),
     ("support, released size", "the number of private records in a cell or cohort, with noise "
                                "added and charged to the budget"),
@@ -115,7 +115,7 @@ TERMS_CORTEC = [
                           "each look like"),
     ("queries, groups, partitions", "every released statistic is a query charged to the ledger. "
                                     "Queries over disjoint parts of the data (partitions) share "
-                                    "one charge; the groups add up"),
+                                    "one charge. The groups add up"),
     ("yield", "rows kept divided by rows requested from the model. Rows outside the schema's "
               "bounds or carrying an undeclared category are dropped and counted, never kept"),
     ("positive rate", "the share of rows whose target is the positive label"),
@@ -127,11 +127,11 @@ TERMS_CORTEC = [
     ("utility transmission bound", "Stage C: for each released cell, a differentially private "
                                    "estimate of the private target rate and a bound on the gap "
                                    "between it and the synthetic rate. The bounds hold over every "
-                                   "cell at once with probability 1 - alpha. It bounds utility; it "
+                                   "cell at once with probability 1 - alpha. It bounds utility. It "
                                    "is not a privacy audit"),
     ("tolerance", "the largest per-cell gap you accept. By default it is derived from the release: the "
                   "noise half-width plus half the largest gap between a released cell rate and the released "
-                  "base rate, so the permuted floor cannot pass at any sample size; pass a number to "
+                  "base rate, so the permuted floor cannot pass at any sample size. Pass a number to "
                   "override. A table is within tolerance when its worst bound is at or below it. No "
                   "verdict is issued while a released cell holds fewer than 20 synthetic rows"),
     ("alpha", "the bound holds over every cell with probability at least 1 - alpha; 0.05 gives "
@@ -147,23 +147,23 @@ TERMS_CORTEC = [
     ("covered, uncovered", "a released cell is covered when the synthetic table has rows in it. "
                            "An uncovered cell scores the trivial bound 1.0, so a bound cannot be "
                            "earned by covering a convenient subset"),
-    ("thin", "a covered cell with fewer than 20 synthetic rows; its bound rests on few rows"),
-    ("mean bound, worst bound", "the average and the largest per-cell bound; the verdict uses "
+    ("thin", "a covered cell with fewer than 20 synthetic rows. Its bound rests on few rows"),
+    ("mean bound, worst bound", "the average and the largest per-cell bound. The verdict uses "
                                 "the worst"),
     ("1-way TV", "for each column, the total-variation distance between the table's histogram and "
                  "the real holdout's on the public bins, averaged over the columns. 0 is "
-                 "identical; lower is better"),
+                 "identical. Lower is better"),
     ("TSTR-LR, TSTR-RF, TSTR-GBM", "train on synthetic, test on real: a logistic regression, a "
                                    "random forest and a gradient-boosting classifier trained on "
                                    "the table and scored by AUC on the real holdout. Higher is "
-                                   "better; read against the ceiling and floor rows"),
+                                   "better. Read against the ceiling and floor rows"),
     ("absent categories", "declared categories that never appear in the table: a "
                           "representativeness failure that no aggregate measure shows"),
     ("reference rows", "the ceiling and floor rows of the evaluation table, printed in grey. Read "
                        "every other row against them, not against a threshold"),
     ("reference draws, reference spread", "the evaluation scores several real samples of the "
                                            "synthetic table's size (five by default), each with a "
-                                           "permuted copy; the reference rows carry their means and "
+                                           "permuted copy. The reference rows carry their means and "
                                            "the `reference spread` table their lowest and highest "
                                            "values. That range is what real data of this size spans "
                                            "on this holdout"),
@@ -172,7 +172,7 @@ TERMS_CORTEC = [
                                "verdict, the privacy spent and the cost. A reading says where the "
                                "synthetic number lies: within the range, beyond every real sample, or "
                                "outside it by how much. Nothing is passed or failed against a threshold"),
-    ("gap", "synthetic minus real sample on one measure; negative on an AUC means the synthetic-"
+    ("gap", "synthetic minus real sample on one measure. Negative on an AUC means the synthetic-"
             "trained student scored lower"),
     ("share of real-sample utility", "(synthetic - permuted) / (real sample - permuted) on one "
                                      "student: the part of a real sample's utility above the "
@@ -274,7 +274,7 @@ def overview(package, *, tool: str, module: str, command: str, run_order, groups
             (f"{command} terms", "what each word in the output means (tolerance, ceiling ...)"),
             (f"{command} --help", f"this page (or: python -m {module})")]
     if example:
-        more.append((f"python {example}", "a runnable tour; no key and no data needed"))
+        more.append((f"python {example}", "a runnable tour. No key and no data needed"))
     more.append((readme, "the manual: each step, troubleshooting"))
     lines += ["", paint("  more", "key"), kv_block(more, indent=4)]
     return "\n".join(lines)
@@ -333,8 +333,8 @@ def detail(package, name: str, *, tool: str, command: str) -> str | None:
 def main(package, argv, *, tool: str, module: str, command: str, run_order, groups, readme: str,
          example: str | None = None, subcommands: dict | None = None, terms=None) -> int:
     """Behind the `cortec` and `cortec-hybrid` commands and `python -m <module>`: a subcommand
-    (`run`) is dispatched with the rest of the arguments; `--help`, `-h` or no argument prints
-    the overview; `terms` prints the glossary; a public name prints its page, a term its entry;
+    (`run`) is dispatched with the rest of the arguments. `--help`, `-h` or no argument prints
+    the overview. `terms` prints the glossary. A public name prints its page, a term its entry;
     an unknown name lists the public names and returns 2."""
     if argv and subcommands and argv[0] in subcommands:
         return int(subcommands[argv[0]](argv[1:]) or 0)

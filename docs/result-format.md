@@ -22,9 +22,9 @@ rec = show(correct(schema, private_df, synthetic_df, columns=("age",), epsilon=0
 files = rec.save("results/run-2026-09-24", "stage_c")   # {name: path}
 ```
 
-`record(obj, ...)` builds the record without printing. `RunRecord.from_json(path)` reads one back.
-Colour is used only on a terminal; `NO_COLOR` or `CORTEC_COLOR=0` disables it and `CORTEC_COLOR=1`
-forces it. The exported files never carry colour.
+`record(obj, ...)` builds the record without printing, and `RunRecord.from_json(path)` reads one
+back. Colour is used only on a terminal. `NO_COLOR` or `CORTEC_COLOR=0` turns it off, and
+`CORTEC_COLOR=1` forces it on. The exported files never carry colour.
 
 ## Fields
 
@@ -66,29 +66,29 @@ the paper's convention, and integers with a thousands separator.
 | Results | `downstream utility result` | student, synthetic AUC, real sample, permuted, gap, share of real-sample utility; one row per student; the note carries the readings |
 | Correction | `released conditional table` | cell, rate, support |
 
-The evaluation table is the paper's head-to-head table layout. A synthetic row is read against the two
-reference rows, never against a threshold: the real sample is the ceiling at that size, and the
-permuted floor is what data with no usable target information scores. The reference rows are means
-over `reference_draws` real samples (five by default), and `reference spread` holds the lowest and
-highest value of each measure over those samples: the range real data of that size spans on that
-holdout.
+The evaluation table uses the layout of the paper's main results table. A synthetic row is read
+against the two reference rows, never against a threshold. The real sample is the ceiling at that
+size, and the shuffled floor is what data with no usable target information scores. The reference
+rows are means over `reference_draws` real samples (five by default). `reference spread` holds the
+lowest and highest value of each measure across those samples, which is the range that real data of
+that size spans on that holdout.
 
 The results record (`record_results(evaluation=..., bound=..., generation=..., release=...)`) is
-built from the other records, so it can be rebuilt from their JSON files. Its values block carries
-one line each for marginal fidelity and downstream utility, the Stage C verdict, the privacy spent and the cost; its two tables place every
-synthetic number against the real-sample range (within it, beyond every real sample, or outside it
-by how much) and give the share of real-sample utility, (synthetic - permuted) / (real sample -
-permuted), per student. Its verdict is the one-sentence headline of the run, `ok` when every
-measure reads within or beyond the range and `warning` otherwise; it is a reading at one draw, not
-a pass or a fail. `cortec run` prints it last and writes it as `RESULTS.md` beside `results.json`.
-The results record has no figure.
+built from the other records, so it can be rebuilt from their JSON files. Its values block has one
+line each for marginal fidelity, downstream utility, the Stage C verdict, the privacy spent and the
+cost. Its two tables place every synthetic number against the real-sample range (within it, beyond
+every real sample, or outside it by a stated amount), and give each student's share of real-sample
+utility, (synthetic - shuffled) / (real sample - shuffled). Its verdict is the run's one-sentence
+headline. It is `ok` when every measure reads within or beyond the range and `warning` otherwise, and
+it is a reading at one draw, not a pass or a fail. `cortec run` prints it last and writes it as
+`RESULTS.md` beside `results.json`. The results record has no figure.
 
 ## Figures
 
-`rec.save()` writes `<stem>.png` for Stage A (cohort rates and the finest conditional level),
-Stage C (the bound per condition against the tolerance), the evaluation (fidelity and utility
-beside the references) and the correction (conditional error before and after). Stage B has no
-figure. The style is the paper's: `cortec.plots.paper_rcparams()` returns the same rc parameters
-the paper's figure script uses, and the palette is the paper's validated categorical palette,
-assigned in fixed order. Reference rows are drawn in grey, results in blue, and the tolerance in
-the paper's reference-line colour.
+`rec.save()` writes `<stem>.png` for Stage A (cohort rates and the finest conditional level), Stage C
+(the bound for each condition against the tolerance), the evaluation (fidelity and utility beside
+the references) and the correction (conditional error before and after). Stage B has no figure. The
+style is the paper's. `cortec.plots.paper_rcparams()` returns the plotting parameters the paper's
+figure script uses, and the palette is the paper's checked categorical palette, assigned in a fixed
+order. Reference rows are drawn in grey, results in blue, and the tolerance in the paper's
+reference-line colour.
