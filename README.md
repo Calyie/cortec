@@ -39,8 +39,10 @@ model, even one behind an interface the institution does not control.
   alone comes from the selection step, not from the model.
 - **What the fixed workload costs.** The release spends its budget on the conditional rates a deployment names. This
   costs accuracy on pairs of columns, which an adaptive workload such as AIM's fits more closely. On utility, the
-  release reaches the reference AIM in five of six dataset-size settings. Our draws are at most 1,000 rows. CoRTeC is
-  meant to sit beside the marginal methods, so choose whichever fits your deployment.
+  release reaches the reference AIM in five of six dataset-size settings. Under the protocols of three recent DP
+  generators (DP-LLMTGen, DP-2Stage and Tab-PE), its utility is within one percentage point of each method's published
+  result or above it. Our draws are at most 1,000 rows. CoRTeC is meant to sit beside the marginal methods, so choose
+  whichever fits your deployment.
 - **The privacy architecture holds in every test.** One release serves any number of draws, and the backbone can be
   replaced at no privacy cost. The strongest membership attack on any CoRTeC configuration reaches an advantage of
   0.02 to 0.05 against the 0.762 the budget permits. No synthetic row copies a training row. The part of the Adult
