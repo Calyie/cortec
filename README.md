@@ -4,11 +4,11 @@
 
 ![The pipeline](paper/figures/fig01_pipeline.png)
 
-We propose CoRTeC, a way to share synthetic tabular data under differential privacy. CoRTeC spends the privacy budget
-once on a small release of noisy counts designed for training a classifier. For each cohort of the data the release
-gives the cohort's size, its class balance, a histogram of every attribute for each outcome class and the outcome rate
-in a set of non-overlapping cells. A reviewer can check every one of these numbers before the release leaves the
-institution.
+Hospitals and other institutions want to share synthetic versions of their tables without exposing the people in them.
+We propose CoRTeC, a method that does this under differential privacy. CoRTeC spends the privacy budget once on a
+small release of noisy counts designed for training a classifier. For each cohort of the data the release gives the
+cohort's size, its class balance, a histogram of every attribute for each outcome class and the outcome rate in a set
+of non-overlapping cells. A reviewer can check every one of these numbers before the release leaves the institution.
 
 Everything after the release is post-processing, so it costs no further privacy. A maximum-entropy decoder can turn
 the counts into rows with no language model at all. A frozen language model can do the same. It reads only the release
