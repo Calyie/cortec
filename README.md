@@ -149,13 +149,6 @@ configuration are deposited with the paper's Zenodo record (DOI 10.5281/zenodo.2
 - **Endpoint.** The guarantee does not depend on the endpoint, but the paper's measurements used the public developer
   APIs and self-hosted models, not the enterprise surfaces recommended above.
 
-## AI use
-
-Language models appear in this work as the objects of study: they are the backbones named in the paper's tables.
-Language-model assistants were also used to draft and edit the text and the code in this repository. Every experiment
-was designed, run and checked by the author, and every number in the documents was produced by the described pipeline
-from stored result files.
-
 ## Citation and licence
 
 See [`CITATION.cff`](CITATION.cff). The licence is Apache-2.0 (see [`LICENSE`](LICENSE)).
