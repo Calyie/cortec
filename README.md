@@ -28,9 +28,9 @@ model, even one behind an interface the institution does not control.
 - **The release on its own is enough to train useful models, with no language model.** At ε = 2 with 300 and 1,000
   rows, we decode the auto-configured release with the maximum-entropy model and the selection step (`cortec decode`).
   Over three splits it trains every student classifier to within 0.02 AUC of a real sample of the same size on UCI
-  Adult. After the selection step the decoded rows carry the conditional rates the release names more closely than
-  such a sample does. On NHANES and bank marketing the gap to a real sample is larger, reaching 0.07 AUC on the
-  medical dataset at 300 rows.
+  Adult. With the fixed cohort rule, the decoded rows carry the conditional rates the release names more closely
+  than such a sample does, once they pass through the selection step. On NHANES and bank marketing the gap to a real
+  sample is larger, reaching 0.07 AUC on the medical dataset at 300 rows.
 - **The language model's contribution comes from the column names.** It repairs pairs of columns it recognises and
   invents links between columns that are nearly independent. When every name is replaced by a neutral token it loses
   that advantage. Without the release it recites the public file. Most of the gain over the plain decoder comes from
