@@ -26,10 +26,14 @@ synthesisers pay once and then sample for free. What this package adds is its ar
 budget is spent once on a small release. The model never sees a row, every draw is post-processing,
 and the model can be changed at no privacy cost.
 
-**Do not use an unconditioned language model** for any regulated quantity. When asked for synthetic
-hospital records with no conditioning, a frontier model reported a 30-day readmission rate of 98.5%
-for a group whose true rate was 21.4%. It reported the same 98.5% whatever the private data said. No
-rank-based utility metric reveals that, because the ordering is right and only the size is wrong.
+**Do not use an unconditioned language model** for any regulated quantity. In one development
+measurement we asked Claude Fable 5 for 300 synthetic diabetic hospital encounters from the column
+names alone, with no release and no private data. Of the 66 generated patients with two or more
+earlier inpatient stays, 65 were readmitted within 30 days, a rate of 98.5%. In the public Diabetes
+130-US Hospitals file (101,766 real encounters), the rate for that group is 21.4%, against 11.2% for
+all patients. Because the model never saw the data, its 98.5% cannot change whatever the private
+table says. No rank-based utility metric reveals that, because the ordering is right and only the
+size is wrong.
 
 ## 2. How close to real data it gets
 
@@ -399,12 +403,12 @@ relationship-by-native-country hierarchy instead. The reference AIM reads 0.052 
 at 0.847, 0.882 and 0.876. The release's single columns are therefore closer to the private table
 than AIM's at both sizes, and its students reach AIM's. AIM fits pairs more closely at the larger
 size only. Its conditional cells are not compared. The evaluator's seen bands are the fixed rule's
-cohorts, and two of its three held-out families are columns this release conditions on. On the one
-family that shares no column with its conditioning (workclass by race), it is closer than AIM at
-both sizes (0.043 against 0.061 at n = 300 and 0.020 against 0.036 at n = 1,000). These are the
-"auto-configured" rows of the paper's Table 3 and Appendix E.2, beside the rows of the schema's own
-cohort rule. The path spends no budget and needs no key. The `pgm` extra installs Private-PGM and
-JAX.
+cohorts, and two of its three held-out families are columns this release conditions on. One held-out
+family shares no column with its conditioning: the income rate by workclass and race. On that family
+its conditional total variation, averaged over the three splits, is 0.043 against AIM's 0.061 at n =
+300 and 0.020 against 0.036 at n = 1,000 (paper, Appendix E.2). These are the "auto-configured" rows
+of the paper's Table 3 and Appendix E.2, beside the rows of the schema's own cohort rule. The path
+spends no budget and needs no key. The `pgm` extra installs Private-PGM and JAX.
 
 **Capability improves single columns and formatting, not utility.** We decoded one Adult release
 through Qwen2.5-7B, Qwen3-8B, Qwen3-14B, Qwen3-32B (4-bit AWQ) and Gemini with the same prompts and
