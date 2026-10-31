@@ -1,4 +1,4 @@
-"""The decoder-with-selection control of the paper (Table 3, Section 6).
+"""CoRTeC with the maximum-entropy decoder, as run for the paper (Table 3, Section 5.2).
 
 The maximum-entropy decoder is sampled at pool_factor times the requested size, each pool is passed through
 CoRTeC-Select (Algorithm 2: rake, refine, the sub-bin rule), integer columns are floored under the integer rule,

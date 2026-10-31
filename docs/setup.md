@@ -419,9 +419,9 @@ synthetic = decode_release(schema, release, n_rows=5000, pool_factor=3)   # no m
 ```
 
 or `cortec decode --schema my_schema.py --release results/<name>/release.json --n-rows 5000`. In the
-paper this path is the decoder-with-selection control (Table 3). On Adult at ε = 2 and n = 300 it
-reads 0.033 on single columns and 0.014 on the conditionals the release names. This matches the best
-language-model configuration. Its students score 0.824, 0.866 and 0.862, above every language-model
+paper this path is the configuration labelled "CoRTeC, maximum-entropy decoder" (Table 3). On Adult
+at ε = 2 and n = 300 it reads 0.033 on single columns and 0.014 on the conditionals the release
+names. This is close to the best language-model configuration (Gemini: 0.027 and 0.013). Its students score 0.824, 0.866 and 0.862, above every language-model
 configuration (one split, three draws). Beyond this, a language model improves only the pairs it
 recognises from the column names and adds nothing to aggregate utility (design notes, section 11).
 Decode this way first. Add a model only where you need that improvement on pairs and only for a
@@ -504,16 +504,16 @@ Nothing in the package compares a number with a threshold.
 output is within 0.025 AUC of the same student trained on a real sample of the same size. That holds
 on an open model (Qwen3-14B: 0.807, 0.862 and 0.833 against the sample's 0.830, 0.870 and 0.840) and
 on a served one (Gemini: 0.805, 0.863 and 0.838). The seen-conditional error is a fifth of the
-sample's. Two things are worth knowing before you read your own panel. First, most of that result
-comes from the release. Decoded with no language model at all, using the maximum-entropy table that
-fits its counts, the release trains students within 0.012 AUC of the package's output. What the
+sample's on Gemini and under half of it on Qwen3-14B. Two things are worth knowing before you read your own panel. First, most of that result
+comes from the release. Decoded with no language model and no selection step, using the
+maximum-entropy table that fits its counts, the release trains students within 0.012 AUC of the
+language-model output. What the
 language model adds comes from the column names. When every name is replaced by a neutral token, its
 advantage on pairs and on utility disappears. On a schema the model does not know,
 expect the release's own result. Second, the reference AIM (fitted the way its authors fit it)
-fits pairs of columns more closely. At n = 1,000 it also scores higher on utility. The package is
-level with it on
-single columns, and on Adult it carries the conditional rates the release names more closely. On a
-clinical survey (NHANES) the package's students were 0.07 to 0.10 AUC below a real sample's. The
+fits pairs of columns more closely than the language-model output. At n = 1,000 it also scores
+higher on utility. At n = 300 the language-model output is level with it on single columns, and on Adult it carries the conditional rates the release names more closely. On a
+clinical survey (NHANES) the language-model students were 0.07 to 0.10 AUC below a real sample's. The
 model-free decoding of the same release scored higher than they did. Do not assume parity. Measure
 it on your own data against a real sample of the same size. Read the conditional measures beside the
 aggregate ones. The design notes carry the full measurements.

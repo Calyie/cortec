@@ -5,9 +5,9 @@ maximum-entropy one assumes nothing the release did not say. Private-PGM (the es
 use) finds it from the released counts and their noise scales alone. This module fits that table,
 samples a pool of `pool_factor * n_rows` records from it, and returns the `n_rows` of them that the
 selection step (`cortec.select.select_to_release`) rakes to the released cells. It reads the release
-and the public schema only: post-processing, no privacy cost, no model, CPU only. It is the paper's
-decoder-with-selection control (Table 3), where it matched the best language-model arm on single
-columns and on the conditionals the release names.
+and the public schema only: post-processing, no privacy cost, no model, CPU only. In the paper it is
+the configuration labelled "CoRTeC, maximum-entropy decoder" (Table 3). There it came close to the
+best language-model configuration on single columns and on the conditionals the release names.
 
 Needs the optional dependency: `pip install 'cortec[pgm]'` (private-pgm's `mbi` 1.1, with JAX).
 """

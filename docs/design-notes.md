@@ -35,12 +35,13 @@ rank-based utility metric reveals that, because the ordering is right and only t
 
 This is the number people usually adopt the method for, so here is its boundary rather than its best
 case. On UCI Adult at ε = 2 and n = 300 (the paper's Table 3, seed 42, three draws), every student
-trained on the package's output is within 0.025 AUC of the same student trained on a real sample of
-the same size. The students score 0.807, 0.862 and 0.833 on Qwen3-14B and 0.805, 0.863 and 0.838 on
-Gemini against the sample's 0.830, 0.870 and 0.840. The single-column error is 0.046 on Qwen3-14B
-and 0.027 on Gemini against the sample's 0.043. The seen-conditional error is 0.027 and 0.013
-against the sample's 0.062. Over three splits with three fresh releases the ordering holds (Figure 3
-and Appendix E.2 of the paper).
+trained on the package's output, with either decoder, is within 0.025 AUC of the same student
+trained on a real sample of the same size. The students score 0.807, 0.862 and 0.833 on Qwen3-14B,
+0.805, 0.863 and 0.838 on Gemini and 0.824, 0.866 and 0.862 with the maximum-entropy decoder,
+against the sample's 0.830, 0.870 and 0.840. The single-column error is 0.046 on Qwen3-14B and 0.027
+on Gemini against the sample's 0.043. The seen-conditional error is 0.027 and 0.013 against the
+sample's 0.062. Over three splits with three fresh releases the ordering holds (Figure 3 and
+Appendix E.2 of the paper).
 
 At n = 1,000 the students are 0.03 AUC below the real sample's (0.827, 0.860 and 0.859 against
 0.855, 0.892 and 0.883). A fixed release does not get richer when you ask for more records. On the
@@ -343,22 +344,22 @@ stratified by contribution count.
 The paper measured the mechanism with the controls a reviewer asks for, and
 three of its findings bear on this package's defaults.
 
-**Most of the result comes from the release.** Decode the same release with no language model at
-all, using the maximum-entropy table that fits every released count (Private-PGM given exactly the
-release, with no further noise and no further query). On Adult the students it trains are within
-0.012 AUC of the package's output at n = 300 and within 0.005 at n = 1,000 over three seeds. On
-NHANES it fits pairs more closely than the package and scores higher on every student. On bank
-marketing it matches a real sample on single columns. The language model's one consistent gain over
-that decoding is on the conditional rates the release names. On Adult at n = 300 its
-seen-conditional error is 0.027 against the decoding's 0.082, and it is lower at 3 of 3 seeds. That
-gain comes from the selection step. Passed through `select_to_release`, the decoding's own pool
-reads 0.017 on the seen conditionals and 0.035 on single columns at n = 300 over three splits (0.007
-and 0.027 at n = 1,000). Its students score at or above those of every language-model configuration
-of CoRTeC. Pair by pair, the model's error is below the decoding's on the pairs it recognises as
-logically linked (education with education number, marital status with relationship). It is above
-the decoding's on pairs it expects to be linked when the data says they are not (four nearly
-independent pairs on bank marketing). The decoding is free. It is the first thing to compare your
-output with.
+**Most of the result comes from the release.** Decode the same release with no language model and no
+selection step, using the maximum-entropy table that fits every released count (Private-PGM given
+exactly the release, with no further noise and no further query). On Adult the students it trains
+are within 0.012 AUC of the language-model output at n = 300 and within 0.005 at n = 1,000 over
+three seeds. On NHANES it fits pairs more closely than the language-model output and scores higher
+on every student at n = 1,000. On bank marketing it matches a real sample on single columns. The
+language model's one consistent gain over that decoding is on the conditional rates the release
+names. On Adult at n = 300 its seen-conditional error is 0.027 against the decoding's 0.082, and it
+is lower at 3 of 3 seeds. That gain comes from the selection step. Passed through
+`select_to_release`, the decoding's own pool reads 0.017 on the seen conditionals and 0.035 on
+single columns at n = 300 over three splits (0.007 and 0.027 at n = 1,000). Its students score at or
+above those of every language-model configuration of CoRTeC. Pair by pair, the model's error is
+below the decoding's on the pairs it recognises as logically linked (education with education
+number, marital status with relationship). It is above the decoding's on pairs it expects to be
+linked when the data says they are not (four nearly independent pairs on bank marketing). The
+decoding is free. It is the first thing to compare your output with.
 
 **The model's advantage comes from the column names.** We renamed every column, category and label
 to a neutral token and ran the same releases and prompts on Gemini. The pair error rose to 0.148
@@ -377,11 +378,11 @@ of the prompt on purpose. The setup guide says what to expect when they carry no
 **The package decodes without a model.** `decode_release` and `cortec decode` fit the
 maximum-entropy table to the released counts. They use Private-PGM's mirror descent on the junction
 tree with each count at the noise scale its budget implies, and a corrected sequential sampler. They
-sample a pool of `pool_factor × n_rows` records and pass it through `select_to_release`. This is the
-paper's decoder-with-selection control. On Adult at ε = 2 the research pipeline's release gave
-errors of 0.033 on single columns, 0.118 on pairs and 0.014 on the seen conditionals at n = 300. At
-n = 1,000 the same errors were 0.027, 0.089 and 0.008. The students were 0.824, 0.866 and 0.862 at n
-= 300 and 0.836, 0.873 and 0.874 at n = 1,000, on one split.
+sample a pool of `pool_factor × n_rows` records and pass it through `select_to_release`. In the
+paper this is the configuration labelled "CoRTeC, maximum-entropy decoder". On Adult at ε = 2 the
+research pipeline's release gave errors of 0.033 on single columns, 0.118 on pairs and 0.014 on the
+seen conditionals at n = 300. At n = 1,000 the same errors were 0.027, 0.089 and 0.008. The students
+were 0.824, 0.866 and 0.862 at n = 300 and 0.836, 0.873 and 0.874 at n = 1,000, on one split.
 
 The package's own Stage A, with the auto-configurator and the package's budget split, made a release
 of the same split. It chose three age cohorts and a relationship-by-marital-status hierarchy.
@@ -398,10 +399,12 @@ relationship-by-native-country hierarchy instead. The reference AIM reads 0.052 
 at 0.847, 0.882 and 0.876. The release's single columns are therefore closer to the private table
 than AIM's at both sizes, and its students reach AIM's. AIM fits pairs more closely at the larger
 size only. Its conditional cells are not compared. The evaluator's seen bands are the fixed rule's
-cohorts, and two of its three held-out families are columns this release conditions on. These are
-the "auto-configured" rows of the paper's Table 3 and Appendix E.2, beside the rows of the schema's
-own cohort rule. The path spends no budget and needs no key. The `pgm` extra installs Private-PGM
-and JAX.
+cohorts, and two of its three held-out families are columns this release conditions on. On the one
+family that shares no column with its conditioning (workclass by race), it is closer than AIM at
+both sizes (0.043 against 0.061 at n = 300 and 0.020 against 0.036 at n = 1,000). These are the
+"auto-configured" rows of the paper's Table 3 and Appendix E.2, beside the rows of the schema's own
+cohort rule. The path spends no budget and needs no key. The `pgm` extra installs Private-PGM and
+JAX.
 
 **Capability improves single columns and formatting, not utility.** We decoded one Adult release
 through Qwen2.5-7B, Qwen3-8B, Qwen3-14B, Qwen3-32B (4-bit AWQ) and Gemini with the same prompts and
@@ -423,14 +426,14 @@ its column order differed from the table's. Single-column counts survived, while
 of some columns was scrambled. That margin came from the sampler, and it is not reported anywhere.
 The paper's rows use the authors' private-pgm mechanisms at their defaults, with a corrected sampler
 and the stable fitting routine. The reference AIM is at the real sample's level on Adult utility at
-n = 300. It fits pairs more closely than the package at every seed. At n = 1,000 it also scores
-higher on utility than the fixed cohort rule. It is level with or below the auto-configured release
-decoded with no model and the selection step (section 11). It is level on single columns, and its
-seen-conditional error is higher (0.055 against 0.027). Seen from AIM's side, the release is a fixed
-workload decoded by the estimator AIM uses. The workload is the class-conditional 1-way marginals
-inside cohorts plus the conditional cells. AIM's adaptive selection gives it the pairs. The fixed
-workload gives the named conditional rates, a file that can be inspected and a release computed in
-seconds.
+n = 300. It fits pairs more closely than the language-model output at every seed. At n = 1,000 it
+also scores higher on utility than the fixed cohort rule. It is level with or below the
+auto-configured release decoded with no model and the selection step (section 11). It is level with
+the language-model output on single columns, and its seen-conditional error is higher (0.055 against
+0.027). Seen from AIM's side, the release is a fixed workload decoded by the estimator AIM uses. The
+workload is the class-conditional 1-way marginals inside cohorts plus the conditional cells. AIM's
+adaptive selection gives it the pairs. The fixed workload gives the named conditional rates, a file
+that can be inspected and a release computed in seconds.
 
 **Privacy of the draws, measured.** We ran four membership attacks on 3,000 candidates, each
 validated on a positive control. The strongest advantage is 0.022 on Qwen3-14B and 0.035 on

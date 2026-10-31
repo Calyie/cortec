@@ -28,21 +28,20 @@ model, even one behind an interface the institution does not control.
 - **The release on its own is enough to train useful models, with no language model.** At ε = 2 with 300 and 1,000
   rows, we decode the auto-configured release with the maximum-entropy model and the selection step (`cortec decode`).
   Over three splits it trains every student classifier to within 0.02 AUC of a real sample of the same size on UCI
-  Adult. With the fixed cohort rule, the decoded rows carry the conditional rates the release names more closely
-  than such a sample does, once they pass through the selection step. On NHANES and bank marketing the gap to a real
-  sample is larger, reaching 0.07 AUC on the medical dataset at 300 rows.
-- **The language model's contribution comes from the column names.** It repairs pairs of columns it recognises and
-  invents links between columns that are nearly independent. When every name is replaced by a neutral token it loses
-  that advantage. Without the release it recites the public file. Most of the gain over the plain decoder comes from
-  the selection step, not from the model.
-- **What the fixed workload costs.** The release spends its budget on the conditional rates a deployment names. This
-  costs accuracy on pairs of columns, which an adaptive workload such as AIM's fits more closely. On utility the
-  release reaches the reference AIM in five of six settings. Our draws are at most 1,000 rows. CoRTeC is meant to sit
-  beside the marginal methods, so choose whichever fits your deployment.
-- **The privacy architecture holds in every test.** One release serves any number of draws, and the backbone can be
-  replaced at no privacy cost. The strongest membership attack on any CoRTeC configuration reaches an advantage of
-  0.02 to 0.05 against the 0.762 the budget permits. No synthetic row copies a training row. The part of the Adult
-  file that the served model has memorised never reaches a draw.
+  Adult. With the fixed cohort rule, the decoded rows carry the conditional rates the release names more closely than
+  such a sample does, once they pass through the selection step. On NHANES and bank marketing the gap to a real sample
+  is larger, reaching 0.07 AUC on the medical dataset at 300 rows. - **The language model's contribution comes from
+  the column names.** It repairs pairs of columns it recognises and invents links between columns that are nearly
+  independent. When every name is replaced by a neutral token it loses that advantage. Without the release it recites
+  the public file. Most of the gain over the maximum-entropy decoder alone comes from the selection step, not from the
+  model. - **What the fixed workload costs.** The release spends its budget on the conditional rates a deployment
+  names. This costs accuracy on pairs of columns, which an adaptive workload such as AIM's fits more closely. On
+  utility the release reaches the reference AIM in five of six settings. Our draws are at most 1,000 rows. CoRTeC is
+  meant to sit beside the marginal methods, so choose whichever fits your deployment. - **The privacy architecture
+  holds in every test.** One release serves any number of draws, and the backbone can be replaced at no privacy cost.
+  The strongest membership attack on any CoRTeC configuration reaches an advantage of 0.02 to 0.05 against the 0.762
+  the budget permits. No synthetic row copies a training row. The part of the Adult file that the served model has
+  memorised never reaches a draw.
 
 ## Install
 
@@ -116,8 +115,8 @@ python3 evaluate_generic.py --dataset adult --spec-json <configurations.json> --
 A release already in the output directory is reused rather than drawn again, so further draws cost no privacy budget.
 Released statistics cannot be regenerated bit for bit because the noise source ignores any seed. For the same reason
 the frozen auto-configurations under `research/results/autoconfig/` are reused by file. The reference-AIM wrapper, the
-maximum-entropy decoder, the decoder-with-selection and one-shot controls, the anonymisation of releases and the
-scorers are all under `research/controls/`. The synthetic draws, the score files and the stored releases of every
+maximum-entropy decoder with and without the selection step, the one-shot control, the anonymisation of releases and
+the scorers are all under `research/controls/`. The synthetic draws, the score files and the stored releases of every
 configuration are deposited with the paper's Zenodo record (DOI 10.5281/zenodo.22945315).
 
 ## Repository layout
