@@ -2,10 +2,10 @@
 
 Every run of `cortec` and `cortec-hybrid` can be printed and exported in one layout, through
 `cortec.report`. The printed form is a stage header, a block of named values, one or more tables,
-the warnings, and a verdict. The exported form is one JSON record with a declared format version,
-a Markdown rendering of the same content, one CSV of the named values, one CSV per table, and a
-figure in the paper's style when matplotlib is installed. This document is the contract for the
-JSON record. The other exports are derived from it.
+the warnings, and a verdict. The exported form is one JSON record with a declared format version.
+Alongside it come a Markdown rendering of the same content, one CSV of the named values, one CSV
+per table, and, when matplotlib is installed, a figure in the paper's style. This document is the
+contract for the JSON record. The other exports are derived from it.
 
 ## Producing a record
 
@@ -75,20 +75,22 @@ that size spans on that holdout.
 
 The results record (`record_results(evaluation=..., bound=..., generation=..., release=...)`) is
 built from the other records, so it can be rebuilt from their JSON files. Its values block has one
-line each for marginal fidelity, downstream utility, the Stage C verdict, the privacy spent and the
-cost. Its two tables place every synthetic number against the real-sample range (within it, beyond
-every real sample, or outside it by a stated amount), and give each student's share of real-sample
-utility, (synthetic - shuffled) / (real sample - shuffled). Its verdict is the run's one-sentence
-headline. It is `ok` when every measure reads within or beyond the range and `warning` otherwise, and
-it is a reading at one draw, not a pass or a fail. `cortec run` prints it last and writes it as
-`RESULTS.md` beside `results.json`. The results record has no figure.
+line each for marginal fidelity, downstream utility, the Stage C verdict, the privacy spent and
+the cost. Its two tables place every synthetic number against the real-sample range: within it,
+beyond every real sample, or outside it by a stated amount. They also give each student's share of
+real-sample utility, computed as (synthetic - shuffled) / (real sample - shuffled). Its verdict is
+the run's one-sentence headline. It is `ok` when every measure reads within or beyond the range
+and `warning` otherwise, and it is a reading at one draw, not a pass or a fail. `cortec run`
+prints it last and writes it as `RESULTS.md` beside `results.json`. The results record has no
+figure.
 
 ## Figures
 
-`rec.save()` writes `<stem>.png` for Stage A (cohort rates and the finest conditional level), Stage C
-(the bound for each condition against the tolerance), the evaluation (fidelity and utility beside
-the references) and the correction (conditional error before and after). Stage B has no figure. The
+`rec.save()` writes a figure, `<stem>.png`, for four kinds of record. For Stage A it shows the
+cohort rates and the finest conditional level. For Stage C it shows the bound for each condition
+against the tolerance. For the evaluation it shows fidelity and utility beside the references, and
+for the correction it shows the conditional error before and after. Stage B has no figure. The
 style is the paper's. `cortec.plots.paper_rcparams()` returns the plotting parameters the paper's
-figure script uses, and the palette is the paper's checked categorical palette, assigned in a fixed
-order. Reference rows are drawn in grey, results in blue, and the tolerance in the paper's
+figure script uses, and the palette is the paper's checked categorical palette, assigned in a
+fixed order. Reference rows are drawn in grey, results in blue, and the tolerance in the paper's
 reference-line colour.

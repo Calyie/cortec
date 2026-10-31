@@ -4,12 +4,12 @@ A correction of the target column for marginal DP synthesisers such as AIM, MST 
 needs no language model, and its heaviest dependency is scikit-learn.
 
 **It does not generate synthetic data.** The name can mislead, so this is the most important point.
-`cortec-hybrid` contains no synthesiser. It never calls AIM, MST or anything else, it will not
-produce a synthetic dataset for you, and it does not depend on smartnoise-synth. It is a
-post-processor. It releases a DP conditional target table from your private data, and rewrites only
-the target column of synthetic data you have already generated, so that each cell's rate matches the
-table. Every feature column comes out exactly as you put it in. The tool reports the shift in the
-feature marginals, which is zero, and the test suite checks that the columns are equal.
+`cortec-hybrid` contains no synthesiser. It never calls AIM, MST or anything else, and it will not
+produce a synthetic dataset for you. Nor does it depend on smartnoise-synth. It is a post-processor.
+It releases a DP conditional target table from your private data. It then rewrites only the target
+column of synthetic data you have already generated, so that each cell's rate matches the table.
+Every feature column comes out exactly as you put it in. The tool reports the shift in the feature
+marginals, which is zero, and the test suite checks that the columns are equal.
 
 If you do not already run a marginal synthesiser, you do not need this tool. `cortec decode`, in the
 `cortec` package, decodes a CoRTeC release with no language model, through the same estimator AIM and
@@ -65,8 +65,8 @@ not on PATH.
 
 ## 2. What you need
 
-1. **Your private data**, one pandas DataFrame with the columns the schema declares. One row per
-   person; section 6 explains why.
+1. **Your private data**, one pandas DataFrame with the columns the schema declares. Use one row per
+   person (section 6 explains why).
 2. **Synthetic data you already generated** with whatever DP synthesiser you use (AIM, MST,
    PrivBayes, a vendor product), with the same columns. This tool does not produce it.
 3. **A `Schema`** from the `cortec` package: the column list, public bounds, public bin edges, the
@@ -83,7 +83,7 @@ from cortec_hybrid import check_feasible, correct
 
 check_feasible(schema, n_rows=len(private_df))   # refuses BEFORE you spend hours on a schema AIM cannot fit
 
-# `synthetic_df` is YOUR synthesiser's output; this tool does not produce it.
+# `synthetic_df` is YOUR synthesiser's output. This tool does not produce it.
 corrected, table, gain = correct(
     schema, private_df, synthetic_df,
     columns=("admission_type", "a1c_result"),   # the cells: richer is better and costs no extra ε
@@ -132,8 +132,8 @@ exits with status 2 instead of showing a traceback (section 10 of the setup guid
 | `worth_it`, `verdict` | true when conditional error fell by more than 0.02, with a sentence saying so |
 | `worth_it_measures`, `worth_it_does_not_predict` | what the criterion is, and what it is not |
 
-`cortec-hybrid terms` prints what each word in the printed output means (conditional error,
-feature marginal shift, worth it, ceiling, floor, TSTR); `cortec-hybrid <term>` prints one.
+`cortec-hybrid terms` explains each word in the printed output, such as conditional error, feature
+marginal shift, worth it, ceiling, floor and TSTR. `cortec-hybrid <term>` explains just one.
 
 `cortec`'s output standard applies here too. `show(correct(...))` prints the result as a stage
 header, the named values, the released table, the warnings and the verdict. It returns a record whose
@@ -158,15 +158,15 @@ dropped every time. `worth_it_does_not_predict` says exactly this. Check the cor
 held-out data before adopting it, and keep your budget if the gain is small.
 
 **What to expect.** Marginal DP synthesisers are excellent at the statistic they optimise, and their
-own papers evaluate them on it. They do not release a conditional target table. On UCI Adult at
-ε = 2 and n = 300, the reference AIM's seen-conditional error is 0.055 and the reference MST's 0.140,
-against a real sample's 0.062 (the paper's Table 3). The reference AIM's downstream utility is at the
-real sample's level. It scores higher than the fixed-rule CoRTeC release at n = 1,000, and level with or
-below the auto-configured release decoded with no model and the selection step (`cortec decode`).
-The measurements in this section were made during development against AIM and MST at a library's
-defaults, whose sampler was later found to be defective (the paper's Appendix D). The large utility
-gap those rows showed came from the sampler, and the paper reports the reference implementations
-instead.
+own papers evaluate them on it. They do not, however, release a conditional target table. On UCI
+Adult at ε = 2 and n = 300, the reference AIM's seen-conditional error is 0.055 and the reference
+MST's is 0.140, against 0.062 for a real sample (the paper's Table 3). The reference AIM's
+downstream utility is at the real sample's level. At n = 1,000 it scores higher than the fixed-rule
+CoRTeC release, and it is level with or below the auto-configured release decoded with no model and
+the selection step (`cortec decode`). The measurements in this section were made during development
+against AIM and MST at a library's defaults, whose sampler was later found to be defective (the
+paper's Appendix D). The large utility gap those rows showed came from the sampler, and the paper
+reports the reference implementations instead.
 
 This tool spends a small, separately accounted part of the budget on the one thing those mechanisms
 do not target: a conditional target table `P(y | cell)` over a partition of the data. It then
@@ -185,17 +185,17 @@ weak conditional target structure, and you need a calibrated rate.
 rather than the third hour. Pass `n_rows=len(private_df)`, because the row count is one of the
 three factors it uses, and `raise_on_fail=False` to receive the report and proceed anyway.
 
-It used to gate on domain size, and our own ablation refuted that. UCI Adult has the largest domain
-of every schema we measured, 4.4 × 10¹³, 6.5 million times larger than a healthcare prefix that
-times out, and Adult is the one that fits. Within a single dataset, the arm with the larger domain
-fit 425 seconds faster than the arm with the smaller one. Domain volume does not predict
-convergence, and gating on it refuses the wrong schemas. Three factors did predict it, each
-demonstrated by a controlled flip:
+It used to gate on domain size, until our own ablation showed that this was wrong. UCI Adult has the
+largest domain of every schema we measured (4.4 × 10¹³, which is 6.5 million times larger than a
+healthcare prefix that times out), and yet Adult is the one that fits. Within a single dataset, the
+run with the larger domain fit 425 seconds faster than the run with the smaller one. Domain volume
+does not predict convergence, and gating on it refuses the wrong schemas. Three factors did predict
+it, each demonstrated by a controlled flip:
 
-- **attribute count**: a 19-attribute schema times out at a row count where a 15-attribute one fits;
-- **row count**: the same schema at the same domain moves from a 26-minute fit to a timeout purely
-  by going from 26,048 to 81,410 rows;
-- **high-cardinality correlated numeric columns**: one dataset has Adult's width, fewer rows and a
+- **Attribute count.** A 19-attribute schema times out at a row count where a 15-attribute one fits.
+- **Row count.** The same schema at the same domain moves from a 26-minute fit to a timeout purely
+  by going from 26,048 to 81,410 rows.
+- **High-cardinality correlated numeric columns.** One dataset has Adult's width, fewer rows and a
   30× smaller domain, and it still fails. Dropping any three columns does not help, but dropping three
   amount columns does. A width-matched control, which drops three demographic columns instead, still
   times out. That is the only way to separate the two causes.
@@ -215,10 +215,10 @@ noise.
 
 **ε protects one ROW, and this tool is the one most likely to be used on data where a row is not a
 person.** It corrects a synthesiser you already run, so it tends to be pointed at the table your
-institution already has, including encounter-level clinical data, where one patient contributes many
-rows. Under group privacy, a person who contributes `k` rows receives `k · ε`. On a real hospital
-dataset whose heaviest patient has 40 encounters, a declared ε of 2.0 is an ε of 80 for that
-patient, which carries no meaningful guarantee.
+institution already has. That often includes encounter-level clinical data, where one patient
+contributes many rows. Under group privacy, a person who contributes `k` rows receives `k · ε`. On a
+real hospital dataset whose heaviest patient has 40 encounters, a declared ε of 2.0 is an ε of 80
+for that patient, which carries no meaningful guarantee.
 
 Declare the privacy unit with `max_rows_per_person`. Where you declare one whose ε per person is
 vacuous, the release is refused, not annotated:

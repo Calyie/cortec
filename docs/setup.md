@@ -34,8 +34,8 @@ the settings that matter, and what to check before moving on.
 | 11. Output and exports | One printed layout and one exportable record for every stage |
 
 Two further documents may help. The [deployment guide](../paper/CoRTeC_deployment_guide.pdf) is the
-manual for a regulated deployment: the architecture, the parameters, the full prompt, the checklist,
-the controls mapped to standards, the failure modes with their guards, and the cost.
+manual for a regulated deployment. It covers the architecture, the parameters, the full prompt, a
+checklist, the controls mapped to standards, the failure modes with their guards, and the cost.
 [`design-notes.md`](design-notes.md) records the measurements behind the defaults.
 
 ## 1. Install and run
@@ -49,8 +49,8 @@ cd cortec
 pip install '.[anthropic]'     # Claude
 pip install '.[openai]'        # GPT, and any server with an OpenAI-compatible interface (vLLM)
 pip install '.[gemini]'        # Gemini
-pip install '.[ollama]'        # local models through Ollama: scientific controls only; NOT a deployment path (step 2)
-pip install '.[pgm]'           # decode a release with NO language model (Private-PGM and JAX; a large install)
+pip install '.[ollama]'        # local models through Ollama, for scientific controls only, NOT a deployment path (step 2)
+pip install '.[pgm]'           # decode a release with NO language model (Private-PGM and JAX, a large install)
 ```
 
 One install gives both packages, `cortec` and `cortec_hybrid`, and both commands, `cortec` and
@@ -66,10 +66,11 @@ whole pipeline on your own table from any directory: Stage A (the release), Stag
 Stage C (the bound) and the evaluation. It prints each stage in the standard layout and writes every
 file into one folder, which it names at the end. The run opens with a banner that says what is about
 to run, and closes with a results panel on one screen, also saved as `RESULTS.md`. The panel shows
-the marginal fidelity and the downstream utility, each placed against the range that real samples
-of the same size span on the same holdout, together with the Stage C verdict, the privacy spent and
-the cost. The command needs two inputs: the private table as a CSV with one row per person (step
-3), and a Python file that declares the schema from public facts only (step 4). For example:
+the marginal fidelity and the downstream utility. Each is placed against the range that real samples
+of the same size span on the same holdout, and the panel also gives the Stage C verdict, the privacy
+spent and the cost. The command needs two inputs. The first is the private table, as a CSV with one
+row per person (step 3). The second is a Python file that declares the schema from public facts only
+(step 4). For example:
 
 ```python
 # my_schema.py
@@ -89,7 +90,7 @@ SCHEMA = Schema(
 # offline first: no key, no spend, the whole pipeline on the mock backend
 cortec run --data private.csv --schema my_schema.py --backend mock
 
-# then a real model, with a spend cap; the run keeps the rows completed within it
+# then a real model, with a spend cap. The run keeps the rows completed within it
 export ANTHROPIC_API_KEY=...
 cortec run --data private.csv --schema my_schema.py \
     --backend anthropic --model claude-fable-5 --n-rows 300 --budget-usd 5
@@ -165,12 +166,13 @@ affects.
 
 **What is verified.** The tests construct each SDK's real client class offline and replace only the
 transport, so an SDK change fails in CI rather than at your first call.
-**Vertex AI is verified live**: the `gemini-3.5-flash` model name (served by Gemini 3.6 Flash since
-8 October 2026) through a service account holding only
-`roles/aiplatform.user`, both generation paths, reasoning reported on every call. The newest Gemini models are served from the
-`global` location and return 404 in every regional one, and a model 404 is a fatal, non-retried
-error. **What is not verified:** a live round trip on Bedrock or Azure OpenAI, because no account
-was available to us. Treat your first run there as that test: generate a small batch, check
+**Vertex AI is verified live.** We ran the `gemini-3.5-flash` model name (served by Gemini 3.6 Flash
+since 8 October 2026)
+through a service account that holds only `roles/aiplatform.user`. Both generation paths worked, and
+reasoning was reported on every call. The newest Gemini models are served from the `global` location
+and return 404 in every regional one. A model 404 is treated as fatal and is not retried. **What is
+not verified:** a live round trip on Bedrock or Azure OpenAI, because no account was available to
+us. Treat your first run there as that test: generate a small batch, check
 `gen.stats.calls_with_reasoning_block` and `gen.stats.thinking_tokens`, and compare the output with
 the release before generating at scale.
 
@@ -182,9 +184,9 @@ trail, and a run on a public surface says so in `gen.stats.warnings`.
 
 Stage A reads one pandas DataFrame with exactly the columns the schema declares.
 
-- Categorical columns hold strings. Integer codes are fine as strings (`"1"`, `"2"`). Read the file
-  with `keep_default_na=False` if a real category is spelled `None`, `NA` or `nan`, because pandas
-  otherwise turns it into a missing value.
+- Categorical columns hold strings. Integer codes are fine as strings (`"1"`, `"2"`). If a real
+  category is spelled `None`, `NA` or `nan`, read the file with `keep_default_na=False`. Otherwise
+  pandas turns it into a missing value.
 - Numeric columns hold numbers inside the declared bounds. Values outside are clipped, and the
   validation report says how many. If that number surprises you, the declared bounds are wrong.
 - The target column holds exactly two labels, the ones declared as `positive` and `negative`.
@@ -196,11 +198,11 @@ Validation runs before any budget is spent and reports every problem at once.
 
 ## 4. Declare the schema
 
-A `Schema` is a public description of the table. Everything in it must be knowledge you have
-without looking at the private file: the column list, domain bounds from documentation or
-convention, bin edges from clinical or regulatory practice, the target. Never derive a bound or an
-edge from the data's own quantiles. A schema inferred from private values leaks through its bounds,
-which is why `Schema.from_dataframe()` does not exist.
+A `Schema` is a public description of the table. Everything in it must be knowledge you have without
+looking at the private file. That means the column list, domain bounds from documentation or
+convention, bin edges from clinical or regulatory practice, and the target. Never derive a bound or
+an edge from the data's own quantiles. A schema inferred from private values leaks through its
+bounds, which is why `Schema.from_dataframe()` does not exist.
 
 ```python
 from cortec import Schema, Band
@@ -270,13 +272,13 @@ the conditional target table, and it records every query in a ledger.
 | `seed` | `None` | tests only: a seeded release is reproducible, so its noise can be subtracted and it carries no guarantee; the audit says so |
 
 **The privacy unit.** ε protects one ROW, and on some data that is not one person. Under group
-privacy a person contributing `k` rows receives `k · ε`. On encounter-level hospital data, one
-admission per row and several per patient, this is not a technicality: in a real dataset of 101,766
-encounters from 71,518 patients the heaviest patient contributes 40 encounters, so a declared ε of
-2.0 is an ε of 80 for that patient, which is outside any range normally considered meaningful. So
-this package is for one-row-per-person data. `k` cannot be computed for you without spending
-budget, so you declare it, and a declaration whose ε per person is vacuous is refused rather than
-annotated:
+privacy a person contributing `k` rows receives `k · ε`. On encounter-level hospital data, with one
+admission per row and several admissions per patient, this matters a great deal. In a real dataset
+of 101,766 encounters from 71,518 patients, the heaviest patient contributes 40 encounters. A
+declared ε of 2.0 is then an ε of 80 for that patient, far outside any range normally considered
+meaningful. This package is therefore meant for one-row-per-person data. `k` cannot be computed for
+you without spending budget, so you declare it. A declaration whose ε per person is meaningless is
+refused, not just annotated:
 
 ```python
 # refused: eps_person = 80
@@ -352,13 +354,13 @@ Three generation methods:
   be missing from the output while every aggregate check still looked healthy.
   `allow_low_coverage=True` overrides the refusal, for measurement rather than for use. Treat the
   guard as a heuristic mitigation, not a solved problem. It checks which bands the released cells
-  cover, not what happens inside a band, and when a DP conditional table can be passed to a
-  language model without silent loss is an open problem. Compare the output column by column with
-  the release anyway.
+  cover, but not what happens inside a band. How to pass a DP conditional table to a language model
+  without silent loss is still an open problem. Compare the output column by column with the release
+  anyway.
 
-**Which model.** Capability is gated before any call, because a model too weak to follow the
-release produces well-formed, plausible rows that carry none of its structure, and no output check
-reveals that.
+**Which model.** Capability is checked before any call. A model that is too weak to follow the
+release still produces well-formed, plausible rows, but they carry none of the release's structure,
+and no output check will reveal that.
 
 | Model | Tier | Measured on |
 |---|---|---|
@@ -372,21 +374,21 @@ reveals that.
 | qwen2.5:32b, qwen2.5:14b | adequate | the sweep (0.098–0.105) |
 | qwen2.5:7b | **insufficient, refused** | the sweep (0.406); on full-dataset generation it wrote its own prior over the released distributions |
 
-`print(cortec.models.recommended_table())` lists the models we recommend, measured on
-full-dataset generation. A sweep-only model reproduces one forced rate in a short prompt, but on
-full-dataset generation it is close to indistinguishable from an unconditioned prompt. The design
-notes give the measurements. On a ladder of open models decoding one release, single-column
-fidelity improved with capability and stopped improving at 14 billion parameters, and downstream
-utility did not change with the model at all (design notes, section 11). An unlisted model is
-refused unless you pass `allow_unvalidated=True`.
+`print(cortec.models.recommended_table())` lists the models we recommend, measured on full-dataset
+generation. A sweep-only model reproduces one forced rate in a short prompt, but on full-dataset
+generation it is close to indistinguishable from an unconditioned prompt. The design notes give the
+measurements. On a ladder of open models decoding one release, single-column fidelity improved with
+capability and stopped improving at 14 billion parameters. Downstream utility did not change with
+the model at all (design notes, section 11). An unlisted model is refused unless you pass
+`allow_unvalidated=True`.
 
 **Enable reasoning, and verify that it fired.** Reasoning is the largest single effect measured. On
-one model tested against itself, conditional error moved from 0.173 ± 0.032 to 0.045 ± 0.007 with
-one flag changed, while downstream utility did not separate (0.786 ± 0.050 against 0.802 ± 0.025).
-A cost comparison on utility alone would therefore choose the 14.5× cheaper setting and ship output
-carrying none of the data's conditional structure. Setting the flag is not evidence that it fired:
-some transports report no reasoning-token count at all, and a count that was never reported is not
-a count of zero. The stats keep the states apart:
+one model tested against itself, changing that one flag moved the conditional error from 0.173 ±
+0.032 to 0.045 ± 0.007. Downstream utility did not separate (0.786 ± 0.050 against 0.802 ± 0.025). A
+cost comparison on utility alone would therefore choose the 14.5× cheaper setting and ship output
+carrying none of the data's conditional structure. Setting the flag is not evidence that it fired.
+Some transports report no reasoning-token count at all, and a count that was never reported is not a
+count of zero. The stats keep the states apart:
 
 ```python
 gen.stats.thinking_tokens              # total reported reasoning tokens
@@ -397,31 +399,31 @@ gen.stats.positives_off_by_more_than_one   # cell-wise calls that missed the "ex
 gen.stats.warnings                     # one explicit warning for each condition above
 ```
 
-**After the run**, read `gen.stats`: `calls`, `parse_ok`, `rows`, `rows_requested`,
+**After the run**, read `gen.stats`. It holds `calls`, `parse_ok`, `rows`, `rows_requested`,
 `rows_out_of_bounds`, `rows_undeclared_category`, `rate_limit_waits` and `spend_usd`. Rows outside
 the declared domain, or with an undeclared category, are dropped and counted, never kept. The output
 carries one provenance column, `_cohort` (or `_cell` for cell-wise generation), naming the released
 unit each row came from. Drop it if your consumer expects only the schema's columns.
 
-**Decoding with no language model.** The same release can be decoded without any model. The
-decoder fits the maximum-entropy table that agrees with every released count (Private-PGM, the
-estimator AIM and MST use), samples it at `pool_factor × n_rows`, and passes the rows through the
-same selection step. It reads only the release and the schema, spends no budget, needs no key and
-runs on a CPU. Install the `pgm` extra to use it.
+**Decoding with no language model.** The same release can be decoded without any model. The decoder
+fits the maximum-entropy table that agrees with every released count, using Private-PGM (the
+estimator AIM and MST use). It samples that table at `pool_factor × n_rows` and passes the rows
+through the same selection step. It reads only the release and the schema, spends no budget, needs
+no key and runs on a CPU. Install the `pgm` extra to use it.
 
 ```python
 from cortec import decode_release
 synthetic = decode_release(schema, release, n_rows=5000, pool_factor=3)   # no model, no API
 ```
 
-or `cortec decode --schema my_schema.py --release results/<name>/release.json --n-rows 5000`. In
-the paper this path is the decoder-with-selection control (Table 3). On Adult at ε = 2 and n = 300
-it reads 0.033 on single columns and 0.014 on the conditionals the release names, the level of the
-best language-model arm, with students at 0.824, 0.866 and 0.862, above every language-model arm
-(one split, three draws). What a language model adds beyond it is plausibility on the pairs it
-recognises from the column names, and nothing on aggregate utility (design notes, section 11).
-Decode this way first, and add a model where its plausibility on a schema it knows is what you
-need.
+or `cortec decode --schema my_schema.py --release results/<name>/release.json --n-rows 5000`. In the
+paper this path is the decoder-with-selection control (Table 3). On Adult at ε = 2 and n = 300, it
+reads 0.033 on single columns and 0.014 on the conditionals the release names, which matches the
+best language-model configuration. Its students score 0.824, 0.866 and 0.862, above every
+language-model configuration (one split, three draws). Beyond this, a language model improves only
+the pairs it recognises from the column names, and adds nothing to aggregate utility (design notes,
+section 11). Decode this way first. Add a model only where you need that improvement on pairs, and
+only for a schema the model knows.
 
 **Dry run first.** `backend="mock"` needs no key and honours the exact-count block, so the whole
 generate-and-select loop runs offline from start to finish. `tests/test_selection.py` does exactly
@@ -429,10 +431,10 @@ that.
 
 ## 7. Stage C: attach a utility bound
 
-For each released cell, Stage C releases a Laplace estimate of the private target rate, at a
-declared budget `epsilon_cert`, and turns the noise into a one-sided bound on the gap between the
-private and synthetic rates. The bound holds for every cell at once, with probability at least
-`1 − alpha`. It is a utility bound computed under DP. It is not a privacy audit.
+For each released cell, Stage C releases a Laplace estimate of the private target rate at a declared
+budget, `epsilon_cert`. It then turns the noise into a one-sided bound on the gap between the
+private and synthetic rates. The bound holds for every cell at once, with probability at least `1 −
+alpha`. It is a utility bound computed under DP. It is not a privacy audit.
 
 ```python
 from cortec import bound_with_controls
@@ -447,10 +449,10 @@ report.to_json("bound.json")       # readable by a third party without the priva
   sample, which should clear the tolerance) and the floor (the same sample with its target
   permuted, which must not). If the ceiling fails or the floor clears, the test did not
   discriminate, `report.verdict` is `None`, and that run is not reported.
-- `epsilon_cert` is spent once, through the ledger. The deployment total is
-  `epsilon_release + epsilon_cert`, stated per row and per person. Each cell's rate is taken over
-  `max(|c|, n_min)` and the Laplace scale uses the public floor `n_min`, so the sensitivity bound holds
-  for every cell whatever its true size and the bound is pure ε-DP.
+- `epsilon_cert` is spent once, through the ledger. The deployment total is `epsilon_release +
+  epsilon_cert`, stated per row and per person. Each cell's rate is taken over `max(|c|, n_min)`,
+  and the Laplace scale uses the public floor `n_min`. The sensitivity bound therefore holds for
+  every cell, whatever its true size, and the bound is pure ε-DP.
 - A released cell that the synthetic data never covers scores the trivial bound of 1.0, so a bound
   cannot be obtained by covering only a convenient subset of cells. Cells with fewer than 20
   synthetic rows are reported as thin. The noise cannot be seeded. The report's `_what_this_is`
@@ -496,22 +498,22 @@ For each student it also gives the share of real-sample utility, (synthetic − 
 sample − shuffled), beside its gap. The panel's headline is a reading at one draw, not a pass or a
 fail, and nothing in the package compares a number with a threshold.
 
-**What to expect.** On UCI Adult at ε = 2 and n = 300, models trained on this package's output are
-within 0.025 AUC of models trained on a real sample of the same size, on every student. That holds
+**What to expect.** On UCI Adult at ε = 2 and n = 300, every student trained on this package's
+output is within 0.025 AUC of the same student trained on a real sample of the same size. That holds
 on an open model (Qwen3-14B: 0.807, 0.862 and 0.833, against the sample's 0.830, 0.870 and 0.840)
 and on a served one (Gemini: 0.805, 0.863 and 0.838). The seen-conditional error is a fifth of the
 sample's. Two things are worth knowing before you read your own panel. First, most of that result
-comes from the release. Decoded with no language model at all, by the maximum-entropy table that fits its
-counts, it trains students within 0.012 AUC of the package's output. What the language model adds
-comes from the column names, and when every name is replaced by a neutral token
-its advantage on pairs and on utility disappears. On a schema the model does not know, expect the
-release's own result. Second, the reference AIM, fitted the way its authors fit it, fits pairs of columns more closely
-and, at n = 1,000, scores higher on utility. The package is level with it on single columns and,
-on Adult, carries the conditional rates the release names more closely. On a clinical survey (NHANES) the
-package's students were 0.07 to 0.10 AUC below a real sample's, and the model-free decoding of the
-same release scored higher than they did. Do not assume parity. Measure it on your own data against a real
-sample of the same size, and read the conditional measures beside the aggregate ones. The design
-notes carry the full measurements.
+comes from the release. Decoded with no language model at all, by the maximum-entropy table that
+fits its counts, it trains students within 0.012 AUC of the package's output. What the language
+model adds comes from the column names, and when every name is replaced by a neutral token its
+advantage on pairs and on utility disappears. On a schema the model does not know, expect the
+release's own result. Second, the reference AIM (fitted the way its authors fit it) fits pairs of
+columns more closely, and at n = 1,000 it scores higher on utility. The package is level with it on
+single columns and, on Adult, carries the conditional rates the release names more closely. On a
+clinical survey (NHANES) the package's students were 0.07 to 0.10 AUC below a real sample's, and the
+model-free decoding of the same release scored higher than they did. Do not assume parity. Measure
+it on your own data against a real sample of the same size, and read the conditional measures beside
+the aggregate ones. The design notes carry the full measurements.
 
 ## 9. Where the trust boundary sits
 
@@ -551,7 +553,7 @@ with guard():            # the same, for one block (works in notebooks too)
   reason
     column 'income' is missing from the data. NO privacy budget was spent.
 
-  The tool stopped on purpose; this is a refusal, not a fault in the tool. Change the input
+  The tool stopped on purpose. This is a refusal, not a fault in the tool. Change the input
   or the setting the reason names and run again.
 ```
 
@@ -583,11 +585,11 @@ exception is a fault and keeps its traceback.
 Every stage prints one layout and exports one record, through `cortec.report`. The layout is a stage
 header, a block of named values, one or more tables (each with the question it answers under its
 name), the warnings, and a verdict. A run opens with a banner of what is about to run, and closes
-with the results panel and a list of every file written. On a terminal, the numbers the run produced
-are printed in blue, reference rows (a real sample, a shuffled floor) in grey, warnings in amber, and
-a verdict against the output or a refusal in orange. Colour is used only on a terminal. `NO_COLOR`
-or `CORTEC_COLOR=0` turns it off and `CORTEC_COLOR=1` forces it on. The exported files never carry
-colour.
+with the results panel and a list of every file written. On a terminal, the run's own numbers are
+printed in blue and the reference rows (a real sample and a shuffled floor) in grey. Warnings appear
+in amber, and a verdict against the output or a refusal appears in orange. Colour is used only on a
+terminal. `NO_COLOR` or `CORTEC_COLOR=0` turns it off and `CORTEC_COLOR=1` forces it on. The
+exported files never carry colour.
 
 ```python
 from cortec import show, record
@@ -599,13 +601,13 @@ files = rec.save("results/run-01", "stage_c")          # {name: path}
 ```
 
 `show()` prints and returns a `RunRecord`, and `record()` builds one without printing. `save()`
-writes `<stem>.json` (the record, format `cortec-result/1`), `<stem>.md` (the same content as
-Markdown), `<stem>.csv` (the named values), one CSV per table, and `<stem>.png` when matplotlib is
-installed. `RunRecord.from_json()` reads a record back. Tables follow the paper's conventions: a
-label column on the left, numbers to three decimal places, and reference rows marked. Figures use
-the paper's own plotting parameters and checked palette, which your own scripts can use through
-`cortec.plots.paper_rcparams()`. [`result-format.md`](result-format.md) is the contract for the
-record and lists the tables each stage writes.
+writes the record as `<stem>.json` (format `cortec-result/1`) and the same content as Markdown in
+`<stem>.md`. It also writes the named values to `<stem>.csv`, one CSV per table, and `<stem>.png`
+when matplotlib is installed. `RunRecord.from_json()` reads a record back. Tables follow the paper's
+conventions: a label column on the left, numbers to three decimal places, and reference rows marked.
+Figures use the paper's own plotting parameters and checked palette, which your own scripts can use
+through `cortec.plots.paper_rcparams()`. [`result-format.md`](result-format.md) is the contract for
+the record and lists the tables each stage writes.
 
 **The words in the output.** `cortec terms` prints every term the records use, in the order a
 run prints them, and `cortec <term>` (for example `cortec discriminating`) prints one. The ones
