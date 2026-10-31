@@ -67,7 +67,7 @@ for _m in _pkgutil.iter_modules(_src.__path__):
 # published DP synthetic-data work omits several of these. They are emitted with every bound report
 # so a reviewer or auditor can check the claim rather than take it on trust.
 #
-# Standards THIS REPORT is aligned to. The list is deliberately short, and it used to be longer.
+# Standards THIS REPORT is aligned to. The list is deliberately short.
 #   NIST SP 800-226   parameter reporting, and documenting where the guarantee does NOT hold
 #   NIST SP 800-188   de-identifying government datasets; disclosure-review framing
 #

@@ -185,12 +185,12 @@ synthesiser's output has weak conditional target structure and you need a calibr
 rather than the third hour. Pass `n_rows=len(private_df)`, because the row count is one of the three
 factors it uses. Pass `raise_on_fail=False` to receive the report and proceed anyway.
 
-It used to gate on domain size, until our own ablation showed that this was wrong. UCI Adult has the
-largest domain of every schema we measured (4.4 × 10¹³, which is 6.5 million times larger than a
-healthcare prefix that times out), and yet Adult is the one that fits. Within a single dataset, the
-run with the larger domain fit 425 seconds faster than the run with the smaller one. Domain volume
-does not predict convergence, so gating on it refuses the wrong schemas. Three factors did predict
-it, each demonstrated by a controlled flip:
+It does not gate on domain size, because our own ablation showed that this would be wrong. UCI Adult
+has the largest domain of every schema we measured (4.4 × 10¹³, which is 6.5 million times larger
+than a healthcare prefix that times out), and yet Adult is the one that fits. Within a single
+dataset, the run with the larger domain fit 425 seconds faster than the run with the smaller one.
+Domain volume does not predict convergence, so gating on it refuses the wrong schemas. Three factors
+did predict it, each demonstrated by a controlled flip:
 
 - **Attribute count.** A 19-attribute schema times out at a row count where a 15-attribute one fits.
 - **Row count.** The same schema at the same domain moves from a 26-minute fit to a timeout purely
@@ -241,8 +241,7 @@ number.
 
 Rank-preserving assignment orders the rows within a cell by a model of the synthetic data's own
 target. We assumed it was necessary for this correction to be worth its cost. Testing this package
-disproved that in one regime, and the code changed as a result: `preserve_ranking=False` is the
-default of `relabel()`.
+disproved that in one regime, so `preserve_ranking=False` is the default of `relabel()`.
 
 Rank preservation helps only when the input synthetic data already carries structure within each
 cell. When its target is close to noise (exactly the case this tool targets), a ranking model fitted
@@ -250,13 +249,13 @@ on that target learns the noise. Ordering by it then adds false structure that a
 mistakes for signal. On the renal registry, that cost 0.068 AUC against plain random assignment
 (0.546 against 0.614 in the table below).
 
-The guard we first wrote for this did not work, and the reason is worth knowing. `_rank_scores`
-gated on whether the synthetic target is predictable from the synthetic features (cross-validated
-AUC against `RANK_INFORMATIVENESS_FLOOR = 0.55`). But a synthesiser generates its target as a
-function of those features, so that score is almost always near-perfect: 0.981 on one dataset whose
-real downstream AUC is 0.631. It measures self-consistency, not validity. It is highest exactly when
-the synthesiser has confidently learned a wrong relationship. It therefore selected for the failure
-mode it was built to prevent.
+A guard based on how predictable the synthetic target is does not work, and the reason is worth
+knowing. `_rank_scores` gated on whether the synthetic target is predictable from the synthetic
+features (cross-validated AUC against `RANK_INFORMATIVENESS_FLOOR = 0.55`). But a synthesiser
+generates its target as a function of those features, so that score is almost always near-perfect:
+0.981 on one dataset whose real downstream AUC is 0.631. It measures self-consistency, not validity.
+It is highest exactly when the synthesiser has confidently learned a wrong relationship. It
+therefore selected for the failure mode it was built to prevent.
 
 Over three datasets at three synthesiser seeds each, i.i.d. assignment scored higher than rank
 preservation in 9 of 9 runs:

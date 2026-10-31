@@ -155,7 +155,7 @@ def check_feasible(schema: Schema, *, n_rows: int | None = None,
                    raise_on_fail: bool = True, max_domain: int | None = None) -> dict:
     """Warn or refuse BEFORE the user spends hours discovering the synthesiser will not converge.
 
-    **This gate used to be domain size, and our own ablation refuted that.** Adult has the largest
+    **The gate is not domain size, because our own ablation refuted that.** Adult has the largest
     domain of every schema we measured (4.4e13, six million times larger than a diabetes prefix that
     times out), yet Adult is the one that fits. Worse, within one dataset the arm with the LARGER
     domain fit 425 s FASTER than the arm with the smaller one. Domain volume does not predict
@@ -378,7 +378,7 @@ def relabel(schema: Schema, synthetic: pd.DataFrame, table: ConditionalTable, *,
     Within a cell, labels are assigned i.i.d. by default. `preserve_ranking=True` instead orders
     records by a model fitted on the synthetic data's own target.
 
-    **Rank preservation used to be the default and it was measured to be WRONG.** Three datasets,
+    **Rank preservation is not the default, because it was measured to be WRONG.** Three datasets,
     three MST seeds each, downstream AUC against the real held-out split:
 
         renal_registry   MST 0.631 -> rank 0.546 (-0.085) -> i.i.d. 0.614 (-0.017)

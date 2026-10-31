@@ -1009,8 +1009,8 @@ def test_cellwise_refuses_a_release_that_does_not_cover_the_population():
 
 def test_cellwise_allows_a_release_that_does_cover_the_population():
     """Releases at 91% and 98% per-column coverage were measured to be FINE -- at the higher one
-    cell-wise beat cohort-wise on every aggregate metric. An earlier aggregate-coverage rule
-    refused both, which would have cost real quality for no safety. The guard must not fire here.
+    cell-wise beat cohort-wise on every aggregate metric. An aggregate-coverage rule would
+    refuse both, which would have cost real quality for no safety. The guard must not fire here.
     """
     import os
     from cortec.generate import Generator, GenerationError
@@ -1691,8 +1691,8 @@ class TestTheAuditArtefactCannotBeReadAsAPrivacyProof:
 
 def test_cell_wise_mock_reproduces_the_requested_positive_counts_exactly():
     """With a backend that honours the instruction, emitted == requested on every call, and the
-    output rate per cell tracks the released rate. (The earlier mock drew a random label per row,
-    which made this test vacuous.)"""
+    output rate per cell tracks the released rate. (A mock that drew a random label per row
+    would make this test vacuous.)"""
     s = demo_schema()
     rel = release_statistics(s, demo_frame(n=4000), epsilon_total=2.0, n_min=150, seed=3)
     g = Generator(s, backend="mock", model="claude-fable-5", rows_per_call=10, seed=5)

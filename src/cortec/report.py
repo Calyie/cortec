@@ -685,7 +685,7 @@ def record_results(*, evaluation: RunRecord | None = None, bound: RunRecord | No
     """The results panel shows, on one screen, the marginal fidelity result and the downstream
     utility result read against a real sample of the same size and the permuted floor. It also gives
     the Stage C verdict, the privacy spent and the cost. It is built from the stage records, so it
-    can be rebuilt from the JSON files of an earlier run. No goal is passed or failed against a
+    can be rebuilt later from the JSON files a run wrote. No goal is passed or failed against a
     threshold. Every number is placed against the range that real samples of the same size span on
     the same holdout (the evaluation's `reference spread` table). When the evaluation drew only one
     real sample, the number is placed against that sample."""

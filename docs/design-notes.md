@@ -29,12 +29,12 @@ draw is post-processing and the model can be changed at no privacy cost.
 **Do not use an unconditioned language model** for any regulated quantity. In one development
 measurement, we asked Claude Fable 5 for 300 synthetic diabetic hospital encounters from the column
 names alone, with no release and no private data. Of the 66 generated patients with two or more
-earlier inpatient stays, 65 were readmitted within 30 days, a rate of 98.5%. In the public Diabetes
-130-US Hospitals file (101,766 real encounters), the rate for that group is 21.4%, against 11.2% for
-all patients. Because the model never saw the data, its 98.5% cannot change whatever the private
-table says. No rank-based utility metric reveals that, because the ordering is right and only the
-size is wrong. The draw and a script that recomputes both rates are in
-`research/results/development/diabetes_header_only/`.
+inpatient stays in the year before the encounter, 65 were readmitted within 30 days, a rate of
+98.5%. In the public Diabetes 130-US Hospitals file (101,766 real encounters), the rate for that
+group is 21.4%, against 11.2% for all patients. Because the model never saw the data, its 98.5%
+cannot change whatever the private table says. No rank-based utility metric reveals that, because
+the ordering is right and only the size is wrong. The draw and a script that recomputes both rates
+are in `research/results/development/diabetes_header_only/`.
 
 ## 2. How close to real data it gets
 
@@ -62,11 +62,11 @@ beside the aggregate ones.
 
 ## 3. The release: class-conditional histograms
 
-The release used to carry one pooled feature histogram per cohort plus the target rate inside the
-conditional hierarchy's cells. It said nothing about how any other feature relates to the target.
-The generator filled that in from its prior. On the finance benchmark, the filled-in columns
-measurably degraded the downstream model (development measurement). The release carries one
-histogram block per (cohort, outcome) wherever both outcomes clear `n_min`.
+A pooled release, with one feature histogram per cohort plus the target rate inside the conditional
+hierarchy's cells, says nothing about how any other feature relates to the target. The generator
+fills that in from its prior. On the finance benchmark, the filled-in columns measurably degraded
+the downstream model (development measurement). The release carries one histogram block per (cohort,
+outcome) wherever both outcomes clear `n_min`.
 
 - **Same ε.** The two outcome blocks of a cohort are disjoint, so they compose in parallel at the
   same ε per query the pooled block spent. The pooled histogram is their mixture under the released

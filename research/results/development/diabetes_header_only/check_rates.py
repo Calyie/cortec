@@ -1,9 +1,10 @@
 """Recompute the two readmission rates quoted in docs/design-notes.md, section 1.
 
-The group is every encounter with two or more earlier inpatient stays (number_inpatient >= 2). The first
-rate is read from the stored draw in this folder, which Claude Fable 5 wrote from the column names alone,
-with no release and no private data. The second is read from the public Diabetes 130-US Hospitals file
-(UCI, `diabetic_data.csv`, 101,766 encounters), where a 30-day readmission is coded '<30'.
+The group is every encounter whose patient had two or more inpatient stays in the year before it
+(number_inpatient >= 2). The first rate is read from the stored draw in this folder, which Claude Fable 5
+wrote from the column names alone, with no release and no private data. The second is read from the public
+Diabetes 130-US Hospitals file (UCI, `diabetic_data.csv`, 101,766 encounters), where a 30-day readmission is
+coded '<30'.
 
 Usage: python check_rates.py [--uci path/to/diabetic_data.csv]
 """

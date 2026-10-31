@@ -8,10 +8,10 @@ These files support one number in `docs/design-notes.md`, section 1: an uncondit
 | `synthetic_header_only_draw0.csv` | 300 encounters written by Claude Fable 5 (`claude-fable-5`, Anthropic API) from the column names alone, with no release and no private data, on 4 September 2026 during development, before the paper's experiments. It holds no real record. |
 | `check_rates.py` | Recomputes both rates: the draw's rate in the group, and the public file's rate in the same group and overall. |
 
-The group is every encounter with two or more earlier inpatient stays (`number_inpatient` of 2 or more). In the
-draw, 65 of the 66 encounters in that group are readmitted within 30 days (98.5%). In the public Diabetes 130-US
-Hospitals file from the UCI repository (`diabetic_data.csv`, 101,766 encounters), the same group's rate is 21.4%,
-against 11.2% for all patients.
+The group is every encounter whose patient had two or more inpatient stays in the year before it (`number_inpatient`
+of 2 or more). In the draw, 65 of the 66 encounters in that group are readmitted within 30 days (98.5%). In the public
+Diabetes 130-US Hospitals file from the UCI repository (`diabetic_data.csv`, 101,766 encounters), the same group's
+rate is 21.4%, against 11.2% for all patients.
 
 ```
 python check_rates.py --uci path/to/diabetic_data.csv
