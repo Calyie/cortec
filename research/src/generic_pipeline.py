@@ -182,7 +182,7 @@ def release_statistics(spec: DatasetSpec, raw_train: pd.DataFrame, *, epsilon_st
         # CLASS-CONDITIONAL HISTOGRAMS. The pooled cohort histogram tells the generator what the
         # cohort looks like and nothing about how any feature relates to the target outside the
         # conditional hierarchy; the generator fills that in from its prior, and on finance the
-        # filled-in columns measurably DEGRADED the downstream model (paper §F.3.1). Partitioning
+        # filled-in columns measurably DEGRADED the downstream model (a development measurement). Partitioning
         # the cohort by the target and releasing one histogram per (cohort, class) hands it the
         # class-conditional marginals a classifier needs, for every column. The two class blocks
         # are disjoint, so they compose in PARALLEL: each spends the same eps_per_query per column
@@ -309,7 +309,7 @@ def build_matched_header_only_prompt(spec: DatasetSpec, cohort_stats: dict,
                                      n_rows: int = 25) -> str:
     """CoRTeC's own prompt with the released statistical arrays deleted and NOTHING else changed.
 
-    §7.1.2's header-only control shares the system prompt, model, decoding, batching, parser and
+    The header-only control shares the system prompt, model, decoding, batching, parser and
     repair path with CoRTeC, but its USER prompt is not CoRTeC's minus the arrays: it also drops the
     cohort framing sentence and closes with a different instruction ("realistic ... use varied
     values" against "faithfully reflect the statistics above"). That residual cannot be removed by
@@ -322,7 +322,7 @@ def build_matched_header_only_prompt(spec: DatasetSpec, cohort_stats: dict,
     byte-identically. The dangling references to "the statistics above" are deliberate: keeping them
     is what makes this an ablation of the STATISTICS rather than of the instructions.
 
-    This is the control §7.1.2 names as the one it still lacked.
+    It is the matched control that the header-only comparison needed.
     """
     full = build_cortec_prompt(spec, cohort_stats, n_rows=n_rows)
 
@@ -567,7 +567,7 @@ def build_cortec_prompt(spec: DatasetSpec, cohort_stats: dict, n_rows: int = 25,
         # The release carries one histogram block per outcome class. Telling the model what
         # positives and negatives each look like is what lets it reproduce the feature->target
         # structure for EVERY column, instead of inventing it from its prior for the columns the
-        # conditional hierarchy does not name (paper §F.3.1: on finance those invented columns
+        # conditional hierarchy does not name (a development measurement: on finance those invented columns
         # measurably degraded the downstream model).
         lines += ["", "FEATURE DISTRIBUTIONS BY OUTCOME. Rows with different outcomes have DIFFERENT "
                       "feature distributions in this cohort. First decide each row's "
@@ -594,7 +594,7 @@ def build_cortec_prompt(spec: DatasetSpec, cohort_stats: dict, n_rows: int = 25,
 
     if quotas:
         # Exact counts turn "match these shares" into a counting task the model can satisfy
-        # exactly, the same move that made conditional rates exact cell-wise (§3.3). The counts
+        # exactly, the same move that made conditional rates exact cell-wise. The counts
         # are apportioned from the released histograms for THIS batch, so they carry no more
         # than the release does.
         lines += ["", f"EXACT COUNTS FOR THIS BATCH OF {quotas['n']} ROWS. These are not targets; "
@@ -699,8 +699,8 @@ def build_cell_prompt(spec, cohort_stats: dict, cell_key: str, n_rows: int,
                       cond_bands: tuple = ()) -> str:
     """Prompt for ONE conditional cell, stating an exact positive COUNT rather than a rate.
 
-    Asking a model to hit a *rate* saturates: §8's calibration defect showed released rates at or
-    above ~0.24 pulled toward 1.0, because a cell receiving a couple of rows can only emit 0 or 1
+    Asking a model to hit a *rate* saturates: in development runs, released rates at or
+    above ~0.24 were pulled toward 1.0, because a cell receiving a couple of rows can only emit 0 or 1
     and the model resolves the ambiguity by rounding up. Asking for "exactly k of n records" removes
     the ambiguity, the quantity requested is one the model can satisfy exactly, and moved
     magnitude error from 0.253 to 0.037 in the reference implementation.

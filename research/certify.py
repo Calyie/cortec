@@ -27,7 +27,8 @@ FLOOR AND CEILING. `certify()` is meaningless unless a known-good input passes a
 fails, so `certify_with_controls()` runs three conditions: the synthetic data, a real hold-out
 sample (should clear the tolerance tightly), and the same real sample with its target permuted
 (must NOT clear it). A run where the permuted control also clears means the tolerance is too loose
-to discriminate and the result should be discarded: the §3 saturation lesson, applied here.
+to discriminate and the result should be discarded. A measure is trusted only once it separates
+a known good input from a known bad one.
 """
 from __future__ import annotations
 

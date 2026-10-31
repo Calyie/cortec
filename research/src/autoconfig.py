@@ -19,7 +19,7 @@ records it wants; everything else is derived.
 Each candidate column is scored from ONE noised contingency table of (its bands) x target: a
 marginal table, not a conditional one. A record occupies exactly one cell of such a table, so its
 L1 sensitivity is 1 however many cells it has, the same argument that makes histogram bin count
-free (§4.2). Those tables are *not* disjoint across candidates (every record appears in all of
+free. Those tables are *not* disjoint across candidates (every record appears in all of
 them), so they compose SEQUENTIALLY: m candidates at epsilon/m each. Everything after the noised
 counts, the mutual-information computation, the coarsening and the ranking, is post-processing
 and free.
@@ -43,9 +43,10 @@ rate, computed from the table already released for the ranking, so it costs noth
 combination reaches parity with expert hand-tuning on all three studied datasets (adult -0.013,
 diabetes +0.012, credit -0.005) and is what runs here.
 
-**How richness is chosen without touching the data at all.** §6.6.1 established that a conditional
+**How richness is chosen without touching the data at all.** Development runs showed that a conditional
 table's usable resolution is set by how many records land in each cell: too coarse wastes capacity
-at large n, too fine fragments at small n and the §8 granularity defect dominates. Cell counts are
+at large n, too fine fragments at small n and the granularity defect dominates (a cell given a
+fraction of a row can only emit 0 or 1). Cell counts are
 a function of the *public* schema cardinalities, and the number of records requested is a public
 choice, so the rule needs no private input.
 """
@@ -56,7 +57,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
-# Target records per conditional cell. Below ~8 the granularity defect of §8 dominates (a cell
+# Target records per conditional cell. Below ~8 the granularity defect dominates (a cell
 # receiving 0.65 rows can only emit 0 or 1, which is what made the calibration curve saturate);
 # above ~40 the table is coarser than the data supports and leaves resolution unused. The Adult
 # richness sweep put the optimum at 24 cells for n=300 (12 records/cell) and the healthcare sweep
@@ -192,7 +193,7 @@ def private_column_ranking(spec, train: pd.DataFrame, *, epsilon: float,
 
     Accounting: one contingency table per candidate at epsilon/m, m = number of candidates. A
     record occupies exactly one cell of a table, so L1 sensitivity is 1 regardless of cell count:
-    the same argument that makes histogram bin count free (§4.2). The m tables are NOT disjoint
+    the same argument that makes histogram bin count free. The m tables are NOT disjoint
     (every record appears in every one), so they compose SEQUENTIALLY: m x (epsilon/m) = epsilon.
     Everything after the noised counts is post-processing.
     """
@@ -360,7 +361,7 @@ def bands_for(spec, train: pd.DataFrame, cfg: "AutoConfig") -> list:
     """Convert a derived configuration into the `Band` objects the release pipeline consumes.
 
     Numerical columns band on their declared public bins. Categorical columns band on the coarsening
-    map when one was produced (post-processing of the ranking tables, §48.1), and on their raw
+    map when one was produced (post-processing of the ranking tables), and on their raw
     levels otherwise. Nothing here reads the private data beyond what the ranking already released.
     """
     from src.dataset_spec import Band

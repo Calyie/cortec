@@ -8,8 +8,9 @@ date-released: "2026-10-30"
 doi: "10.5281/zenodo.22945315"
 repository-code: "https://github.com/Calyie/cortec"
 abstract: >-
-  Hospitals and other institutions want to share synthetic versions of their tables without
-  exposing the people in them. We propose CoRTeC, a method that does this under differential
+  The records that could train the most useful models, such as a hospital's patient files, are
+  often the ones an institution cannot share. We propose CoRTeC, a method that lets others learn
+  from such records without seeing anyone in them, by releasing synthetic data under differential
   privacy. CoRTeC spends the privacy budget once, on a small file of noisy counts designed for
   training a classifier. For each group of records the file gives the group's size, its balance of
   outcomes, a histogram of every column for each outcome and the outcome rate in a set of

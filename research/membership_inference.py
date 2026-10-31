@@ -11,7 +11,7 @@ First, it detects **implementation** failure. A proof covers the mechanism as wr
 covers the code as run. If the release accidentally leaked a record: a suppression threshold not
 applied, a cohort of size one, a released histogram that is a delta on a single individual: the
 proof would still be true of the algorithm and false of the artifact. This is the same reason we
-verify the accounting numerically rather than trusting the derivation (§4.3).
+verify the accounting numerically rather than trusting the derivation.
 
 Second, it gives a **measured** number for the audience that asks for one. Regulators and security
 reviewers routinely ask "has anyone tried to attack it", and "the proof forbids it" is a correct

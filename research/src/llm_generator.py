@@ -258,8 +258,8 @@ class LLMSyntheticGenerator:
         # thinking + CSV never truncates. Bigger rows_per_call amortises the per-call thinking overhead.
         # 3072 was not enough headroom: on the Adult release two consecutive calls each spent the
         # ENTIRE 3072 on reasoning and returned no CSV at all, which the parse guard correctly
-        # caught but which reads as "the model cannot follow the schema". This is the §8 defect-8
-        # failure mode recurring on a frontier model rather than a local reasoning model, so the
+        # caught but which reads as "the model cannot follow the schema". This failure was first
+        # seen on a local reasoning model and recurs on a frontier model, so the
         # budget has to cover reasoning *plus* the rows, not the rows alone.
         self.anthropic_max_tokens = 8192
         self._anthropic_extra: dict = {}
@@ -476,7 +476,7 @@ class LLMSyntheticGenerator:
         """CoRTeC generation driven by exact per-cell counts rather than per-cohort rates.
 
         `generate_cortec` gives the model a cohort's conditional table and asks it to honour the
-        rates. That saturates: on the constructed registry of §9 it preserved the ORDERING of a
+        rates. That saturates: on a constructed registry it preserved the ORDERING of a
         planted relationship while overstating its spread (0.741 emitted against a released 0.340
         for the strongest group, 0.009 against 0.075 for the weakest). This path instead asks, per
         released cell, for "exactly k of n records": a quantity the model can satisfy exactly.
@@ -597,7 +597,7 @@ class LLMSyntheticGenerator:
 
     def generate_matched_header_only(self, cohort_stats_list: list[dict],
                                      n_total: int = 200) -> pd.DataFrame:
-        """§7.1.2's missing control: CoRTeC's own run with the released arrays deleted.
+        """The matched header-only control: CoRTeC's own run with the released arrays deleted.
 
         Shares `generate_cortec`'s cohort loop, row allocation, batching and parsing exactly -- the
         ONLY difference is the prompt builder, so nothing but the statistical content varies between
@@ -628,7 +628,7 @@ class LLMSyntheticGenerator:
         Condition B: generate n_total rows spread across cohorts, each batch
         conditioned on that cohort's DP statistics.
 
-        `prompt_builder` exists so the matched header-only control of §7.1.2 can reuse this loop
+        `prompt_builder` exists so the matched header-only control can reuse this loop
         verbatim -- same allocation, same batching, same parser -- and differ in the prompt alone.
 
         `prior` resumes an aborted run: the rows a previous call of this loop had already
@@ -1343,7 +1343,7 @@ class LLMSyntheticGenerator:
         df = df.dropna(subset=numeric_present) if numeric_present else df
 
         # Reject rows outside the schema's PUBLIC domain bounds. These bounds are public by
-        # assumption (§3.1), so filtering on them costs no privacy budget. A degenerate response
+        # assumption, so filtering on them costs no privacy budget. A degenerate response
         # once produced LIMIT_BAL=34 against a documented floor of 10,000 and AGE=0 against a
         # floor of 21; without this the row entered the synthetic dataset silently, and an
         # out-of-domain value is not a fidelity error to be measured, it is a malformed record.

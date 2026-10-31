@@ -303,7 +303,7 @@ def main():
     ap.add_argument("--skip-cortec", action="store_true",
                     help="generate only the control arm, reusing an existing CoRTeC arm")
     ap.add_argument("--matched-header-only", action="store_true",
-                    help="control = CoRTeC's prompt with the released arrays deleted (§7.1.2)")
+                    help="control = CoRTeC's prompt with the released arrays deleted")
     ap.add_argument("--no-class-conditional", dest="class_conditional", action="store_false",
                     default=True,
                     help="release POOLED cohort histograms only (one block per cohort, no class blocks). The "
@@ -330,7 +330,7 @@ def main():
                          "from the release instead of shares to match")
     ap.add_argument("--pool-factor", type=float, default=1.0,
                     help="cohort-wise path only: generate this many times n rows and select the n "
-                         "whose marginals match the release (pool-and-rake selection, §7.12)")
+                         "whose marginals match the release (pool-and-rake selection, Algorithm 2 of the paper)")
     ap.add_argument("--no-by-cell", dest="by_cell", action="store_false",
                     help="use the original per-cohort rate-based path")
     ap.add_argument("--methods", nargs="+", default=["mst", "aim", "patectgan"],

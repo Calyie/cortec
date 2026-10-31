@@ -211,7 +211,7 @@ def credit_spec() -> DatasetSpec:
     mar = Band("MARRIAGE", groups={"married": ["1"], "single": ["2"]})
     # PAY_2 is the second-strongest predictor of default in this data and is public domain
     # knowledge in credit risk (repayment history predicts default), so conditioning on it is a
-    # legitimate a priori choice rather than selection on private values. §6.11.1 measured that
+    # legitimate a priori choice rather than selection on private values. A development run found that
     # the original hierarchy conditioned on MARRIAGE (mutual information with the target 0.004)
     # while omitting PAY_2 (0.057), and that the unconditioned columns actively degraded a
     # downstream model. `credit_payhist` swaps the two at identical epsilon: levels compose
@@ -318,7 +318,7 @@ def titanic_spec() -> DatasetSpec:
 @register("credit_aim12")
 def credit_aim12_spec() -> DatasetSpec:
     """The credit schema minus the three PAY_AMT columns -- the 12-column schema on which AIM
-    converges (§F.2.2's ablation, arm C). Used ONLY to score §F.3's AIM comparison like-for-like:
+    converges (a development ablation). Used ONLY to score that AIM comparison like-for-like:
     every arm, CoRTeC and the real floors included, is scored on these 12 columns. Dropping columns
     from an already-generated table is post-processing and costs no budget; the conditional
     hierarchy, stratification and held-out families of `credit` do not touch the dropped columns."""
@@ -344,7 +344,7 @@ def credit_payhist_spec() -> DatasetSpec:
     """Credit, with the conditional hierarchy ordered by expected predictive strength.
 
     Identical to `credit_spec()` in every respect except the conditional levels: PAY_2 takes the
-    place MARRIAGE held. This is the change §6.11.1 proposes, isolated so the comparison is clean:
+    place MARRIAGE held. This is the change that run suggested, isolated so the comparison is clean:
     same columns, same bounds, same bins, same stratification, same epsilon, same number of levels
     and therefore the same per-level budget.
     """

@@ -121,8 +121,8 @@ def retinopathy_spec() -> DatasetSpec:
             # column by ITS OWN observed min and max, so the declared bounds of (0, 1) hold only
             # because the data was fitted to them. Extremes are the most disclosive statistic a
             # column has -- a single record determines them -- so a release computed on top of
-            # this is not protected by epsilon alone, exactly as `n_min` suppression is not
-            # (§4.4). The Messidor features are confidence-level microaneurysm counts with no
+            # this is not protected by epsilon alone, exactly as `n_min` suppression is not.
+            # The Messidor features are confidence-level microaneurysm counts with no
             # published range, so there is no public constant to substitute; rather than invent
             # one by looking at the data, we keep the transform and declare it. This is the only
             # loader in the project that does anything data-dependent, and retinopathy is an
