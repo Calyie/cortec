@@ -1,0 +1,51 @@
+cff-version: 1.2.0
+title: "CoRTeC: A Differentially Private Release for Synthetic Tabular Data, Decodable by Any Generator"
+message: "If you use this software or the accompanying paper, please cite the paper on arXiv (arXiv:2611.06342)."
+type: software
+license: Apache-2.0
+version: "1.2.6"
+date-released: "2026-11-24"
+doi: "10.5281/zenodo.22945315"
+repository-code: "https://github.com/Calyie/cortec"
+abstract: >-
+  The records that could train the most useful models, such as a hospital's patient files, are
+  often the ones an institution cannot share. We propose CoRTeC, a method that releases synthetic
+  versions of such records under differential privacy. Differential privacy places a proven limit
+  on what the synthetic data can reveal about any person, and in particular on membership
+  inference. CoRTeC spends the privacy budget once, on a small file of noisy counts designed for
+  training a classifier. For each group of records, the file gives the group's size, its balance
+  of outcomes, a histogram of every column for each outcome and the outcome rate in each of
+  several non-overlapping cells. A reviewer can check every number before the file leaves the
+  institution. Anyone can then turn the counts into synthetic rows, as often as they like and at
+  no further privacy cost. A maximum-entropy decoder can do this without any language model, and
+  so can each of the five frozen language models we tested. None of them ever sees a real record.
+  A selection step then matches the rows to the released counts. Decoded without a language model,
+  the automatically configured release at ε = 2 trains classifiers to within 0.02 AUC of a real
+  sample of the same size on the Adult dataset, across three data splits. On NHANES (three splits)
+  and bank marketing (one split), rerun with freshly derived configurations and the selection
+  step, it stays within 0.04 AUC on average. On Adult, with a fixed cohort rule, the release
+  carries the outcome rates a deployment names more closely than a real sample does, at some cost
+  in accuracy on pairs of columns. Four controls show that most of the utility comes from the
+  release and the selection step, and that a language model adds what it knows from the column
+  names. No private row ever reaches a model, and no row CoRTeC generates copies a real one. The
+  strongest membership attack stays far below the bound the budget allows.
+authors:
+  - family-names: "Nnona"
+    given-names: "Calister"
+    email: "research@calisternnona.com"
+identifiers:
+  - type: url
+    value: "https://arxiv.org/abs/2611.06342"
+    description: "The paper on arXiv (cite this)"
+  - type: doi
+    value: "10.5281/zenodo.22945315"
+    description: "The Zenodo record: the paper, the deployment guide, the code and the results"
+preferred-citation:
+  type: article
+  title: "CoRTeC: A Differentially Private Release for Synthetic Tabular Data, Decodable by Any Generator"
+  authors:
+    - family-names: "Nnona"
+      given-names: "Calister"
+  journal: "arXiv preprint arXiv:2611.06342"
+  year: 2026
+  url: "https://arxiv.org/abs/2611.06342"

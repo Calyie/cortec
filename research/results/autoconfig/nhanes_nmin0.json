@@ -1,0 +1,79 @@
+{
+  "conditional_columns": [
+    "age_years",
+    "diastolic_bp",
+    "race_ethnicity"
+  ],
+  "n_levels": 3,
+  "cells_at_finest": 27,
+  "records_per_cell": 37.03703703703704,
+  "epsilon_selection": 0.1,
+  "epsilon_release": 1.9,
+  "coarsen": {
+    "age_years": {
+      "(17.999, 30.0]": "g0",
+      "(30.0, 40.0]": "g0",
+      "(70.0, 80.0]": "g1",
+      "(50.0, 60.0]": "g1",
+      "(40.0, 50.0]": "g2",
+      "(60.0, 70.0]": "g2"
+    },
+    "diastolic_bp": {
+      "(80.0, 90.0]": "g0",
+      "(90.0, 100.0]": "g0",
+      "(60.0, 80.0]": "g1",
+      "(29.999, 60.0]": "g1",
+      "(100.0, 130.0]": "g2"
+    },
+    "race_ethnicity": {
+      "asian_nh": "g0",
+      "other_multi": "g0",
+      "black_nh": "g1",
+      "white_nh": "g1",
+      "mexican_american": "g2",
+      "other_hispanic": "g2"
+    }
+  },
+  "ranking": [
+    [
+      "age_years",
+      0.11528284357601123
+    ],
+    [
+      "diastolic_bp",
+      0.0855796836143263
+    ],
+    [
+      "race_ethnicity",
+      0.08268826567443081
+    ],
+    [
+      "education",
+      0.07789859696801206
+    ],
+    [
+      "systolic_bp",
+      0.06533527746905352
+    ],
+    [
+      "bmi",
+      0.0510080490979427
+    ],
+    [
+      "waist_cm",
+      0.04217110813022545
+    ],
+    [
+      "sex",
+      0.039410481397060486
+    ],
+    [
+      "income_bracket",
+      0.003677835062088803
+    ]
+  ],
+  "notes": [
+    "m=9, median levels=5, |Y|=2, n=3107 -> selection needs eps>=0.029 of the total; using 5%"
+  ],
+  "_provenance": "FROZEN from the original seeded derivation (AUTO_SEED=0) so the results reported in the paper remain reproducible against a recorded configuration. That seeded mechanism did NOT provide the epsilon_sel guarantee it charged; a fresh deployment derives this securely and gets a different configuration."
+}
